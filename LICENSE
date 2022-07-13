@@ -1,0 +1,28 @@
+KFLAT - Linux kernel implementation of the library for fast serialization of C structures
+Copyright (C) 2022 Samsung Electronics Co., Ltd.
+
+This program is free software. All the files in this project may be
+distributed under the terms of the GNU General Public License version 2.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License version 2 for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
+Red-black tree and interval tree implementation was taken
+from the Linux kernel source tree and therefore might be distributed
+under GNU General Public License v.2 or any later version.
+Red Black Trees:
+(C) 1999  Andrea Arcangeli <andrea@suse.de>
+(C) 2002  David Woodhouse <dwmw2@infradead.org>
+(C) 2012  Michel Lespinasse <walken@google.com>
+Interval Trees:
+(C) 2012  Michel Lespinasse <walken@google.com>
+Please see the following files for details:
+- rbtree.c
+- rbtree.h
+- rbtree_augmented.h
+- interval_tree_generic.h

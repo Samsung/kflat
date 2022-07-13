@@ -1,0 +1,4 @@
+export KBUILD_EXTRA_SYMBOLS=${M}/../core/Module.symvers
+ccflags-y := -std=gnu99
+
+obj-m += random_read/
