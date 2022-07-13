@@ -1,0 +1,17 @@
+*.mod.c
+*.cmd
+*.mod
+*.ko
+*.o
+*.so
+*.a
+
+modules.order
+Module.symvers
+.vscode/
+.thinlto-cache
+__pycache__
+
+tools/executor
+tools/imginfo
+tools/kflattest

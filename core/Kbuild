@@ -1,0 +1,11 @@
+TOPDIR := ${M}/../
+ccflags-y := -std=gnu99 -I${TOPDIR}/include/
+
+LINUX_INCLUDES := ${LINUX_INCLUDES} ${TOPDIR}/include/
+
+kflat_core-y = kflat.o kflat_impl.o kflat_recipes.o probing.o kdump.o
+kflat_core-$(CONFIG_ARM64) += probing_arm.o
+kflat_core-$(CONFIG_X86_64) += probing_x86.o
+kflat_core-y += tests/kflat_test.o
+
+obj-m := kflat_core.o
