@@ -132,6 +132,11 @@ int main(int argc, char** argv) {
     if(ret)
         log_abort("invalid options provided");
 
+    if(opts.recipe == NULL)
+        log_abort("you need to specify the ID of target recipe");
+    else if(opts.node == NULL)
+        log_abort("you need to specify the target file used by recipe");
+
     fd = open(KFLAT_NODE, O_RDONLY);
     if(fd < 0)
         log_abort("Failed to open %s - %s", KFLAT_NODE, strerror(errno));
@@ -163,30 +168,43 @@ int main(int argc, char** argv) {
 
 
     // Invoke instrumented function
-    char buf[128];
-    int rd_fd = open(opts.node, O_RDONLY);
+    int oflag = O_RDONLY;
+    if(opts.handler == interface_write)
+        oflag = O_WRONLY;
+    int rd_fd = open(opts.node, oflag);
     if(rd_fd < 0) 
         log_abort("Failed to open %s device - %s", opts.node, strerror(errno));
 
     ret = opts.handler(rd_fd);
-    log_error("%s on node %s returned %d - %s", opts.interface, opts.node, ret, strerror(ret));
+    log_info("%s on node %s returned %d - %s", opts.interface, opts.node, ret, strerror(errno));
     close(rd_fd);
 
 
     // Cleanup
-    ret = ioctl(fd, KFLAT_PROC_DISABLE, 0);
+    struct kflat_ioctl_disable disable = {0};
+    ret = ioctl(fd, KFLAT_PROC_DISABLE, &disable);
     if(ret)
         log_abort("Failed to IOCTL KFLAT_PROC_DISABLE - %s", strerror(errno));
     log_info("Disabled kflat capture mode (IOCTL KFLAT_PROC_DISABLE)");
 
+    if(!disable.invoked)
+        log_abort("Recipe was not invoked. Check whether you're selected correct operation and device");
+    if(disable.error)
+        log_abort("Recipe failed with an error: %d", disable.error);
+
+    log_info("Recipe produced %zu bytes of flattened memory", disable.size);
+    if(disable.size > dump_size)
+        log_abort("Recipe somehow produced image larger than mmaped buffer (kernel bug?)"
+                    " - size: %zu; mmap size: %zu", disable.size, dump_size);
+
     // Save result
     if(opts.output) {
-        int save_fd = open(opts.output, O_RDWR | O_CREAT);
+        int save_fd = open(opts.output, O_RDWR | O_CREAT, 0660);
         if(save_fd < 0)
             log_abort("Failed to open %s - %s", opts.output, strerror(errno));
         
-        for(int i = 0; i < dump_size; ) {
-            ret = write(save_fd, area + i, dump_size - i);
+        for(int i = 0; i < disable.size; ) {
+            ret = write(save_fd, area + i, disable.size - i);
             if(ret == 0) break;
             else if(ret < 0) log_abort("Failed to write %s - %s", opts.output, strerror(errno));
             else i += ret;

@@ -41,6 +41,7 @@ struct kflat_test_case {
 
 const struct kflat_test_case test_cases[] = {
     KFLAT_TEST_CASE(CIRCLE),
+    KFLAT_TEST_CASE(INFO),
     KFLAT_TEST_CASE(STRINGSET),
     KFLAT_TEST_CASE(POINTER),
     KFLAT_TEST_CASE(CURRENTTASK),
@@ -49,9 +50,15 @@ const struct kflat_test_case test_cases[] = {
     KFLAT_TEST_CASE(OVERLAPPTR),
     KFLAT_TEST_CASE(STRUCTARRAY),
     KFLAT_TEST_CASE(RPOINTER),
-    KFLAT_TEST_CASE(CIRCLEARG),
     KFLAT_TEST_CASE(GLOBALCHECK),
     KFLAT_TEST_CASE(PADDING),
+    KFLAT_TEST_CASE(GETOBJECTCHECK),
+    KFLAT_TEST_CASE(LIST),
+    KFLAT_TEST_CASE(LISTHEAD),
+    KFLAT_TEST_CASE(HLIST),
+    KFLAT_TEST_CASE(LLIST),
+    KFLAT_TEST_CASE(HNULLSLIST),
+    KFLAT_TEST_CASE(RBNODE),
 };
 
 int64_t name_to_test(char* name) {
@@ -75,7 +82,8 @@ int run_test(struct args* args, int no) {
     int ret;
     char out_name[128];
     bool success = false;
-    size_t flat_size = 10 * 1024 * 1024;   // 10MB
+    const size_t flat_size = 10 * 1024 * 1024;   // 10MB
+    size_t output_size;
     
     log_info("starting test %s...", test_cases[no].name);
 
@@ -100,26 +108,31 @@ int run_test(struct args* args, int no) {
         goto close_fd;
     }
 
-    ret = ioctl(fd, KFLAT_TESTS, KFLAT_TEST_TO_ARG(no, args->flags));
-    if(ret) {
+    output_size = ioctl(fd, KFLAT_TESTS, KFLAT_TEST_TO_ARG(no, args->flags));
+    if(ret < 0) {
         log_error("failed to execute KFLAT_TEST ioctl - %s", strerror(errno));
         goto munmap_area;
     }
 
+    if(output_size > flat_size)
+        log_abort("recipe somehow produced image larger than mmaped buffer (kernel bug?)"
+                    " - size: %zu; mmap size: %zu", output_size, flat_size);
+    log_info("recipe produced %zu bytes of flattened memory", output_size);
+
     // Save kflat image
     if(args->output_dir) {
-        snprintf(out_name, sizeof(out_name), "%s/flat_%d.img", args->output_dir, no);
+        snprintf(out_name, sizeof(out_name), "%s/flat_%s.img", args->output_dir, test_cases[no].name);
 
-        int save_fd = open(out_name, O_WRONLY | O_CREAT);
+        int save_fd = open(out_name, O_WRONLY | O_CREAT, 0700);
         if(save_fd < 0) {
             log_error("failed to save flatten image to file %s - %s", out_name, strerror(errno));
             goto munmap_area;
         }
 
         do {
-            ret = write(save_fd, area, flat_size);
+            ret = write(save_fd, area, output_size);
             if(ret > 0)
-                flat_size -= ret;
+                output_size -= ret;
         } while(ret > 0);
         if(ret < 0) {
             log_error("failed to write flatten image to file %s - %s", out_name, strerror(errno));
@@ -238,7 +251,12 @@ int main(int argc, char** argv) {
         return 0;
     }
     if(opts.output_dir) {
-        mkdir("opts.output_dir", 0770);
+        if (mkdir(opts.output_dir, 0770)<0) {
+        	if (errno!=EEXIST) {
+        		log_info("Could not create directory: %s [error: %s]", opts.output_dir, strerror(errno));
+        		exit(1);
+        	}
+        }
         log_info("will be using %s as output directory", opts.output_dir);
     }
     if(opts.test && !opts.output_dir) {

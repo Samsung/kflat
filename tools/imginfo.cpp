@@ -13,11 +13,20 @@
 #include <cstdio>
 #include <cstdint>
 #include <cstring>
+#include <cstddef>
 
 #include <set>
 #include <string>
 
 #include "../lib/unflatten.hpp"
+
+extern "C" {
+#include <rbtree.h>
+}
+
+#define container_of(ptr, type, member) ({			\
+  	const typeof( ((type *)0)->member ) *__mptr = (ptr);	\
+  	(type *)( (char *)__mptr - offsetof(type,member) );})
 
 /* Structures used in kflat tests */
 struct task_struct {
@@ -133,6 +142,40 @@ void walk_print_task_struct(struct task_struct* T,std::set<struct task_struct*>&
 	}
 }
 
+struct string_node {
+	struct rb_node node;
+	const char* s;
+};
+
+static void stringset_nprint(const struct rb_root* root, size_t n) {
+
+	struct rb_node * p = rb_first(root);
+	printf("[\n");
+	size_t i=0;
+	while(p) {
+		struct string_node* data = (struct string_node*)p;
+		printf("  %s\n",data->s);
+		p = rb_next(p);
+		if (p && (i>=n-1)) {
+			printf("  ...\n");
+			break;
+		}
+		++i;
+	}
+	printf("]\n");
+}
+
+static size_t stringset_count(const struct rb_root* root) {
+
+	struct rb_node * p = rb_first(root);
+	size_t count = 0;
+	while(p) {
+		count++;
+		p = rb_next(p);
+	}
+	return count;
+}
+
 struct fptr_test_struct {
 	int i;
 	long l;
@@ -242,6 +285,97 @@ struct paddingRoot {
 	struct paddingC* c;
 };
 
+struct list_head {
+	struct list_head *next, *prev;
+};
+
+struct myLongList {
+	int k;
+	struct list_head v;
+};
+
+struct myLongHeadList {
+	int k;
+	struct list_head v;
+};
+
+struct hlist_node {
+	struct hlist_node *next, **pprev;
+};
+
+struct hlist_head {
+	struct hlist_node *first;
+};
+
+struct myLongHList {
+	int k;
+	struct hlist_node r;
+};
+
+struct hlist_nulls_head {
+	struct hlist_nulls_node *first;
+};
+
+struct hlist_nulls_node {
+	struct hlist_nulls_node *next, **pprev;
+};
+
+struct myLongHnullsList {
+	int k;
+	struct hlist_nulls_node n;
+};
+
+struct llist_node {
+	struct llist_node *next;
+};
+
+struct llist_head {
+	struct llist_node *first;
+};
+
+struct myLongLList {
+	int k;
+	struct llist_node l;
+};
+
+struct myTreeNode {
+	int i;
+	struct rb_node inode;
+	struct K {
+		char c;
+		double d;
+	} k;
+	struct rb_node snode;
+	char* s;
+};
+
+static inline int is_a_nulls(const struct hlist_nulls_node *ptr)
+{
+	return ((unsigned long)ptr & 1);
+}
+
+static size_t strset_count(const struct rb_root* root) {
+
+	struct rb_node * p = rb_first(root);
+	size_t count = 0;
+	while(p) {
+		count++;
+		p = rb_next(p);
+	}
+	return count;
+}
+
+static size_t intset_count(const struct rb_root* root) {
+
+	struct rb_node * p = rb_first(root);
+	size_t count = 0;
+	while(p) {
+		count++;
+		p = rb_next(p);
+	}
+	return count;
+}
+
 int main(int argc, char* argv[]) {
 	int ret;
 
@@ -335,9 +469,9 @@ int main(int argc, char* argv[]) {
 		return 0;
 	}
 	else if ((!strcmp(argv[2],"STRINGSET"))||(!strcmp(argv[2],"STRINGSETM"))) {
-		// const struct rb_root* root = ROOT_POINTER_NEXT(const struct rb_root*);
-		// printf("stringset size: %zu\n",stringset_count(root));
-		// stringset_nprint(root,10);
+		const struct rb_root* root = (struct rb_root*)flatten.get_next_root();
+		printf("stringset size: %zu\n",stringset_count(root));
+		stringset_nprint(root,10);
 		return 0;
 	}
 	else if (!strcmp(argv[2],"POINTER")) {
@@ -381,6 +515,99 @@ int main(int argc, char* argv[]) {
 		printf("b: %c \n", pr->b->c);
 		printf("a1: %d\n", pr->a1->i);
 		printf("c: %c \n", pr->c->c);
+		return 0;
+	}
+	else if (!strcmp(argv[2],"LIST")) {
+		struct list_head *p;
+		size_t list_size = 0;
+		struct myLongList* myhead = (struct myLongList*)flatten.get_next_root();
+		printf("[ ");
+		for (p = (&myhead->v)->next; p != (&myhead->v); p = p->next) {
+			struct myLongList *entry = container_of(p, struct myLongList, v);
+			printf("%d ",entry->k);
+			list_size++;
+		}
+		printf("]\n");
+		printf("List size: %zu\n",list_size);
+		return 0;
+	}
+	else if (!strcmp(argv[2],"LISTHEAD")) {
+		struct list_head* lhead = (struct list_head*)flatten.get_seq_root(0);
+		struct list_head *p;
+		size_t list_size = 0;
+		printf("[ ");
+		for (p = lhead->next; p != lhead; p = p->next) {
+			struct myLongHeadList *entry = container_of(p, struct myLongHeadList, v);
+			printf("%d ",entry->k);
+			list_size++;
+		}
+		printf("]\n");
+		printf("List size: %zu\n",list_size);
+		return 0;
+	}
+	else if (!strcmp(argv[2],"HLIST")) {
+		struct hlist_head* harr = (struct hlist_head*)flatten.get_seq_root(0);
+		struct hlist_node *p;
+		for (int i=0; i<5; ++i) {
+			unsigned long list_size = 0;
+			printf("h%d: [ ",i);
+			for (p = (&harr[i])->first; p ; p = p->next) {
+				struct myLongHList *entry = container_of(p, struct myLongHList, r);
+				printf("%d ",entry->k);
+				list_size++;
+			}
+			printf("]: size %lu\n",list_size);
+		}
+		return 0;
+	}
+	else if (!strcmp(argv[2],"HNULLSLIST")) {
+		struct hlist_nulls_head* hnarr = (struct hlist_nulls_head*)flatten.get_seq_root(0);
+		struct hlist_nulls_node *p;
+		for (int i=0; i<5; ++i) {
+			unsigned long list_size = 0;
+			printf("hn%d: [ ",i);
+			struct myLongHnullsList *entry;
+			for (p = (&hnarr[i])->first;
+			     (!is_a_nulls(p)) &&
+				({ entry = container_of(p, typeof(*entry), n); 1;});
+			     p = p->next) {
+				printf("%d ",entry->k);
+				list_size++;
+			}
+			printf("]: size %lu\n",list_size);
+		}
+		return 0;
+	}
+	else if (!strcmp(argv[2],"LLIST")) {
+		struct llist_head* lhead = (struct llist_head*)flatten.get_seq_root(0);
+		struct llist_node *p;
+		size_t list_size = 0;
+		printf("[ ");
+		for ((p) = (lhead->first); p; (p) = (p)->next) {
+			struct myLongLList *entry = container_of(p, struct myLongLList, l);
+			list_size++;
+			printf("%d ",entry->k);
+		}
+		printf("]: size %lu\n",list_size);
+		return 0;
+	}
+	else if (!strcmp(argv[2],"RBNODE")) {
+		struct rb_root* iroot = (struct rb_root*)flatten.get_seq_root(0);
+		struct rb_root* sroot = (struct rb_root*)flatten.get_seq_root(1);
+		printf("strset size: %lu\n",strset_count(sroot));
+		struct rb_node * sf = rb_first(sroot);
+		struct myTreeNode *sfentry = container_of(sf, struct myTreeNode, snode);
+		printf("%s\n",sfentry->s);
+		struct rb_node * sl = rb_last(sroot);
+		struct myTreeNode *slentry = container_of(sl, struct myTreeNode, snode);
+		printf("%s\n",slentry->s);
+		printf("intset size: %lu\n",intset_count(iroot));
+		struct rb_node * intf = rb_first(iroot);
+		struct myTreeNode *ifentry = container_of(intf, struct myTreeNode, inode);
+		printf("%d\n",ifentry->i);
+		struct rb_node * intl = rb_last(iroot);
+		struct myTreeNode *ilentry = container_of(intl, struct myTreeNode, inode);
+		printf("%d\n",ilentry->i);
 		return 0;
 	}
 

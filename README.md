@@ -1,6 +1,6 @@
 # Kflat: Kernel memory flattening module
 
-**Kflat** is a Linux kernel implementation of the library for fast serialization of C structures. It works by making a copy of the kernel memory for indicated variables and structures. Such copy can be used to recreate the layout of kernel memory in userspace process, for instance in auto-of-target project.
+**Kflat** is a Linux kernel implementation of the library for fast serialization of C structures. It works by making a copy of the kernel memory for indicated variables and structures. Such copy can be used to recreate the layout of kernel memory in userspace process, for instance in [Auto off-Target](https://github.com/Samsung/auto_off_target) project.
 
 Currently supported architectures are x86_64 and ARM64.
 
@@ -16,24 +16,14 @@ After collecting the above requirements, you can build kflat for your target arc
 ```sh
 export KERNEL_DIR="<path to kernel source>"
 export CLANG_DIR="<path to clang directory>"
-make KDIR=$KERNEL_DIR                   \
-    ARCH=arm64                          \
-    CROSS_COMPILE=aarch64-linux-gnu-    \
-    CC=$CLANG_DIR/bin/clang.real        \
-    CFLAGS="--target=aarch64-linux-gnu --prefix=aarch64-linux-gnu-" \
-    LD=$CLANG_DIR/bin/ld.lld            \
-    CXX=aarch64-linux-gnu-g++
+make KDIR=$KERNEL_DIR CCDIR=$CLANG_DIR ARCH=arm64
 ```
 
 **x86_64**:
 ```sh
 export KERNEL_DIR="<path to kernel source>"
 export CLANG_DIR="<path to clang directory>"
-make KDIR=$KERNEL_DIR                   \
-    ARCH=x86_64                         \
-    CC=$CLANG_DIR/bin/clang.real        \
-    LD=$CLANG_DIR/bin/ld.lld            \
-    CXX=g++
+make KDIR=$KERNEL_DIR CCDIR=$CLANG_DIR ARCH=x86_64
 ```
 
 ## Project layout
@@ -89,10 +79,10 @@ Kflat is equipped with set of basic tests to ensure that all the functionalities
 ./kflattest ALL
 
 # Run test CIRCLE and save its output to directory `output`
-./kflattest -o output circle
+./kflattest -o output CIRCLE
 ```
 
-Created memory dumps can be analyzed by using `imginfo` program (formerly called `main.cpp` in original kflat repository). As an arguments, `imginfo` takes the name of test that has been run and memory dump associated with it. Under hood, the dumped memory is recreated in userspace and processed to determine whether all parts of it were correcly saved and restored.
+Created memory dumps can be analyzed by using `imginfo` program (formerly called `main.cpp` in original kflat repository). As an arguments, `imginfo` takes the name of test that has been run and memory dump associated with it. Under the hood, the dumped memory is recreated in userspace and processed to determine whether all parts of it were correcly saved and restored.
 
 `kflattest` is capable of executing `imginfo` app on every test result. To use this functionality, simply add `-t ./imginfo` option to cmdline
 
@@ -102,9 +92,9 @@ Created memory dumps can be analyzed by using `imginfo` program (formerly called
 ```
 
 ### Prepare kflat recipe
-Kflat requires a description of target memory called _kflat recipe_. Vast and extensive documentation of recipes format can be found on dedicated KB article available [here](https://kb.sprc.samsung.pl/pages/viewpage.action?spaceKey=SELSECU&title=kflat). For sample recipes, refer to directory `recipes/`.
+Kflat requires a description of target memory called _kflat recipe_. Vast and extensive documentation of recipes format is pending. For sample recipes, refer to directory `recipes/`.
 
-Script for automatic generation of such recipes for any given kernel structure is under development. The current revision can be find in `utils/` directory.
+Script for automatic generation of such recipes for any given kernel structure is under development. The current revision can be found in `utils/` directory.
 
 ### Execute kflat recipe
 To execute selected kflat recipe, use `executor` app located in `tools/` directory. The basic usage looks as follow:
@@ -133,8 +123,6 @@ int main(int argc, char** argv) {
     assert(flatten.load(in, NULL) == 0);
 
     const struct A* pA = (const struct A*) flatten.get_next_root();
-    
-    flatten.unload();
 }
 ```
 

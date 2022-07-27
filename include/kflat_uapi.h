@@ -20,6 +20,12 @@ struct kflat_ioctl_enable {
     char    target_name[128];
 };
 
+struct kflat_ioctl_disable {
+	int		invoked;
+	size_t	size;
+	int 	error;
+};
+
 struct kflat_ioctl_mem_map {
 	void* buffer;
 	size_t size;
@@ -40,7 +46,6 @@ enum kflat_test_codes {
 	OVERLAPPTR,
 	STRUCTARRAY,
 	RPOINTER,
-	CIRCLEARG,
 	GLOBALCHECK,
 	PADDING,
 	GETOBJECTCHECK,
@@ -50,6 +55,7 @@ enum kflat_test_codes {
 	LLIST,
 	HNULLSLIST,
 	RBNODE,
+	INFO,
 };
 
 #define KFLAT_TEST_TO_ARG(CODE, FLAG)       ((uint64_t) CODE << 2 | FLAG)
@@ -59,7 +65,7 @@ enum kflat_test_codes {
 
 #define KFLAT_INIT					_IOW('k', 1, struct kflat_ioctl_init)
 #define KFLAT_PROC_ENABLE			_IOW('k', 2, struct kflat_ioctl_enable)
-#define KFLAT_PROC_DISABLE			_IO ('k', 3)
+#define KFLAT_PROC_DISABLE			_IOR('k', 3, struct kflat_ioctl_disable)
 #define KFLAT_TESTS     			_IOW('k', 4, uint64_t)
 #define KFLAT_MEMORY_MAP			_IOR('k', 5, struct kflat_ioctl_mem_map)
 

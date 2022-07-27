@@ -1,4 +1,4 @@
-#define KFLAT_RECIPE_LIST(...)            struct kflat_recipe __kflat_recipes_list[] = { __VA_ARGS__ }
+#define KFLAT_RECIPE_LIST(...)            static struct kflat_recipe __kflat_recipes_list[] = { __VA_ARGS__ }
 #define KFLAT_RECIPE(SYM, FUNC)         {.owner = THIS_MODULE, .symbol = SYM, .handler= FUNC}
 
 #define KFLAT_RECIPE_MODULE(DESC)       \

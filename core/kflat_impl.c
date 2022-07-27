@@ -1,110 +1,25 @@
+/**
+ * @file kflat_impl.c
+ * @author Samsung R&D Poland - Mobile Security Group
+ * @brief Main implementation of kflat fast serialization
+ * 
+ */
+
 #include "kflat.h"
 
-#include "../../mm/slab.h"
-#include <linux/vmalloc.h>
-#include <linux/module.h>
 #include <linux/interval_tree_generic.h>
+#include <linux/module.h>
 #include <linux/version.h>
+#include <linux/vmalloc.h>
+
+
+/* Nasty include, but we need some of the macros that for whatever
+ *  reasons are stored in header files located outside of include/ dir */
+#include "../../mm/slab.h"
+
 
 #define START(node) ((node)->start)
 #define LAST(node)  ((node)->last)
-
-int kflat_g_filter_pid_cache;
-int kflat_g_debug_cache;
-struct rb_root if_fns = RB_ROOT;
-
-struct ifns_node* ifns_search(const char* s) {
-
-	struct rb_node *node = if_fns.rb_node;
-
-	while (node) {
-		struct ifns_node* data = container_of(node, struct ifns_node, node);
-
-		if (strcmp(s,data->s)<0) {
-			node = node->rb_left;
-		}
-		else if (strcmp(s,data->s)>0) {
-			node = node->rb_right;
-		}
-		else
-			return data;
-	}
-
-	return 0;
-}
-EXPORT_SYMBOL_GPL(ifns_search);
-
-int ifns_insert(const char* s, void* arg) {
-
-	struct ifns_node* data = libflat_zalloc(1,sizeof(struct ifns_node));
-	struct rb_node **new, *parent = 0;
-	data->s = libflat_zalloc(1,strlen(s)+1);
-	strcpy(data->s,s);
-	data->f = arg;
-	new = &(if_fns.rb_node);
-
-	/* Figure out where to put new node */
-	while (*new) {
-		struct ifns_node* this = container_of(*new, struct ifns_node, node);
-
-		parent = *new;
-		if (strcmp(data->s,this->s)<0)
-			new = &((*new)->rb_left);
-		else if (strcmp(data->s,this->s)>0)
-			new = &((*new)->rb_right);
-		else {
-		    libflat_free((void*)data->s);
-		    libflat_free(data);
-		    return 0;
-		}
-	}
-
-	/* Add new node and rebalance tree. */
-	rb_link_node(&data->node, parent, new);
-	rb_insert_color(&data->node, &if_fns);
-
-	return 1;
-}
-EXPORT_SYMBOL_GPL(ifns_insert);
-
-int ifns_delete(const char* s) {
-
-	struct ifns_node* node = ifns_search(s);
-	if (node) {
-		rb_erase(&node->node, &if_fns);
-		return 1;
-	}
-	return 0;
-}
-EXPORT_SYMBOL_GPL(ifns_delete);
-
-void ifns_destroy(void) {
-
-	struct rb_root* root = &if_fns;
-	struct rb_node * p = rb_first(root);
-    while(p) {
-        struct ifns_node* data = (struct ifns_node*)p;
-        rb_erase(p, root);
-        p = rb_next(p);
-        libflat_free((void*)data->s);
-        libflat_free(data);
-    }
-}
-EXPORT_SYMBOL_GPL(ifns_destroy);
-
-size_t ifns_count(void) {
-
-	const struct rb_root* root = &if_fns;
-	struct rb_node * p = rb_first(root);
-	size_t count = 0;
-	while(p) {
-		count++;
-		p = rb_next(p);
-	}
-	return count;
-}
-EXPORT_SYMBOL_GPL(ifns_count);
-
 INTERVAL_TREE_DEFINE(struct flat_node, rb,
 		     uintptr_t, __subtree_last,
 		     START, LAST,static,interval_tree)
@@ -241,11 +156,8 @@ int binary_stream_calculate_index(struct kflat* kflat) {
 	size_t index=0;
     while(p) {
     	struct blstream* cp = p;
-#if 1
     	size_t align=0;
-#endif
     	p = p->next;
-#if 1
     	if (cp->alignment) {
     		struct blstream* v;
     		unsigned char* padding = kflat_zalloc(kflat,cp->alignment,1);
@@ -264,7 +176,6 @@ int binary_stream_calculate_index(struct kflat* kflat) {
     		v->index = index;
     		index+=v->size;
     	}
-#endif
 
     	cp->index = index;
     	index+=cp->size;
@@ -1796,3 +1707,80 @@ void* flatten_global_address(const char* module, uint64_t offset) {
 }
 #endif
 EXPORT_SYMBOL_GPL(flatten_global_address);
+
+
+/*******************************************************
+ * KFLAT RECIPES REGISTRY
+ *******************************************************/
+LIST_HEAD(kflat_recipes_registry);
+DEFINE_MUTEX(kflat_recipes_registry_lock);
+
+int kflat_recipe_register(struct kflat_recipe* recipe) {
+    int ret = 0;
+    struct kflat_recipe* entry = NULL;
+
+    if(!recipe || !recipe->owner || !recipe->symbol || !recipe->handler) {
+        pr_err("cannot register incomplete recipe");
+        return -EINVAL;
+    }
+
+    mutex_lock(&kflat_recipes_registry_lock);
+
+    // Check for name duplicates
+    list_for_each_entry(entry, &kflat_recipes_registry, list) {
+        if(!strcasecmp(entry->symbol, recipe->symbol)) {
+            pr_err("cannot register the same recipe twice");
+            ret = -EBUSY;
+            goto exit;
+        }
+    }
+    list_add(&recipe->list, &kflat_recipes_registry);
+
+exit:
+    mutex_unlock(&kflat_recipes_registry_lock);
+    return ret;
+}
+EXPORT_SYMBOL_GPL(kflat_recipe_register);
+
+
+int kflat_recipe_unregister(struct kflat_recipe* recipe) {
+    int ret = -EINVAL;
+    struct kflat_recipe* entry;
+    
+    mutex_lock(&kflat_recipes_registry_lock);
+    list_for_each_entry(entry, &kflat_recipes_registry, list) {
+        if(entry == recipe) {
+            list_del(&entry->list);
+            goto exit;
+        }
+    }
+
+exit:
+    mutex_unlock(&kflat_recipes_registry_lock);
+    return ret;
+}
+EXPORT_SYMBOL_GPL(kflat_recipe_unregister);
+
+
+struct kflat_recipe* kflat_recipe_get(char* name) {
+    struct kflat_recipe* entry, *ret = NULL;
+    
+    mutex_lock(&kflat_recipes_registry_lock);
+    list_for_each_entry(entry, &kflat_recipes_registry, list) {
+        if(!strcasecmp(entry->symbol, name)) {
+            ret = entry;
+            break;
+        }
+    }
+    mutex_unlock(&kflat_recipes_registry_lock);
+
+    if(ret)
+        try_module_get(ret->owner); // TODO: Error handling
+    return ret;
+}
+
+void kflat_recipe_put(struct kflat_recipe* recipe) {
+    if(recipe == NULL)
+        return;
+    module_put(recipe->owner);
+}

@@ -1,95 +1,21 @@
+/**
+ * @file kflat_test.c
+ * @author Samsung R&D Poland - Mobile Security Group
+ * @brief Collection of basic functions and recipes used for testing kflat
+ * 
+ */
+
 #include "kflat.h"
 
 #include <linux/init.h>
+#include <linux/interval_tree_generic.h>
+#include <linux/list_nulls.h>
 #include <linux/mm.h>
 #include <linux/printk.h>
 #include <linux/random.h>
 #include <linux/slab.h>
 #include <linux/vmalloc.h>
-#include <linux/interval_tree_generic.h>
-#include <linux/list_nulls.h>
 
-/* Global variables for flatten test */
-
-int kflat_global_int;
-
-enum kflat_global_enum {
-	kflat_global_enum_val0,
-	kflat_global_enum_val1,
-};
-
-enum kflat_global_enum kflat_global_enum_named;
-enum kflat_global_enum kflat_global_enum_named_array[5];
-
-enum { kflat_global_enum_n_val0, kflat_global_enum_n_val1 } kflat_global_enum_nonamed;
-
-typedef enum kflat_global_enum kflat_global_enum_t;
-kflat_global_enum_t kflat_global_enum_typedef;
-kflat_global_enum_t* kflat_global_enum_typedef_pointer;
-
-struct kflat_global_struct {
-	int i;
-};
-
-union kflat_global_union {
-	int i;
-	long l;
-};
-
-struct kflat_global_struct kflat_global_struct;
-union kflat_global_union kflat_global_union;
-
-struct { int i; } kflat_global_struct_nonamed;
-
-int kflat_global_int_array[20];
-struct kflat_global_struct kflat_global_struct_array[5];
-
-struct { int i; } kflat_global_struct_nonamed_array[2];
-
-int* kflat_global_int_p = &kflat_global_int;
-int** kflat_global_int_pp = &kflat_global_int_p;
-
-struct kflat_global_struct* kflat_global_struct_p = &kflat_global_struct;
-struct kflat_global_struct* kflat_global_struct_pa = kflat_global_struct_array;
-struct kflat_global_struct** kflat_global_struct_pp = &kflat_global_struct_p;
-enum kflat_global_enum* kflat_global_enum_named_p = &kflat_global_enum_named;
-
-struct kflat_global_struct** kflat_global_struct_pp_array[9];
-
-char* kflat_global_string = "kflat";
-void* kfalt_global_void = "kflat";
-
-void (*kflat_global_fun)(int);
-void (*kflat_global_fun_array[12])(int);
-
-typedef void (*kflat_global_fun_t)(int);
-kflat_global_fun_t kflat_global_function_pointer_array_typedef[3];
-
-int* kflat_global_pointer_array[8];
-const char* kflat_global_string_array[4];
-struct kflat_global_struct* kflat_global_struct_pointer_array[4];
-
-typedef int myInt;
-typedef myInt myIntInt;
-typedef myIntInt myIntIntInt;
-
-myIntIntInt kflat_global_typedef_int;
-
-typedef struct kflat_global_struct my_global_struct_t;
-my_global_struct_t kflat_global_struct_typedef;
-
-typedef struct kflat_global_struct my_global_struct_array_t[2];
-my_global_struct_array_t kflat_global_struct_typedef_array;
-
-my_global_struct_t* kflat_global_struct_pointer_typedef;
-
-struct kflat_struct_forward;
-struct kflat_struct_forward* kflat_global_struct_forward;
-
-myIntInt kflat_global_typedef_int_array[20];
-my_global_struct_t global_typedef_struct_array[5];
-
-/* done */
 
 #define START(node) ((node)->start)
 #define LAST(node)  ((node)->last)
@@ -97,6 +23,939 @@ my_global_struct_t global_typedef_struct_array[5];
 INTERVAL_TREE_DEFINE(struct flat_node, rb,
 		     uintptr_t, __subtree_last,
 		     START, LAST,static __used,interval_tree)
+
+/*******************************************************
+ * TEST CASE #1
+ *******************************************************/
+struct B {
+	unsigned char T[4];
+};
+struct A {
+	unsigned long X;
+	struct B* pB;
+};
+
+FUNCTION_DEFINE_FLATTEN_STRUCT(B);
+
+FUNCTION_DEFINE_FLATTEN_STRUCT(A,
+    AGGREGATE_FLATTEN_STRUCT(B,pB);
+);
+
+static int kflat_simple_test(struct kflat *kflat) {
+
+	int err = 0;
+	struct B b = { "ABC" };
+	struct A a = { 0x0000404F, &b };
+	struct A* pA = &a;
+	struct A* vpA = (struct A*) 0xdeadbeefdabbad00;
+
+	flatten_init(kflat);
+
+	FOR_ROOT_POINTER(pA,
+		FLATTEN_STRUCT(A, vpA);
+		FLATTEN_STRUCT(A, pA);
+	);
+
+	flat_infos("@Flatten done: %d\n",kflat->errno);
+	if (!kflat->errno) {
+		err = flatten_write(kflat);
+	}
+	flatten_fini(kflat);
+
+	return err;
+
+}
+
+/*******************************************************
+ * TEST CASE #2
+ *******************************************************/
+struct my_list_head {
+	struct my_list_head* prev;
+	struct my_list_head* next;
+};
+struct intermediate {
+	struct my_list_head* plh;
+};
+struct my_task_struct {
+	int pid;
+	struct intermediate* im;
+	struct my_list_head u;
+	float w;
+};
+/* RECURSIVE version */
+FUNCTION_DEFINE_FLATTEN_STRUCT(my_list_head,
+	AGGREGATE_FLATTEN_STRUCT(my_list_head,prev);
+	AGGREGATE_FLATTEN_STRUCT(my_list_head,next);
+);
+
+FUNCTION_DEFINE_FLATTEN_STRUCT(intermediate,
+	AGGREGATE_FLATTEN_STRUCT(my_list_head,plh);
+);
+
+FUNCTION_DEFINE_FLATTEN_STRUCT(my_task_struct,
+	AGGREGATE_FLATTEN_STRUCT(intermediate,im);
+	AGGREGATE_FLATTEN_STRUCT(my_list_head,u.prev);
+	AGGREGATE_FLATTEN_STRUCT(my_list_head,u.next);
+);
+
+/* ITER version */
+FUNCTION_DECLARE_FLATTEN_STRUCT_ITER(my_list_head);
+FUNCTION_DECLARE_FLATTEN_STRUCT_ITER(intermediate);
+FUNCTION_DECLARE_FLATTEN_STRUCT_ITER(my_task_struct);
+
+FUNCTION_DEFINE_FLATTEN_STRUCT_ITER(my_list_head,
+	AGGREGATE_FLATTEN_STRUCT_ITER(my_list_head,prev);
+	AGGREGATE_FLATTEN_STRUCT_ITER(my_list_head,next);
+);
+
+FUNCTION_DEFINE_FLATTEN_STRUCT_ITER(intermediate,
+	AGGREGATE_FLATTEN_STRUCT_ITER(my_list_head,plh);
+);
+
+FUNCTION_DEFINE_FLATTEN_STRUCT_ITER(my_task_struct,
+	AGGREGATE_FLATTEN_STRUCT_ITER(intermediate,im);
+	AGGREGATE_FLATTEN_STRUCT_ITER(my_list_head,u.prev);
+	AGGREGATE_FLATTEN_STRUCT_ITER(my_list_head,u.next);
+);
+
+static int kflat_overlaplist_test(struct kflat *kflat) {
+	int err = 0;
+	struct my_task_struct T;
+	struct intermediate IM = {&T.u};
+
+	T.pid = 123;
+	T.im = &IM;
+	T.u.prev = T.u.next = &T.u;
+	T.w = 1.0;
+
+	flatten_init(kflat);
+
+	FOR_ROOT_POINTER(&T,
+		FLATTEN_STRUCT(my_task_struct,&T);
+	);
+
+	flat_infos("@Flatten done: %d\n",kflat->errno);
+	if (!kflat->errno) {
+		err = flatten_write(kflat);
+	}
+	flatten_fini(kflat);
+
+	return err;
+}
+
+static int kflat_overlaplist_test_iter(struct kflat *kflat) {
+	int err = 0;
+	struct my_task_struct T;
+	struct intermediate IM = {&T.u};
+
+	T.pid = 123;
+	T.im = &IM;
+	T.u.prev = T.u.next = &T.u;
+	T.w = 1.0;
+
+	flatten_init(kflat);
+	
+
+	FOR_ROOT_POINTER(&T,
+		UNDER_ITER_HARNESS(
+			FLATTEN_STRUCT_ITER(my_task_struct,&T);
+		);
+	);
+
+	flat_infos("@Flatten done: %d\n",kflat->errno);
+	if (!kflat->errno) {
+		err = flatten_write(kflat);
+	}
+	flatten_fini(kflat);
+
+	return err;
+}
+
+/*******************************************************
+ * TEST CASE #3
+ *******************************************************/
+typedef struct struct_B {
+	int i;
+} my_B;
+typedef struct struct_A {
+	unsigned long ul;
+	my_B* pB0;
+	my_B* pB1;
+	my_B* pB2;
+	my_B* pB3;
+	char* p;
+} my_A;
+
+/* RECURSIVE version */
+FUNCTION_DEFINE_FLATTEN_STRUCT_TYPE(my_B);
+
+FUNCTION_DEFINE_FLATTEN_STRUCT_TYPE(my_A,
+	STRUCT_ALIGN(64);
+	AGGREGATE_FLATTEN_STRUCT_TYPE(my_B,pB0);
+	AGGREGATE_FLATTEN_STRUCT_TYPE(my_B,pB1);
+	AGGREGATE_FLATTEN_STRUCT_TYPE(my_B,pB2);
+	AGGREGATE_FLATTEN_STRUCT_TYPE(my_B,pB3);
+	AGGREGATE_FLATTEN_STRING(p);
+);
+
+/* ITER version */
+FUNCTION_DEFINE_FLATTEN_STRUCT_TYPE_ITER(my_B);
+
+FUNCTION_DEFINE_FLATTEN_STRUCT_TYPE_ITER(my_A,
+	STRUCT_ALIGN(120);
+	AGGREGATE_FLATTEN_STRUCT_TYPE_ITER(my_B,pB0);
+	AGGREGATE_FLATTEN_STRUCT_TYPE_ITER(my_B,pB1);
+	AGGREGATE_FLATTEN_STRUCT_TYPE_ITER(my_B,pB2);
+	AGGREGATE_FLATTEN_STRUCT_TYPE_ITER(my_B,pB3);
+	AGGREGATE_FLATTEN_STRING(p);
+);
+
+static int kflat_overlapptr_test(struct kflat *kflat) {
+	int err = 0;
+	my_B arrB[4] = {{1},{2},{3},{4}};
+	my_A T[3] = {{},{0,&arrB[0],&arrB[1],&arrB[2],&arrB[3],"p in struct A"},{}};
+	unsigned char* p;
+
+	flatten_init(kflat);
+	
+
+	flat_infos("sizeof(struct A): %zu\n",sizeof(my_A));
+	flat_infos("sizeof(struct B): %zu\n",sizeof(my_B));
+
+	p = (unsigned char*)&T[1]-8;
+	FOR_ROOT_POINTER(p,
+		FLATTEN_TYPE_ARRAY(unsigned char,p,sizeof(struct A)+16);
+	);
+
+	FOR_ROOT_POINTER(&T[1],
+		FLATTEN_STRUCT_TYPE(my_A,&T[1]);
+	);
+
+	flat_infos("@Flatten done: %d\n",kflat->errno);
+	if (!kflat->errno) {
+		err = flatten_write(kflat);
+	}
+	flatten_fini(kflat);
+
+	return err;
+}
+
+static int kflat_overlapptr_test_iter(struct kflat *kflat) {
+	int err = 0;
+	my_B arrB[4] = {{1},{2},{3},{4}};
+	my_A T[3] = {{},{0,&arrB[0],&arrB[1],&arrB[2],&arrB[3],"p in struct A"},{}};
+	unsigned char* p;
+
+	flatten_init(kflat);
+	
+
+	flat_infos("sizeof(struct A): %zu\n",sizeof(my_A));
+	flat_infos("sizeof(struct B): %zu\n",sizeof(my_B));
+
+	p = (unsigned char*)&T[1]-8;
+	FOR_ROOT_POINTER(p,
+		FLATTEN_TYPE_ARRAY(unsigned char,p,sizeof(struct A)+16);
+	);
+
+	FOR_ROOT_POINTER(&T[1],
+		UNDER_ITER_HARNESS(
+			FLATTEN_STRUCT_TYPE_ITER(my_A,&T[1]);
+		);
+	);
+
+	flat_infos("@Flatten done: %d\n",kflat->errno);
+	if (!kflat->errno) {
+		err = flatten_write(kflat);
+	}
+	flatten_fini(kflat);
+
+	return err;
+}
+
+
+/*******************************************************
+ * TEST CASE #4
+ *******************************************************/
+struct myLongList {
+	int k;
+	struct list_head v;
+};
+
+FUNCTION_DECLARE_FLATTEN_STRUCT_ARRAY_ITER_SELF_CONTAINED(myLongList,24);
+
+FUNCTION_DEFINE_FLATTEN_STRUCT_ITER_SELF_CONTAINED(myLongList,24,
+	AGGREGATE_FLATTEN_STRUCT_ARRAY_ITER_SELF_CONTAINED_SHIFTED(myLongList,24,v.next,8,1,-8);
+	AGGREGATE_FLATTEN_STRUCT_ARRAY_ITER_SELF_CONTAINED_SHIFTED(myLongList,24,v.prev,16,1,-8);
+);
+
+static int kflat_list_test_iter(struct kflat *kflat, int debug_flag) {
+	int i, err = 0;
+	struct myLongList myhead = {-1};
+	struct list_head* head;
+	struct list_head *p;
+	unsigned long count = 0;
+
+	INIT_LIST_HEAD(&myhead.v);
+	head = &myhead.v;
+	for (i = 0; i < 10; ++i) {
+		struct myLongList* item = kvzalloc(sizeof(struct myLongList),GFP_KERNEL);
+		item->k = i+1;
+		list_add(&item->v, head);
+		head = &item->v;
+	}
+
+	list_for_each(p, &myhead.v) {
+		struct myLongList *entry = list_entry(p, struct myLongList, v);
+		(void)entry;
+		count++;
+	}
+
+	flat_infos("List size: %zu\n",count);
+
+	flatten_init(kflat);
+	kflat->FLCTRL.debug_flag = debug_flag;
+
+	UNDER_ITER_HARNESS(
+		FOR_ROOT_POINTER(&myhead,
+			FLATTEN_STRUCT_ARRAY_ITER(myLongList,&myhead,1);
+		);
+	);
+
+	while(!list_empty(&myhead.v)) {
+		struct myLongList *entry = list_entry(myhead.v.next, struct myLongList, v);
+		list_del(myhead.v.next);
+		kvfree(entry);
+	}
+
+	flat_infos("@Flatten done: %d\n",kflat->errno);
+	if (!kflat->errno) {
+		err = flatten_write(kflat);
+	}
+	flatten_fini(kflat);
+
+	return err;
+}
+
+
+/*******************************************************
+ * TEST CASE #5
+ *******************************************************/
+struct myLongHeadList {
+	int k;
+	struct list_head v;
+};
+
+FUNCTION_DECLARE_FLATTEN_STRUCT_ARRAY_ITER_SELF_CONTAINED(list_head,16);
+
+FUNCTION_DEFINE_FLATTEN_STRUCT_ITER_SELF_CONTAINED(list_head,16,
+	AGGREGATE_FLATTEN_STRUCT_ARRAY_ITER_SELF_CONTAINED(list_head,16,next,0,1);
+	AGGREGATE_FLATTEN_STRUCT_ARRAY_ITER_SELF_CONTAINED(list_head,16,prev,8,1);
+);
+
+FUNCTION_DECLARE_FLATTEN_STRUCT_ARRAY_ITER_SELF_CONTAINED(myLongHeadList,24);
+
+FUNCTION_DEFINE_FLATTEN_STRUCT_ITER_SELF_CONTAINED(myLongHeadList,24,
+	AGGREGATE_FLATTEN_STRUCT_ARRAY_ITER_SELF_CONTAINED(list_head,16,v.next,8,1);
+	AGGREGATE_FLATTEN_STRUCT_ARRAY_ITER_SELF_CONTAINED(list_head,16,v.prev,16,1);
+);
+
+static int kflat_listhead_test_iter(struct kflat *kflat, int debug_flag) {
+	int i, err = 0;
+	struct list_head lhead;
+	struct list_head* head = &lhead;
+	struct list_head *p;
+	unsigned long count = 0;
+
+	INIT_LIST_HEAD(&lhead);
+	for (i=0; i<10; ++i) {
+		struct myLongHeadList* item = kvzalloc(sizeof(struct myLongHeadList),GFP_KERNEL);
+		item->k = i+1;
+		list_add(&item->v, head);
+		head = &item->v;
+	}
+
+	list_for_each(p, &lhead) {
+		struct myLongHeadList *entry = list_entry(p, struct myLongHeadList, v);
+		(void)entry;
+		count++;
+	}
+
+	flatten_init(kflat);
+	kflat->FLCTRL.debug_flag = debug_flag;
+
+	UNDER_ITER_HARNESS(
+		FOR_ROOT_POINTER(&lhead,
+			FLATTEN_STRUCT_ARRAY_ITER(list_head,&lhead,1);
+		);
+	);
+
+	UNDER_ITER_HARNESS(
+		FOR_ROOT_POINTER(&lhead,
+			list_for_each(p, &lhead) {
+				struct myLongHeadList *entry = list_entry(p, struct myLongHeadList, v);
+				FLATTEN_STRUCT_ARRAY_ITER(myLongHeadList,entry,1);
+			}
+		);
+	);
+
+	while(!list_empty(&lhead)) {
+		struct myLongHeadList *entry = list_entry(lhead.next, struct myLongHeadList, v);
+		list_del(lhead.next);
+		kvfree(entry);
+	}
+
+	flat_infos("@Flatten done: %d\n",kflat->errno);
+	if (!kflat->errno) {
+		err = flatten_write(kflat);
+	}
+	flatten_fini(kflat);
+
+	return err;
+}
+
+
+/*******************************************************
+ * TEST CASE #6
+ *******************************************************/
+struct paddingA {
+	int i;
+};
+
+FUNCTION_DEFINE_FLATTEN_STRUCT(paddingA);
+
+struct paddingB {
+	char c;
+} __attribute__(( aligned(sizeof(long)) ));
+
+FUNCTION_DEFINE_FLATTEN_STRUCT(paddingB,
+	STRUCT_ALIGN(sizeof(long));
+);
+
+struct paddingC {
+	char c;
+};
+
+FUNCTION_DEFINE_FLATTEN_STRUCT(paddingC);
+
+struct paddingRoot {
+	struct paddingA* a0;
+	struct paddingB* b;
+	struct paddingA* a1;
+	struct paddingC* c;
+};
+
+FUNCTION_DEFINE_FLATTEN_STRUCT(paddingRoot,
+	AGGREGATE_FLATTEN_STRUCT(paddingA,a0);
+	AGGREGATE_FLATTEN_STRUCT(paddingB,b);
+	AGGREGATE_FLATTEN_STRUCT(paddingA,a1);
+	AGGREGATE_FLATTEN_STRUCT(paddingC,c);
+);
+
+static int kflat_padding_test(struct kflat *kflat) {
+	int err = 0;
+	struct paddingA a0 = {3};
+	struct paddingB b = {'3'};
+	struct paddingA a1 = {33};
+	struct paddingC c = {'x'};
+
+	struct paddingRoot r = {&a0,&b,&a1,&c};
+
+	flatten_init(kflat);
+
+	FOR_ROOT_POINTER(&r,
+		FLATTEN_STRUCT(paddingRoot,&r);
+	);
+
+	flat_infos("@Flatten done: %d\n",kflat->errno);
+	if (!kflat->errno) {
+		err = flatten_write(kflat);
+	}
+	flatten_fini(kflat);
+
+	return err;
+}
+
+
+/*******************************************************
+ * TEST CASE #7
+ *******************************************************/
+static int kflat_pointer_test(struct kflat *kflat) {
+	int err = 0;
+	double magic_number = 3.14159265359;
+	double* pointer_to_it = &magic_number;
+	double** pointer_to_pointer_to_it = &pointer_to_it;
+	double*** ehhh = &pointer_to_pointer_to_it;
+
+	flatten_init(kflat);
+
+	FOR_ROOT_POINTER(ehhh,
+		FLATTEN_TYPE_ARRAY(double**, &pointer_to_pointer_to_it, 1);
+		FOREACH_POINTER(double**,p, &pointer_to_pointer_to_it, 1,
+			FLATTEN_TYPE_ARRAY(double*, p, 1);
+			FOREACH_POINTER(double*, q, p, 1,
+				FLATTEN_TYPE_ARRAY(double, q, 1);
+			);
+		);
+	);
+
+	flat_infos("@Flatten done: %d\n",kflat->errno);
+	if (!kflat->errno) {
+		err = flatten_write(kflat);
+	}
+	flatten_fini(kflat);
+
+	return err;
+}
+
+
+/*******************************************************
+ * TEST CASE #8
+ *******************************************************/
+struct myLongHList {
+	int k;
+	struct hlist_node r;
+};
+
+FUNCTION_DECLARE_FLATTEN_STRUCT_ARRAY_ITER_SELF_CONTAINED(hlist_node,16);
+
+FUNCTION_DEFINE_FLATTEN_STRUCT_ITER_SELF_CONTAINED(hlist_node,16,
+	AGGREGATE_FLATTEN_STRUCT_ARRAY_ITER_SELF_CONTAINED(hlist_node,16,next,0,1);
+	AGGREGATE_FLATTEN_TYPE_ARRAY_SELF_CONTAINED(struct hlist_node*,pprev,8,1);
+	FOR_POINTER(struct hlist_node*,__pprev, OFFATTR(void**,8),
+		FLATTEN_STRUCT_ARRAY_ITER_SELF_CONTAINED(hlist_node,16,__pprev,1);
+	);
+);
+
+FUNCTION_DECLARE_FLATTEN_STRUCT_ARRAY_ITER_SELF_CONTAINED(hlist_head,8);
+
+FUNCTION_DEFINE_FLATTEN_STRUCT_ITER_SELF_CONTAINED(hlist_head,8,
+	AGGREGATE_FLATTEN_STRUCT_ARRAY_ITER_SELF_CONTAINED(hlist_node,16,first,0,1);
+);
+
+FUNCTION_DECLARE_FLATTEN_STRUCT_ARRAY_ITER_SELF_CONTAINED(myLongHList,24);
+
+FUNCTION_DEFINE_FLATTEN_STRUCT_ITER_SELF_CONTAINED(myLongHList,24,
+	AGGREGATE_FLATTEN_STRUCT_ARRAY_ITER_SELF_CONTAINED_SHIFTED(myLongList,24,r.next,8,1,-8);
+	AGGREGATE_FLATTEN_TYPE_ARRAY_SELF_CONTAINED(struct hlist_node*,pprev,8,1);
+	FOR_POINTER(struct hlist_node*,__pprev, OFFATTR(void**,8),
+		FLATTEN_STRUCT_ARRAY_ITER_SELF_CONTAINED(myLongList,24,__pprev,1);
+	);
+);
+
+static int kflat_hlist_test_iter(struct kflat *kflat, int debug_flag) {
+
+	int err = 0;
+	struct hlist_head harr[5];
+	int i,j;
+	struct hlist_node *p;
+
+	for (i=0; i<5; ++i) {
+		struct hlist_node* node;
+		INIT_HLIST_HEAD(&harr[i]);
+		node = harr[i].first;
+		for (j=0; j<10; ++j) {
+			struct myLongHList* item = kvzalloc(sizeof(struct myLongHList),GFP_KERNEL);
+			item->k = i*10+j+1;
+			if (j==0) {
+				hlist_add_head(&item->r, &harr[i]);
+			}
+			else {
+				hlist_add_behind(&item->r,node);
+			}
+			node = &item->r;
+		}
+	}
+
+	for (i=0; i<5; ++i) {
+		unsigned long count = 0;
+		hlist_for_each(p, &harr[i]) {
+			struct myLongHList *entry = hlist_entry(p, struct myLongHList, r);
+			(void)entry;
+			count++;
+		}
+		flat_infos("myLongHList[%d] size: %lu\n",i,count);
+	}
+
+	flatten_init(kflat);
+	kflat->FLCTRL.debug_flag = debug_flag;
+
+	UNDER_ITER_HARNESS(
+		FOR_ROOT_POINTER(harr,
+			FLATTEN_STRUCT_ARRAY_ITER(hlist_head,harr,5);
+		);
+	);
+
+	UNDER_ITER_HARNESS(
+		FOR_ROOT_POINTER(harr,
+			for (i=0; i<5; ++i) {
+				hlist_for_each(p, &harr[i]) {
+					struct myLongHList *entry = hlist_entry(p, struct myLongHList, r);
+					FLATTEN_STRUCT_ARRAY_ITER(myLongHList,entry,1);
+				}
+			}
+		);
+	);
+
+	for (i=0; i<5; ++i) {
+		while(!hlist_empty(&harr[i])) {
+			struct myLongHList *entry = hlist_entry(harr[i].first, struct myLongHList, r);
+			hlist_del(harr[i].first);
+			kvfree(entry);
+		}
+	}
+
+	flat_infos("@Flatten done: %d\n",kflat->errno);
+	if (!kflat->errno) {
+		err = flatten_write(kflat);
+	}
+	flatten_fini(kflat);
+
+	return err;
+}
+
+
+
+/*******************************************************
+ * TEST CASE #9
+ *******************************************************/
+struct myLongHnullsList {
+	int k;
+	struct hlist_nulls_node n;
+};
+
+FUNCTION_DECLARE_FLATTEN_STRUCT_ARRAY_ITER_SELF_CONTAINED(hlist_nulls_node,16);
+
+FUNCTION_DEFINE_FLATTEN_STRUCT_ITER_SELF_CONTAINED(hlist_nulls_node,16,
+	if (!is_a_nulls(ATTR(next))) {
+		AGGREGATE_FLATTEN_STRUCT_ARRAY_ITER_SELF_CONTAINED(hlist_nulls_node,16,next,0,1);
+	}
+	AGGREGATE_FLATTEN_TYPE_ARRAY_SELF_CONTAINED(struct hlist_nulls_node*,pprev,8,1);
+	FOR_POINTER(struct hlist_nulls_node*,__pprev, OFFATTR(void**,8),
+		FLATTEN_STRUCT_ARRAY_ITER_SELF_CONTAINED(hlist_nulls_node,16,__pprev,1);
+	);
+);
+
+FUNCTION_DECLARE_FLATTEN_STRUCT_ARRAY_ITER_SELF_CONTAINED(hlist_nulls_head,8);
+
+FUNCTION_DEFINE_FLATTEN_STRUCT_ITER_SELF_CONTAINED(hlist_nulls_head,8,
+	AGGREGATE_FLATTEN_STRUCT_ARRAY_ITER_SELF_CONTAINED(hlist_nulls_node,16,first,0,1);
+);
+
+FUNCTION_DECLARE_FLATTEN_STRUCT_ARRAY_ITER_SELF_CONTAINED(myLongHnullsList,24);
+
+FUNCTION_DEFINE_FLATTEN_STRUCT_ITER_SELF_CONTAINED(myLongHnullsList,24,
+	if (!is_a_nulls(ATTR(n).next)) {
+		AGGREGATE_FLATTEN_STRUCT_ARRAY_ITER_SELF_CONTAINED_SHIFTED(myLongHnullsList,24,n.next,8,1,-8);
+	}
+	AGGREGATE_FLATTEN_TYPE_ARRAY_SELF_CONTAINED(struct hlist_nulls_node*,n.pprev,8,1);
+	FOR_POINTER(struct hlist_nulls_node*,__pprev, OFFATTR(void**,8),
+		FLATTEN_STRUCT_ARRAY_ITER_SELF_CONTAINED(myLongHnullsList,24,__pprev,1);
+	);
+);
+
+static int kflat_hlist_nulls_test_iter(struct kflat *kflat, int debug_flag) {
+
+	int err = 0;
+	struct hlist_nulls_head hnarr[5];
+	int i,j;
+	struct hlist_nulls_node *p;
+
+	for (i=0; i<5; ++i) {
+		INIT_HLIST_NULLS_HEAD(&hnarr[i],0);
+		for (j=0; j<10; ++j) {
+			struct myLongHnullsList* item = kvzalloc(sizeof(struct myLongHnullsList),GFP_KERNEL);
+			item->k = i*10+j+1;
+			hlist_nulls_add_head(&item->n, &hnarr[i]);
+		}
+	}
+
+	for (i=0; i<5; ++i) {
+		unsigned long count = 0;
+		struct myLongHnullsList *entry;
+		hlist_nulls_for_each_entry(entry,p, &hnarr[i],n) {
+			(void)entry;
+			count++;
+		}
+		flat_infos("myLongHnullsList[%d] size: %lu\n",i,count);
+	}
+
+	flatten_init(kflat);
+	kflat->FLCTRL.debug_flag = debug_flag;
+
+	UNDER_ITER_HARNESS(
+		FOR_ROOT_POINTER(hnarr,
+			FLATTEN_STRUCT_ARRAY_ITER(hlist_nulls_head,hnarr,5);
+		);
+	);
+
+	UNDER_ITER_HARNESS(
+		FOR_ROOT_POINTER(hnarr,
+			for (i=0; i<5; ++i) {
+				struct myLongHnullsList *entry;
+				hlist_nulls_for_each_entry(entry,p, &hnarr[i],n) {
+					FLATTEN_STRUCT_ARRAY_ITER(myLongHnullsList,entry,1);
+				}
+			}
+		);
+	);
+
+	for (i=0; i<5; ++i) {
+		while(!hlist_nulls_empty(&hnarr[i])) {
+			struct myLongHnullsList *entry = hlist_nulls_entry(hnarr[i].first, struct myLongHnullsList, n);
+			hlist_nulls_del(hnarr[i].first);
+			kvfree(entry);
+		}
+	}
+
+	flat_infos("@Flatten done: %d\n",kflat->errno);
+	if (!kflat->errno) {
+		err = flatten_write(kflat);
+	}
+	flatten_fini(kflat);
+
+	return err;
+}
+
+
+/*******************************************************
+ * TEST CASE #10
+ *******************************************************/
+struct llist_node *__llist_del_first(struct llist_head *head)
+{
+	struct llist_node *entry, *old_entry, *next;
+
+	entry = smp_load_acquire(&head->first);
+	for (;;) {
+		if (entry == NULL)
+			return NULL;
+		old_entry = entry;
+		next = READ_ONCE(entry->next);
+		entry = cmpxchg(&head->first, old_entry, next);
+		if (entry == old_entry)
+			break;
+	}
+
+	return entry;
+}
+
+struct myLongLList {
+	int k;
+	struct llist_node l;
+};
+
+FUNCTION_DECLARE_FLATTEN_STRUCT_ARRAY_ITER_SELF_CONTAINED(llist_node,8);
+
+FUNCTION_DEFINE_FLATTEN_STRUCT_ITER_SELF_CONTAINED(llist_node,8,
+	AGGREGATE_FLATTEN_STRUCT_ARRAY_ITER_SELF_CONTAINED(llist_node,8,next,0,1);
+);
+
+FUNCTION_DECLARE_FLATTEN_STRUCT_ARRAY_ITER_SELF_CONTAINED(llist_head,8);
+
+FUNCTION_DEFINE_FLATTEN_STRUCT_ITER_SELF_CONTAINED(llist_head,8,
+	AGGREGATE_FLATTEN_STRUCT_ARRAY_ITER_SELF_CONTAINED(llist_node,8,first,0,1);
+);
+
+FUNCTION_DECLARE_FLATTEN_STRUCT_ARRAY_ITER_SELF_CONTAINED(myLongLList,24);
+
+FUNCTION_DEFINE_FLATTEN_STRUCT_ITER_SELF_CONTAINED(myLongLList,16,
+	AGGREGATE_FLATTEN_STRUCT_ARRAY_ITER_SELF_CONTAINED_SHIFTED(myLongLList,16,l.next,8,1,-8);
+);
+
+static int kflat_llist_test_iter(struct kflat *kflat, int debug_flag) {
+
+	int err = 0;
+	struct llist_head lhead;
+	int i;
+	struct llist_node *p;
+	unsigned long count = 0;
+
+	init_llist_head(&lhead);
+	for (i=0; i<10; ++i) {
+		struct myLongLList* item = kvzalloc(sizeof(struct myLongLList),GFP_KERNEL);
+		item->k = i+1;
+		llist_add(&item->l, &lhead);
+	}
+
+	llist_for_each(p, lhead.first) {
+		struct myLongLList *entry = llist_entry(p, struct myLongLList, l);
+		(void)entry;
+		count++;
+	}
+	flat_infos("myLongLList size: %lu\n",count);
+
+	flatten_init(kflat);
+	kflat->FLCTRL.debug_flag = debug_flag;
+
+	UNDER_ITER_HARNESS(
+		FOR_ROOT_POINTER(&lhead,
+			FLATTEN_STRUCT_ARRAY_ITER(llist_head,&lhead,1);
+		);
+	);
+
+	UNDER_ITER_HARNESS(
+		FOR_ROOT_POINTER(&lhead,
+			llist_for_each(p, lhead.first) {
+				struct myLongLList *entry = llist_entry(p, struct myLongLList, l);
+				FLATTEN_STRUCT_ARRAY_ITER(myLongLList,entry,1);
+			}
+		);
+	);
+
+	while(!(llist_empty(&lhead))) {
+		struct myLongLList *entry = llist_entry(lhead.first, struct myLongLList, l);
+		__llist_del_first(&lhead);
+		kvfree(entry);
+	}
+
+	flat_infos("@Flatten done: %d\n",kflat->errno);
+	if (!kflat->errno) {
+		err = flatten_write(kflat);
+	}
+	flatten_fini(kflat);
+
+	return err;
+}
+
+/*******************************************************
+ * TEST CASE #11
+ *******************************************************/
+struct point {
+    double x;
+    double y;
+    unsigned n;
+    struct point** other;
+};
+
+struct figure {
+    const char* name;
+    unsigned n;
+    struct point* points;
+};
+
+
+FUNCTION_DECLARE_FLATTEN_STRUCT(point);
+FUNCTION_DECLARE_FLATTEN_STRUCT(figure);
+FUNCTION_DECLARE_FLATTEN_STRUCT_ITER(point);
+FUNCTION_DECLARE_FLATTEN_STRUCT_ITER(figure);
+
+FUNCTION_DEFINE_FLATTEN_STRUCT(point,
+    AGGREGATE_FLATTEN_TYPE_ARRAY(struct point*, other, ATTR(n));
+    FOREACH_POINTER(struct point*, p, ATTR(other), ATTR(n),
+            FLATTEN_STRUCT(point, p);
+    );
+);
+
+FUNCTION_DEFINE_FLATTEN_STRUCT_ITER(point,
+    AGGREGATE_FLATTEN_TYPE_ARRAY(struct point*, other, ATTR(n));
+    FOREACH_POINTER(struct point*, p, ATTR(other), ATTR(n),
+            FLATTEN_STRUCT_ITER(point, p);
+    );
+);
+
+FUNCTION_DEFINE_FLATTEN_STRUCT(figure,
+    AGGREGATE_FLATTEN_STRING(name);
+    AGGREGATE_FLATTEN_STRUCT_ARRAY(point,points,ATTR(n));
+);
+
+FUNCTION_DEFINE_FLATTEN_STRUCT_ITER(figure,
+    AGGREGATE_FLATTEN_STRING(name);
+    AGGREGATE_FLATTEN_STRUCT_ARRAY_ITER(point,points,ATTR(n));
+);
+
+#define MAKE_POINT(p, i, N)   \
+    p.x = (cosx[i]);	\
+    p.y = (sinx[i]);	\
+    p.n = (N);  \
+    p.other = kvzalloc((N)*sizeof*p.other,GFP_KERNEL);
+
+
+static int kflat_circle_test(struct kflat *kflat, size_t num_points, double* cosx, double* sinx) {
+
+	struct figure circle = { "circle",num_points };
+	unsigned i, j;
+	int err = 0;
+
+	flatten_init(kflat);
+	
+	
+	circle.points = kvzalloc(circle.n*sizeof(struct point),GFP_KERNEL);
+	for (i = 0; i < circle.n; ++i) {
+		MAKE_POINT(circle.points[i], i, circle.n - 1);
+	}
+	for (i = 0; i < circle.n; ++i) {
+		unsigned u = 0;
+		for (j = 0; j < circle.n; ++j) {
+			if (i == j)
+				continue;
+			circle.points[i].other[u++] = &circle.points[j];
+		}
+	}
+
+	FOR_ROOT_POINTER(&circle,
+		FLATTEN_STRUCT(figure, &circle);
+	);
+
+	for (i = 0; i < circle.n; ++i) {
+		kvfree(circle.points[i].other);
+	}
+	kvfree(circle.points);
+
+	flat_infos("@Flatten done: %d\n",kflat->errno);
+	if (!kflat->errno) {
+		err = flatten_write(kflat);
+	}
+	flatten_fini(kflat);
+
+	return err;
+
+}
+
+static int kflat_circle_test_iter(struct kflat *kflat, size_t num_points, double* cosx, double* sinx) {
+
+	struct figure circle = { "circle",num_points };
+	unsigned i, j;
+	int err = 0;
+
+	flatten_init(kflat);
+	
+
+	circle.points = kvzalloc(circle.n*sizeof(struct point),GFP_KERNEL);
+    for (i = 0; i < circle.n; ++i) {
+        MAKE_POINT(circle.points[i], i, circle.n - 1);
+    }
+    for (i = 0; i < circle.n; ++i) {
+		unsigned u = 0;
+		for (j = 0; j < circle.n; ++j) {
+			if (i == j)
+				continue;
+			circle.points[i].other[u++] = &circle.points[j];
+		}
+	}
+
+	FOR_ROOT_POINTER(&circle,
+		UNDER_ITER_HARNESS(
+			FLATTEN_STRUCT_ITER(figure, &circle);
+		);
+	);
+
+	for (i = 0; i < circle.n; ++i) {
+		kvfree(circle.points[i].other);
+	}
+	kvfree(circle.points);
+
+	flat_infos("@Flatten done: %d\n",kflat->errno);
+	if (!kflat->errno) {
+		err = flatten_write(kflat);
+	}
+	flatten_fini(kflat);
+
+	return err;
+
+}
+
+
+
+
 
 struct string_node {
 	struct rb_node node;
@@ -186,648 +1045,9 @@ static size_t stringset_count(const struct rb_root* root) {
 	return count;
 }
 
-struct B {
-	unsigned char T[4];
-};
 
-struct A {
-	unsigned long X;
-	struct B* pB;
-};
 
-FUNCTION_DEFINE_FLATTEN_STRUCT(B,
-);
 
-FUNCTION_DEFINE_FLATTEN_STRUCT(A,
-    AGGREGATE_FLATTEN_STRUCT(B,pB);
-);
-
-static int kflat_simple_test(struct kflat *kflat) {
-
-	struct B b = { "ABC" };
-	struct A a = { 0x0000404F, &b/*0xffffdddddddddddd*/ };
-	struct A* pA = &a;
-	struct A* vpA = (struct A*) 0xdeadbeefdabbad00;
-	int err = 0;
-
-	flatten_init(kflat);
-
-	FOR_ROOT_POINTER(pA,
-		FLATTEN_STRUCT(A, vpA);
-		FLATTEN_STRUCT(A, pA);
-	);
-
-	flat_infos("@Flatten done: %d\n",kflat->errno);
-	if (!kflat->errno) {
-		err = flatten_write(kflat);
-	}
-	flatten_fini(kflat);
-
-	return err;
-
-}
-
-struct my_list_head;
-struct intermediate;
-struct my_task_struct;
-
-FUNCTION_DECLARE_FLATTEN_STRUCT_ITER(my_list_head);
-FUNCTION_DECLARE_FLATTEN_STRUCT_ITER(intermediate);
-FUNCTION_DECLARE_FLATTEN_STRUCT_ITER(my_task_struct);
-
-struct my_list_head {
-	struct my_list_head* prev;
-	struct my_list_head* next;
-};
-
-FUNCTION_DEFINE_FLATTEN_STRUCT(my_list_head,
-	AGGREGATE_FLATTEN_STRUCT(my_list_head,prev);
-	AGGREGATE_FLATTEN_STRUCT(my_list_head,next);
-);
-
-FUNCTION_DEFINE_FLATTEN_STRUCT_ITER(my_list_head,
-	AGGREGATE_FLATTEN_STRUCT_ITER(my_list_head,prev);
-	AGGREGATE_FLATTEN_STRUCT_ITER(my_list_head,next);
-);
-
-struct intermediate {
-	struct my_list_head* plh;
-};
-
-FUNCTION_DEFINE_FLATTEN_STRUCT(intermediate,
-	AGGREGATE_FLATTEN_STRUCT(my_list_head,plh);
-);
-
-FUNCTION_DEFINE_FLATTEN_STRUCT_ITER(intermediate,
-	AGGREGATE_FLATTEN_STRUCT_ITER(my_list_head,plh);
-);
-
-struct my_task_struct {
-	int pid;
-	struct intermediate* im;
-	struct my_list_head u;
-	float w;
-};
-
-FUNCTION_DEFINE_FLATTEN_STRUCT(my_task_struct,
-	AGGREGATE_FLATTEN_STRUCT(intermediate,im);
-	AGGREGATE_FLATTEN_STRUCT(my_list_head,u.prev);
-	AGGREGATE_FLATTEN_STRUCT(my_list_head,u.next);
-);
-
-FUNCTION_DEFINE_FLATTEN_STRUCT_ITER(my_task_struct,
-	AGGREGATE_FLATTEN_STRUCT_ITER(intermediate,im);
-	AGGREGATE_FLATTEN_STRUCT_ITER(my_list_head,u.prev);
-	AGGREGATE_FLATTEN_STRUCT_ITER(my_list_head,u.next);
-);
-
-static int kflat_overlaplist_test(struct kflat *kflat) {
-
-	struct my_task_struct T;
-	struct intermediate IM = {&T.u};
-	int err = 0;
-
-	T.pid = 123;
-	T.im = &IM;
-	T.u.prev = T.u.next = &T.u;
-	T.w = 1.0;
-
-	flatten_init(kflat);
-
-	FOR_ROOT_POINTER(&T,
-		FLATTEN_STRUCT(my_task_struct,&T);
-	);
-
-	flat_infos("@Flatten done: %d\n",kflat->errno);
-	if (!kflat->errno) {
-		err = flatten_write(kflat);
-	}
-	flatten_fini(kflat);
-
-	return err;
-
-}
-
-static int kflat_overlaplist_test_iter(struct kflat *kflat) {
-
-	struct my_task_struct T;
-	struct intermediate IM = {&T.u};
-	int err = 0;
-
-	T.pid = 123;
-	T.im = &IM;
-	T.u.prev = T.u.next = &T.u;
-	T.w = 1.0;
-
-	flatten_init(kflat);
-	
-
-	FOR_ROOT_POINTER(&T,
-		UNDER_ITER_HARNESS(
-			FLATTEN_STRUCT_ITER(my_task_struct,&T);
-		);
-	);
-
-	flat_infos("@Flatten done: %d\n",kflat->errno);
-	if (!kflat->errno) {
-		err = flatten_write(kflat);
-	}
-	flatten_fini(kflat);
-
-	return err;
-
-}
-
-typedef struct struct_B {
-	int i;
-} my_B;
-
-FUNCTION_DEFINE_FLATTEN_STRUCT_TYPE(my_B,
-);
-
-FUNCTION_DEFINE_FLATTEN_STRUCT_TYPE_ITER(my_B,
-);
-
-typedef struct struct_A {
-	unsigned long ul;
-	my_B* pB0;
-	my_B* pB1;
-	my_B* pB2;
-	my_B* pB3;
-	char* p;
-} /*__attribute__((aligned(64)))*/ my_A;
-
-FUNCTION_DEFINE_FLATTEN_STRUCT_TYPE(my_A,
-	STRUCT_ALIGN(64);
-	AGGREGATE_FLATTEN_STRUCT_TYPE(my_B,pB0);
-	AGGREGATE_FLATTEN_STRUCT_TYPE(my_B,pB1);
-	AGGREGATE_FLATTEN_STRUCT_TYPE(my_B,pB2);
-	AGGREGATE_FLATTEN_STRUCT_TYPE(my_B,pB3);
-	AGGREGATE_FLATTEN_STRING(p);
-);
-
-FUNCTION_DEFINE_FLATTEN_STRUCT_TYPE_ITER(my_A,
-	STRUCT_ALIGN(120);
-	AGGREGATE_FLATTEN_STRUCT_TYPE_ITER(my_B,pB0);
-	AGGREGATE_FLATTEN_STRUCT_TYPE_ITER(my_B,pB1);
-	AGGREGATE_FLATTEN_STRUCT_TYPE_ITER(my_B,pB2);
-	AGGREGATE_FLATTEN_STRUCT_TYPE_ITER(my_B,pB3);
-	AGGREGATE_FLATTEN_STRING(p);
-);
-
-static int kflat_overlapptr_test(struct kflat *kflat) {
-
-	my_B arrB[4] = {{1},{2},{3},{4}};
-	my_A T[3] = {{},{0,&arrB[0],&arrB[1],&arrB[2],&arrB[3],"p in struct A"},{}};
-	int err = 0;
-	unsigned char* p;
-
-	flatten_init(kflat);
-	
-
-	flat_infos("sizeof(struct A): %zu\n",sizeof(my_A));
-	flat_infos("sizeof(struct B): %zu\n",sizeof(my_B));
-
-	p = (unsigned char*)&T[1]-8;
-	FOR_ROOT_POINTER(p,
-		FLATTEN_TYPE_ARRAY(unsigned char,p,sizeof(struct A)+16);
-	);
-
-	FOR_ROOT_POINTER(&T[1],
-		FLATTEN_STRUCT_TYPE(my_A,&T[1]);
-	);
-
-	flat_infos("@Flatten done: %d\n",kflat->errno);
-	if (!kflat->errno) {
-		err = flatten_write(kflat);
-	}
-	flatten_fini(kflat);
-
-	return err;
-
-}
-
-static int kflat_overlapptr_test_iter(struct kflat *kflat) {
-
-	my_B arrB[4] = {{1},{2},{3},{4}};
-	my_A T[3] = {{},{0,&arrB[0],&arrB[1],&arrB[2],&arrB[3],"p in struct A"},{}};
-	int err = 0;
-	unsigned char* p;
-
-	flatten_init(kflat);
-	
-
-	flat_infos("sizeof(struct A): %zu\n",sizeof(my_A));
-	flat_infos("sizeof(struct B): %zu\n",sizeof(my_B));
-
-	p = (unsigned char*)&T[1]-8;
-	FOR_ROOT_POINTER(p,
-		FLATTEN_TYPE_ARRAY(unsigned char,p,sizeof(struct A)+16);
-	);
-
-	FOR_ROOT_POINTER(&T[1],
-		UNDER_ITER_HARNESS(
-			FLATTEN_STRUCT_TYPE_ITER(my_A,&T[1]);
-		);
-	);
-
-	flat_infos("@Flatten done: %d\n",kflat->errno);
-	if (!kflat->errno) {
-		err = flatten_write(kflat);
-	}
-	flatten_fini(kflat);
-
-	return err;
-
-}
-
-struct myLongList {
-	int k;
-	struct list_head v;
-};
-
-FUNCTION_DECLARE_FLATTEN_STRUCT_ARRAY_ITER_SELF_CONTAINED(myLongList,24);
-
-FUNCTION_DEFINE_FLATTEN_STRUCT_ITER_SELF_CONTAINED(myLongList,24,
-	AGGREGATE_FLATTEN_STRUCT_ARRAY_ITER_SELF_CONTAINED_SHIFTED(myLongList,24,v.next,8,1,-8);
-	AGGREGATE_FLATTEN_STRUCT_ARRAY_ITER_SELF_CONTAINED_SHIFTED(myLongList,24,v.prev,16,1,-8);
-);
-
-static int kflat_list_test_iter(struct kflat *kflat, int debug_flag) {
-
-	struct myLongList myhead = {-1};
-	int i;
-	struct list_head* head;
-	struct list_head *p;
-	unsigned long count = 0;
-	int err = 0;
-
-	INIT_LIST_HEAD(&myhead.v);
-	head = &myhead.v;
-	for (i=0; i<10; ++i) {
-		struct myLongList* item = kvzalloc(sizeof(struct myLongList),GFP_KERNEL);
-		item->k = i+1;
-		list_add(&item->v, head);
-		head = &item->v;
-	}
-
-	list_for_each(p, &myhead.v) {
-		struct myLongList *entry = list_entry(p, struct myLongList, v);
-		(void)entry;
-		count++;
-	}
-	flat_infos("myLongList size: %lu\n",count);
-	flat_infos("sizeof(struct myLongList): %zu\n",sizeof(struct myLongList));
-	flat_infos("offsetof(struct myLongList,k): %zu\n",offsetof(struct myLongList,k));
-	flat_infos("offsetof(struct myLongList,v): %zu\n",offsetof(struct myLongList,v));
-
-	flatten_init(kflat);
-	kflat->FLCTRL.debug_flag = debug_flag;
-
-	UNDER_ITER_HARNESS(
-		FOR_ROOT_POINTER(&myhead,
-			FLATTEN_STRUCT_ARRAY_ITER(myLongList,&myhead,1);
-		);
-	);
-
-	flat_infos("@Flatten done: %d\n",kflat->errno);
-	if (!kflat->errno) {
-		err = flatten_write(kflat);
-	}
-	flatten_fini(kflat);
-
-	return err;
-}
-
-struct myLongHeadList {
-	int k;
-	struct list_head v;
-};
-
-FUNCTION_DECLARE_FLATTEN_STRUCT_ARRAY_ITER_SELF_CONTAINED(list_head,16);
-
-FUNCTION_DEFINE_FLATTEN_STRUCT_ITER_SELF_CONTAINED(list_head,16,
-	AGGREGATE_FLATTEN_STRUCT_ARRAY_ITER_SELF_CONTAINED(list_head,16,next,0,1);
-	AGGREGATE_FLATTEN_STRUCT_ARRAY_ITER_SELF_CONTAINED(list_head,16,prev,8,1);
-);
-
-FUNCTION_DECLARE_FLATTEN_STRUCT_ARRAY_ITER_SELF_CONTAINED(myLongHeadList,24);
-
-FUNCTION_DEFINE_FLATTEN_STRUCT_ITER_SELF_CONTAINED(myLongHeadList,24,
-	AGGREGATE_FLATTEN_STRUCT_ARRAY_ITER_SELF_CONTAINED(list_head,16,v.next,8,1);
-	AGGREGATE_FLATTEN_STRUCT_ARRAY_ITER_SELF_CONTAINED(list_head,16,v.prev,16,1);
-);
-
-static int kflat_listhead_test_iter(struct kflat *kflat, int debug_flag) {
-
-	struct list_head lhead;
-
-	int i;
-	struct list_head* head = &lhead;
-	struct list_head *p;
-	unsigned long count = 0;
-	int err = 0;
-
-	INIT_LIST_HEAD(&lhead);
-	for (i=0; i<10; ++i) {
-		struct myLongHeadList* item = kvzalloc(sizeof(struct myLongHeadList),GFP_KERNEL);
-		item->k = i+1;
-		list_add(&item->v, head);
-		head = &item->v;
-	}
-
-	list_for_each(p, &lhead) {
-		struct myLongHeadList *entry = list_entry(p, struct myLongHeadList, v);
-		(void)entry;
-		count++;
-	}
-	flat_infos("myLongList size: %lu\n",count);
-	flat_infos("sizeof(struct myLongList): %zu\n",sizeof(struct myLongList));
-	flat_infos("offsetof(struct myLongList,k): %zu\n",offsetof(struct myLongList,k));
-	flat_infos("offsetof(struct myLongList,v): %zu\n",offsetof(struct myLongList,v));
-
-	flatten_init(kflat);
-	kflat->FLCTRL.debug_flag = debug_flag;
-
-	UNDER_ITER_HARNESS(
-		FOR_ROOT_POINTER(&lhead,
-			FLATTEN_STRUCT_ARRAY_ITER(list_head,&lhead,1);
-		);
-	);
-
-	UNDER_ITER_HARNESS(
-		FOR_ROOT_POINTER(&lhead,
-			list_for_each(p, &lhead) {
-				struct myLongHeadList *entry = list_entry(p, struct myLongHeadList, v);
-				FLATTEN_STRUCT_ARRAY_ITER(myLongHeadList,entry,1);
-			}
-		);
-	);
-
-	flat_infos("@Flatten done: %d\n",kflat->errno);
-	if (!kflat->errno) {
-		err = flatten_write(kflat);
-	}
-	flatten_fini(kflat);
-
-	return err;
-}
-
-struct myLongHList {
-	int k;
-	struct hlist_node r;
-};
-
-FUNCTION_DECLARE_FLATTEN_STRUCT_ARRAY_ITER_SELF_CONTAINED(hlist_node,16);
-
-FUNCTION_DEFINE_FLATTEN_STRUCT_ITER_SELF_CONTAINED(hlist_node,16,
-	AGGREGATE_FLATTEN_STRUCT_ARRAY_ITER_SELF_CONTAINED(hlist_node,16,next,0,1);
-	AGGREGATE_FLATTEN_TYPE_ARRAY_SELF_CONTAINED(struct hlist_node*,pprev,8,1);
-	FOR_POINTER(struct hlist_node*,__pprev, OFFATTR(void**,8),
-		FLATTEN_STRUCT_ARRAY_ITER_SELF_CONTAINED(hlist_node,16,__pprev,1);
-	);
-);
-
-FUNCTION_DECLARE_FLATTEN_STRUCT_ARRAY_ITER_SELF_CONTAINED(hlist_head,8);
-
-FUNCTION_DEFINE_FLATTEN_STRUCT_ITER_SELF_CONTAINED(hlist_head,8,
-	AGGREGATE_FLATTEN_STRUCT_ARRAY_ITER_SELF_CONTAINED(hlist_node,16,first,0,1);
-);
-
-FUNCTION_DECLARE_FLATTEN_STRUCT_ARRAY_ITER_SELF_CONTAINED(myLongHList,24);
-
-FUNCTION_DEFINE_FLATTEN_STRUCT_ITER_SELF_CONTAINED(myLongHList,24,
-	AGGREGATE_FLATTEN_STRUCT_ARRAY_ITER_SELF_CONTAINED_SHIFTED(myLongList,24,r.next,8,1,-8);
-	AGGREGATE_FLATTEN_TYPE_ARRAY_SELF_CONTAINED(struct hlist_node*,pprev,8,1);
-	FOR_POINTER(struct hlist_node*,__pprev, OFFATTR(void**,8),
-		FLATTEN_STRUCT_ARRAY_ITER_SELF_CONTAINED(myLongList,24,__pprev,1);
-	);
-);
-
-static int kflat_hlist_test_iter(struct kflat *kflat, int debug_flag) {
-
-	int err = 0;
-	struct hlist_head harr[5];
-	int i,j;
-	struct hlist_node *p;
-
-	for (i=0; i<5; ++i) {
-		struct hlist_node* node;
-		INIT_HLIST_HEAD(&harr[i]);
-		node = harr[i].first;
-		for (j=0; j<10; ++j) {
-			struct myLongHList* item = kvzalloc(sizeof(struct myLongHList),GFP_KERNEL);
-			item->k = i*10+j+1;
-			if (j==0) {
-				hlist_add_head(&item->r, &harr[i]);
-			}
-			else {
-				hlist_add_behind(&item->r,node);
-			}
-			node = &item->r;
-		}
-	}
-
-	for (i=0; i<5; ++i) {
-		unsigned long count = 0;
-		hlist_for_each(p, &harr[i]) {
-			struct myLongHList *entry = hlist_entry(p, struct myLongHList, r);
-			(void)entry;
-			count++;
-		}
-		flat_infos("myLongHList[%d] size: %lu\n",i,count);
-	}
-
-	flatten_init(kflat);
-	kflat->FLCTRL.debug_flag = debug_flag;
-
-	UNDER_ITER_HARNESS(
-		FOR_ROOT_POINTER(harr,
-			FLATTEN_STRUCT_ARRAY_ITER(hlist_head,harr,5);
-		);
-	);
-
-	UNDER_ITER_HARNESS(
-		FOR_ROOT_POINTER(harr,
-			for (i=0; i<5; ++i) {
-				hlist_for_each(p, &harr[i]) {
-					struct myLongHList *entry = hlist_entry(p, struct myLongHList, r);
-					FLATTEN_STRUCT_ARRAY_ITER(myLongHList,entry,1);
-				}
-			}
-		);
-	);
-
-	flat_infos("@Flatten done: %d\n",kflat->errno);
-	if (!kflat->errno) {
-		err = flatten_write(kflat);
-	}
-	flatten_fini(kflat);
-
-	return err;
-}
-
-struct myLongHnullsList {
-	int k;
-	struct hlist_nulls_node n;
-};
-
-FUNCTION_DECLARE_FLATTEN_STRUCT_ARRAY_ITER_SELF_CONTAINED(hlist_nulls_node,16);
-
-FUNCTION_DEFINE_FLATTEN_STRUCT_ITER_SELF_CONTAINED(hlist_nulls_node,16,
-	if (!is_a_nulls(ATTR(next))) {
-		AGGREGATE_FLATTEN_STRUCT_ARRAY_ITER_SELF_CONTAINED(hlist_nulls_node,16,next,0,1);
-	}
-	AGGREGATE_FLATTEN_TYPE_ARRAY_SELF_CONTAINED(struct hlist_nulls_node*,pprev,8,1);
-	FOR_POINTER(struct hlist_nulls_node*,__pprev, OFFATTR(void**,8),
-		FLATTEN_STRUCT_ARRAY_ITER_SELF_CONTAINED(hlist_nulls_node,16,__pprev,1);
-	);
-);
-
-FUNCTION_DECLARE_FLATTEN_STRUCT_ARRAY_ITER_SELF_CONTAINED(hlist_nulls_head,8);
-
-FUNCTION_DEFINE_FLATTEN_STRUCT_ITER_SELF_CONTAINED(hlist_nulls_head,8,
-	AGGREGATE_FLATTEN_STRUCT_ARRAY_ITER_SELF_CONTAINED(hlist_nulls_node,16,first,0,1);
-);
-
-FUNCTION_DECLARE_FLATTEN_STRUCT_ARRAY_ITER_SELF_CONTAINED(myLongHnullsList,24);
-
-FUNCTION_DEFINE_FLATTEN_STRUCT_ITER_SELF_CONTAINED(myLongHnullsList,24,
-	if (!is_a_nulls(ATTR(n).next)) {
-		AGGREGATE_FLATTEN_STRUCT_ARRAY_ITER_SELF_CONTAINED_SHIFTED(myLongHnullsList,24,n.next,8,1,-8);
-	}
-	AGGREGATE_FLATTEN_TYPE_ARRAY_SELF_CONTAINED(struct hlist_nulls_node*,n.pprev,8,1);
-	FOR_POINTER(struct hlist_nulls_node*,__pprev, OFFATTR(void**,8),
-		FLATTEN_STRUCT_ARRAY_ITER_SELF_CONTAINED(myLongHnullsList,24,__pprev,1);
-	);
-);
-
-static int kflat_hlist_nulls_test_iter(struct kflat *kflat, int debug_flag) {
-
-	int err = 0;
-	struct hlist_nulls_head hnarr[5];
-	int i,j;
-	struct hlist_nulls_node *p;
-
-	for (i=0; i<5; ++i) {
-		INIT_HLIST_NULLS_HEAD(&hnarr[i],0);
-		for (j=0; j<10; ++j) {
-			struct myLongHnullsList* item = kvzalloc(sizeof(struct myLongHnullsList),GFP_KERNEL);
-			item->k = i*10+j+1;
-			hlist_nulls_add_head(&item->n, &hnarr[i]);
-		}
-	}
-
-	for (i=0; i<5; ++i) {
-		unsigned long count = 0;
-		struct myLongHnullsList *entry;
-		hlist_nulls_for_each_entry(entry,p, &hnarr[i],n) {
-			(void)entry;
-			count++;
-		}
-		flat_infos("myLongHnullsList[%d] size: %lu\n",i,count);
-	}
-
-	flatten_init(kflat);
-	kflat->FLCTRL.debug_flag = debug_flag;
-
-	UNDER_ITER_HARNESS(
-		FOR_ROOT_POINTER(hnarr,
-			FLATTEN_STRUCT_ARRAY_ITER(hlist_nulls_head,hnarr,5);
-		);
-	);
-
-	UNDER_ITER_HARNESS(
-		FOR_ROOT_POINTER(hnarr,
-			for (i=0; i<5; ++i) {
-				struct myLongHnullsList *entry;
-				hlist_nulls_for_each_entry(entry,p, &hnarr[i],n) {
-					FLATTEN_STRUCT_ARRAY_ITER(myLongHnullsList,entry,1);
-				}
-			}
-		);
-	);
-
-	flat_infos("@Flatten done: %d\n",kflat->errno);
-	if (!kflat->errno) {
-		err = flatten_write(kflat);
-	}
-	flatten_fini(kflat);
-
-	return err;
-}
-
-struct myLongLList {
-	int k;
-	struct llist_node l;
-};
-
-FUNCTION_DECLARE_FLATTEN_STRUCT_ARRAY_ITER_SELF_CONTAINED(llist_node,8);
-
-FUNCTION_DEFINE_FLATTEN_STRUCT_ITER_SELF_CONTAINED(llist_node,8,
-	AGGREGATE_FLATTEN_STRUCT_ARRAY_ITER_SELF_CONTAINED(llist_node,8,next,0,1);
-);
-
-FUNCTION_DECLARE_FLATTEN_STRUCT_ARRAY_ITER_SELF_CONTAINED(llist_head,8);
-
-FUNCTION_DEFINE_FLATTEN_STRUCT_ITER_SELF_CONTAINED(llist_head,8,
-	AGGREGATE_FLATTEN_STRUCT_ARRAY_ITER_SELF_CONTAINED(llist_node,8,first,0,1);
-);
-
-FUNCTION_DECLARE_FLATTEN_STRUCT_ARRAY_ITER_SELF_CONTAINED(myLongLList,24);
-
-FUNCTION_DEFINE_FLATTEN_STRUCT_ITER_SELF_CONTAINED(myLongLList,16,
-	AGGREGATE_FLATTEN_STRUCT_ARRAY_ITER_SELF_CONTAINED_SHIFTED(myLongLList,16,l.next,8,1,-8);
-);
-
-static int kflat_llist_test_iter(struct kflat *kflat, int debug_flag) {
-
-	int err = 0;
-	struct llist_head lhead;
-	int i;
-	struct llist_node *p;
-	unsigned long count = 0;
-
-	init_llist_head(&lhead);
-	for (i=0; i<10; ++i) {
-		struct myLongLList* item = kvzalloc(sizeof(struct myLongLList),GFP_KERNEL);
-		item->k = i+1;
-		llist_add(&item->l, &lhead);
-	}
-
-	llist_for_each(p, lhead.first) {
-		struct myLongLList *entry = llist_entry(p, struct myLongLList, l);
-		(void)entry;
-		count++;
-	}
-	flat_infos("myLongLList size: %lu\n",count);
-
-	flatten_init(kflat);
-	kflat->FLCTRL.debug_flag = debug_flag;
-
-	UNDER_ITER_HARNESS(
-		FOR_ROOT_POINTER(&lhead,
-			FLATTEN_STRUCT_ARRAY_ITER(llist_head,&lhead,1);
-		);
-	);
-
-	UNDER_ITER_HARNESS(
-		FOR_ROOT_POINTER(&lhead,
-			llist_for_each(p, lhead.first) {
-				struct myLongLList *entry = llist_entry(p, struct myLongLList, l);
-				FLATTEN_STRUCT_ARRAY_ITER(myLongLList,entry,1);
-			}
-		);
-	);
-
-	flat_infos("@Flatten done: %d\n",kflat->errno);
-	if (!kflat->errno) {
-		err = flatten_write(kflat);
-	}
-	flatten_fini(kflat);
-
-	return err;
-}
 
 struct myTreeNode {
 	int i;
@@ -982,7 +1202,7 @@ static int strset_insert(struct rb_root* root, struct myTreeNode* sdata) {
 
 	/* Add new node and rebalance tree. */
 	rb_link_node(&sdata->snode, parent, new);
-	rb_insert_color(&sdata->snode, &stringset_root);
+	rb_insert_color(&sdata->snode, root);
 
 	return 1;
 }
@@ -993,8 +1213,10 @@ static void strset_destroy(struct rb_root* root) {
 
     struct rb_node * p = rb_first(root);
     while(p) {
-        rb_erase(p, root);
+    	struct myTreeNode* data = container_of(p,struct myTreeNode,snode);
+    	rb_erase(p, root);
         p = rb_next(p);
+        libflat_free(data->s);
     }
 }
 
@@ -1070,95 +1292,10 @@ static int kflat_rbnode_test_iter(struct kflat *kflat, int debug_flag) {
 		);
 	);
 
-	flat_infos("@Flatten done: %d\n",kflat->errno);
-	if (!kflat->errno) {
-		err = flatten_write(kflat);
-	}
-	flatten_fini(kflat);
-
-	return err;
-}
-
-struct point {
-    double x;
-    double y;
-    unsigned n;
-    struct point** other;
-};
-
-struct figure {
-    const char* name;
-    unsigned n;
-    struct point* points;
-};
-
-
-FUNCTION_DECLARE_FLATTEN_STRUCT(point);
-FUNCTION_DECLARE_FLATTEN_STRUCT(figure);
-FUNCTION_DECLARE_FLATTEN_STRUCT_ITER(point);
-FUNCTION_DECLARE_FLATTEN_STRUCT_ITER(figure);
-
-FUNCTION_DEFINE_FLATTEN_STRUCT(point,
-    AGGREGATE_FLATTEN_TYPE_ARRAY(struct point*, other, ATTR(n));
-    FOREACH_POINTER(struct point*, p, ATTR(other), ATTR(n),
-            FLATTEN_STRUCT(point, p);
-    );
-);
-
-FUNCTION_DEFINE_FLATTEN_STRUCT_ITER(point,
-    AGGREGATE_FLATTEN_TYPE_ARRAY(struct point*, other, ATTR(n));
-    FOREACH_POINTER(struct point*, p, ATTR(other), ATTR(n),
-            FLATTEN_STRUCT_ITER(point, p);
-    );
-);
-
-FUNCTION_DEFINE_FLATTEN_STRUCT(figure,
-    AGGREGATE_FLATTEN_STRING(name);
-    AGGREGATE_FLATTEN_STRUCT_ARRAY(point,points,ATTR(n));
-);
-
-FUNCTION_DEFINE_FLATTEN_STRUCT_ITER(figure,
-    AGGREGATE_FLATTEN_STRING(name);
-    AGGREGATE_FLATTEN_STRUCT_ARRAY_ITER(point,points,ATTR(n));
-);
-
-#define MAKE_POINT(p, i, N)   \
-    p.x = (cosx[i]);	\
-    p.y = (sinx[i]);	\
-    p.n = (N);  \
-    p.other = kvzalloc((N)*sizeof*p.other,GFP_KERNEL);
-
-
-static int kflat_circle_test(struct kflat *kflat, size_t num_points, double* cosx, double* sinx) {
-
-	struct figure circle = { "circle",num_points };
-	unsigned i, j;
-	int err = 0;
-
-	flatten_init(kflat);
-	
-	
-	circle.points = kvzalloc(circle.n*sizeof(struct point),GFP_KERNEL);
-	for (i = 0; i < circle.n; ++i) {
-		MAKE_POINT(circle.points[i], i, circle.n - 1);
-	}
-	for (i = 0; i < circle.n; ++i) {
-		unsigned u = 0;
-		for (j = 0; j < circle.n; ++j) {
-			if (i == j)
-				continue;
-			circle.points[i].other[u++] = &circle.points[j];
-		}
-	}
-
-	FOR_ROOT_POINTER(&circle,
-		FLATTEN_STRUCT(figure, &circle);
-	);
-
-	for (i = 0; i < circle.n; ++i) {
-		kvfree(circle.points[i].other);
-	}
-	kvfree(circle.points);
+	strset_destroy(&sroot);
+	sroot.rb_node = 0;
+	intset_destroy(&iroot);
+	iroot.rb_node = 0;
 
 	flat_infos("@Flatten done: %d\n",kflat->errno);
 	if (!kflat->errno) {
@@ -1167,112 +1304,9 @@ static int kflat_circle_test(struct kflat *kflat, size_t num_points, double* cos
 	flatten_fini(kflat);
 
 	return err;
-
 }
 
-static int kflat_circle_test_iter(struct kflat *kflat, size_t num_points, double* cosx, double* sinx) {
 
-	struct figure circle = { "circle",num_points };
-	unsigned i, j;
-	int err = 0;
-
-	flatten_init(kflat);
-	
-
-	circle.points = kvzalloc(circle.n*sizeof(struct point),GFP_KERNEL);
-    for (i = 0; i < circle.n; ++i) {
-        MAKE_POINT(circle.points[i], i, circle.n - 1);
-    }
-    for (i = 0; i < circle.n; ++i) {
-		unsigned u = 0;
-		for (j = 0; j < circle.n; ++j) {
-			if (i == j)
-				continue;
-			circle.points[i].other[u++] = &circle.points[j];
-		}
-	}
-
-	FOR_ROOT_POINTER(&circle,
-		UNDER_ITER_HARNESS(
-			FLATTEN_STRUCT_ITER(figure, &circle);
-		);
-	);
-
-	for (i = 0; i < circle.n; ++i) {
-		kvfree(circle.points[i].other);
-	}
-	kvfree(circle.points);
-
-	flat_infos("@Flatten done: %d\n",kflat->errno);
-	if (!kflat->errno) {
-		err = flatten_write(kflat);
-	}
-	flatten_fini(kflat);
-
-	return err;
-
-}
-
-static int kflat_circle_test_arg_iter(struct kflat *kflat, size_t num_points, double* cosx, double* sinx) {
-
-	struct figure circle = { "circle",num_points };
-	unsigned i, j;
-	int err = 0;
-
-	circle.points = kvzalloc(circle.n*sizeof(struct point),GFP_KERNEL);
-    for (i = 0; i < circle.n; ++i) {
-        MAKE_POINT(circle.points[i], i, circle.n - 1);
-    }
-    for (i = 0; i < circle.n; ++i) {
-		unsigned u = 0;
-		for (j = 0; j < circle.n; ++j) {
-			if (i == j)
-				continue;
-			circle.points[i].other[u++] = &circle.points[j];
-		}
-	}
-
-    FLATTEN_FUNCTION_VARIABLE(flatten_circle_arg_iter,circle,&circle);
-
-	for (i = 0; i < circle.n; ++i) {
-		kvfree(circle.points[i].other);
-	}
-	kvfree(circle.points);
-
-	return err;
-
-}
-
-static int kflat_pointer_test(struct kflat *kflat) {
-
-	double magic_number = 3.14159265359;
-	double* pointer_to_it = &magic_number;
-	double** pointer_to_pointer_to_it = &pointer_to_it;
-	double*** ehhh = &pointer_to_pointer_to_it;
-	int err = 0;
-
-	flatten_init(kflat);
-	
-
-	FOR_ROOT_POINTER(ehhh,
-		FLATTEN_TYPE_ARRAY(double**, &pointer_to_pointer_to_it, 1);
-		FOREACH_POINTER(double**,p, &pointer_to_pointer_to_it, 1,
-			FLATTEN_TYPE_ARRAY(double*, p, 1);
-			FOREACH_POINTER(double*, q, p, 1,
-				FLATTEN_TYPE_ARRAY(double, q, 1);
-			);
-		);
-	);
-
-	flat_infos("@Flatten done: %d\n",kflat->errno);
-	if (!kflat->errno) {
-		err = flatten_write(kflat);
-	}
-	flatten_fini(kflat);
-
-	return err;
-
-}
 
 int iarr[10] = {0,1,2,3,4,5,6,7,8,9};
 struct iptr {
@@ -1280,10 +1314,6 @@ struct iptr {
 	int* p;
 	struct iptr** pp;
 };
-
-#define SELF_CONTAINED
-#ifdef SELF_CONTAINED
-
 FUNCTION_DECLARE_FLATTEN_STRUCT_ARRAY_ITER_SELF_CONTAINED(iptr,24);
 
 FUNCTION_DEFINE_FLATTEN_STRUCT_ITER_SELF_CONTAINED(iptr,24,
@@ -1293,20 +1323,6 @@ FUNCTION_DEFINE_FLATTEN_STRUCT_ITER_SELF_CONTAINED(iptr,24,
 	  FLATTEN_STRUCT_ARRAY_ITER(iptr,__iptr_1,1);  /* not SAFE */
 	);
 );
-
-#else
-
-FUNCTION_DECLARE_FLATTEN_STRUCT_ITER(iptr);
-
-FUNCTION_DEFINE_FLATTEN_STRUCT_ITER(iptr,
-    AGGREGATE_FLATTEN_TYPE_ARRAY(int,p,ATTR(l));
-	AGGREGATE_FLATTEN_TYPE_ARRAY(struct iptr*,pp,1);
-	FOR_POINTER(struct iptr*,__iptr_1,ATTR(pp) /*OFFATTR(void**,2048)*/, /* not SAFE */
-	  FLATTEN_STRUCT_ARRAY_ITER(iptr,__iptr_1,1);  /* not SAFE */
-	);
-);
-
-#endif
 
 int kflat_record_pointer_test(struct kflat *kflat) {
 
@@ -1508,6 +1524,7 @@ static int kflat_stringset_test(struct kflat *kflat, size_t num_strings) {
 	);
 
 	stringset_destroy(&stringset_root);
+	stringset_root.rb_node = 0;
 
 	flat_infos("@Flatten done: %d\n",kflat->errno);
 	if (!kflat->errno) {
@@ -1547,6 +1564,7 @@ static int kflat_stringset_test_iter(struct kflat *kflat, size_t num_strings) {
 	);
 
 	stringset_destroy(&stringset_root);
+	stringset_root.rb_node = 0;
 
 	flat_infos("@Flatten done: %d\n",kflat->errno);
 	if (!kflat->errno) {
@@ -1555,74 +1573,6 @@ static int kflat_stringset_test_iter(struct kflat *kflat, size_t num_strings) {
 	flatten_fini(kflat);
 
 	return err;
-}
-
-struct paddingA {
-	int i;
-};
-
-FUNCTION_DEFINE_FLATTEN_STRUCT(paddingA,
-);
-
-struct paddingB {
-	char c;
-} __attribute__((aligned(sizeof(long))));;
-
-FUNCTION_DEFINE_FLATTEN_STRUCT(paddingB,
-	STRUCT_ALIGN(sizeof(long));
-);
-
-struct paddingC {
-	char c;
-};
-
-FUNCTION_DEFINE_FLATTEN_STRUCT(paddingC,
-);
-
-struct paddingRoot {
-	struct paddingA* a0;
-	struct paddingB* b;
-	struct paddingA* a1;
-	struct paddingC* c;
-};
-
-FUNCTION_DEFINE_FLATTEN_STRUCT(paddingRoot,
-	AGGREGATE_FLATTEN_STRUCT(paddingA,a0);
-	AGGREGATE_FLATTEN_STRUCT(paddingB,b);
-	AGGREGATE_FLATTEN_STRUCT(paddingA,a1);
-	AGGREGATE_FLATTEN_STRUCT(paddingC,c);
-);
-
-static int kflat_padding_test(struct kflat *kflat) {
-
-	int err = 0;
-
-	struct paddingA a0 = {3};
-	struct paddingB b = {'3'};
-	struct paddingA a1 = {33};
-	struct paddingC c = {'x'};
-
-	struct paddingRoot r = {&a0,&b,&a1,&c};
-
-	flat_infos("a0: %lx [%zu]\n",&a0,sizeof(struct paddingA));
-	flat_infos("b: %lx [%zu]\n",&b,sizeof(struct paddingB));
-	flat_infos("a1: %lx [%zu]\n",&a1,sizeof(struct paddingA));
-	flat_infos("c: %lx [%zu]\n",&c,sizeof(struct paddingC));
-
-	flatten_init(kflat);
-
-	FOR_ROOT_POINTER(&r,
-		FLATTEN_STRUCT(paddingRoot,&r);
-	);
-
-	flat_infos("@Flatten done: %d\n",kflat->errno);
-	if (!kflat->errno) {
-		err = flatten_write(kflat);
-	}
-	flatten_fini(kflat);
-
-	return err;
-
 }
 
 struct CC {
@@ -1764,7 +1714,18 @@ static int kflat_structarray_test_iter(struct kflat *kflat) {
 	return err;
 }
 
+static int kflat_info_test(struct kflat *kflat) {
+
+	int err = 0;
+
+	flat_infos("ADDR_VALID(0): %d\n",ADDR_VALID(0));
+	err = (ADDR_VALID(0)!=0);
+
+	return err;
+}
+
 #include "kflat_test_data.h"
+
 
 /*******************************************************
  * TEST SUITE ENTRY POINT
@@ -1780,9 +1741,12 @@ int kflat_ioctl_test(struct kflat *kflat, unsigned int cmd, unsigned long arg) {
 	flatten_set_option(kflat, debug_flag);
 
 	switch(test_code) {
+		case INFO:
+			err = kflat_info_test(kflat);
+			break;
+
 		case SIMPLE:
 			err = kflat_simple_test(kflat);
-			if(err) return err;
 			break;
 
 		case CIRCLE:
@@ -1791,11 +1755,7 @@ int kflat_ioctl_test(struct kflat *kflat, unsigned int cmd, unsigned long arg) {
 			else
 				err = kflat_circle_test(kflat, 30, cosx, sinx);
 			break;
-		
-		case CIRCLEARG:
-			err = kflat_circle_test_arg_iter(kflat, 750, cosxi, sinxi);
-			break;
-		
+
 		case STRINGSET:
 			if(iter_flag)
 				err = kflat_stringset_test_iter(kflat, 50000);
@@ -1901,5 +1861,9 @@ int kflat_ioctl_test(struct kflat *kflat, unsigned int cmd, unsigned long arg) {
 			err = -EINVAL;
 	}
 
-	return err;
+	// On success, return the size of flattened memory
+	if(err < 0)
+		return err;
+	
+	return *(size_t*)kflat->area + sizeof(size_t);
 }

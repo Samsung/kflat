@@ -17,10 +17,10 @@ Library exposes API for both C and C++ applications.
 Flatten::Flatten(int level = 0);
 
 /*
- * load - load new image into the given class instance. This method
- *        can be safely called multiple times to load one image after another
- *   (FILE*) file:  pointer to opened file to kflat image from
- *   (fptr*) gfa:   optional pointer to function resolving function addressses
+ * load - load new kflat image from file. This method can be safely
+ *  	  called multiple times to load one image after another
+ *   (FILE*) file:  pointer to opened file with kflat image
+ *   (fptr*) gfa:   optional pointer to function resolving function addresses
  */
 Flatten::load(FILE* file, get_function_address_t gfa = NULL);
 
@@ -58,19 +58,16 @@ Below, the most basic use of this library is presented. Kflat image provided as 
 #include "unflatten.hpp"
 
 int main() {
-    int ret;
     Flatten flatten;
 
     FILE* in = fopen(argv[1], "r");
     assert(in != NULL);
 
-    ret = flatten.load(in, NULL);
+    int ret = flatten.load(in, NULL);
     assert(ret == 0);
 
     const struct A* pA = (const struct A*) flatten.get_next_root();
     std::cout << pA->x << std::endl;
-
-    flatten.unload();
 }
 ```
 

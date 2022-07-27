@@ -1,14 +1,21 @@
+/**
+ * @file kflat.c
+ * @author Pawel Wieczorek (p.wieczorek@samsung.com)
+ * @brief Collection of driver's entry points for userspace
+ * 
+ * File operations have been slightly inspired by Linux KCOV
+ */
 #include "kflat.h"
 #include "probing.h"
 
 #include <linux/atomic.h>
+#include <linux/debugfs.h>
 #include <linux/fs.h>
 #include <linux/module.h>
 #include <linux/printk.h>
 #include <linux/slab.h>
 #include <linux/spinlock.h>
 #include <linux/vmalloc.h>
-#include <linux/debugfs.h>
 
 
 /*******************************************************
@@ -34,6 +41,8 @@ static void kflat_put(struct kflat *kflat) {
 
 /*******************************************************
  * CLIENTS REGISTRY
+ *  The simple data structure for storing per user
+ *  information
  *******************************************************/
 LIST_HEAD(kflat_clients_registry);
 DEFINE_SPINLOCK(kflat_clients_registry_lock);
@@ -45,11 +54,11 @@ struct kflat_client {
 
 static int kflat_register(struct kflat* kflat) {
 	int ret = 0;
-	struct kflat_client* entry;
+	struct kflat_client* entry, *new_entry;
 	unsigned long flags;
 
-	entry = kmalloc(sizeof *entry, GFP_KERNEL);
-	if(entry == NULL)
+	new_entry = kmalloc(sizeof *new_entry, GFP_KERNEL);
+	if(new_entry == NULL)
 		return -ENOMEM;
 	
 	spin_lock_irqsave(&kflat_clients_registry_lock, flags);
@@ -63,14 +72,14 @@ static int kflat_register(struct kflat* kflat) {
 		}
 	}
 
-	entry->kflat = kflat;
-	list_add(&entry->list, &kflat_clients_registry);
+	new_entry->kflat = kflat;
+	list_add(&new_entry->list, &kflat_clients_registry);
 
 exit:
 	spin_unlock_irqrestore(&kflat_clients_registry_lock, flags);
 	if(ret != 0)
 		// If an error occurred, `entry` buffer hasn't been used
-		kfree(entry);
+		kfree(new_entry);
 	return ret;
 }
 
@@ -87,6 +96,7 @@ static int kflat_unregister(struct kflat* kflat) {
 		}
 	}
 	ret = -EINVAL;
+	entry = NULL;
 
 exit:
 	spin_unlock_irqrestore(&kflat_clients_registry_lock, flags);
@@ -128,6 +138,13 @@ void kflat_put_current(struct kflat* kflat) {
 
 /*******************************************************
  * PROBING DELEGATE
+ *  This functions will be invoked after kprobe successfully
+ *  reroutes execution flow in kernel. In here, argument regs
+ *  contains the copy of all registers values (useful for 
+ *  extracting function arguments).
+ * 
+ *  This functions returns uint64_t containing the address
+ *  to which kprobe should return.
  *******************************************************/
 asmlinkage __used uint64_t probing_delegate(struct probe_regs* regs) {
 	int err;
@@ -168,12 +185,14 @@ asmlinkage __used uint64_t probing_delegate(struct probe_regs* regs) {
 	return return_addr;
 }
 
+
 /*******************************************************
  * FILE OPERATIONS
  *******************************************************/
 static int kflat_open(struct inode *inode, struct file *filep) {
 	struct kflat *kflat;
 
+	/* this module is used only for debug purposes, but restrict access anyway */
 	if(!capable(CAP_SYS_RAWIO))
 		return -EPERM;
 
@@ -196,6 +215,7 @@ static int kflat_ioctl_locked(struct kflat *kflat, unsigned int cmd,
 	union {
 		struct kflat_ioctl_init init;
 		struct kflat_ioctl_enable enable;
+		struct kflat_ioctl_disable disable;
 		struct kflat_ioctl_mem_map map;
 	} args;
 	struct kflat_recipe* recipe;
@@ -249,6 +269,14 @@ static int kflat_ioctl_locked(struct kflat *kflat, unsigned int cmd,
 		
 		probing_disarm(&kflat->probing);
 		kflat_unregister(kflat);
+
+		args.disable.size = *(size_t*)kflat->area  + sizeof(size_t);
+		args.disable.invoked = args.disable.size > 0;
+		args.disable.error = kflat->errno;
+		if(copy_to_user((void*)arg, &args.disable, sizeof(args.disable))) {
+			printk(KERN_INFO "Kflat: failed to copy_to_user");
+			return -EFAULT;
+		}
 		return 0;
 
 	case KFLAT_TESTS:
@@ -391,7 +419,7 @@ static void __exit kflat_exit(void) {
 	kdump_exit();
 }
 
-MODULE_AUTHOR("Bartosz Zator");
+MODULE_AUTHOR("Bartosz Zator, Pawel Wieczorek");
 MODULE_DESCRIPTION("Kernel driver allowing user to dump kernel structures");
 MODULE_LICENSE("GPL");
 

@@ -6,6 +6,7 @@
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <sys/time.h>
 #include <unistd.h>
 
@@ -35,8 +36,8 @@ static void _log_generic(FILE* stream, const char* color, const char* prefix,
     if(supports_colors)
         fprintf(stdout, "[%s%s" LOG_DEFAULT_COLOR "][" 
                         LOG_TIME_COLOR "%7.3lf" LOG_DEFAULT_COLOR "] "
-                        LOG_FUNC_COLOR "%-10s|" LOG_DEFAULT_COLOR " ",
-                        color, prefix, log_time(), func);
+                        LOG_FUNC_COLOR "%-*s|" LOG_DEFAULT_COLOR " ",
+                        color, prefix, log_time(), 15 - strlen(prefix), func);
     else
         fprintf(stdout, "[%s][%7.3lf] %-10s| ", prefix, log_time(), func);
 

@@ -23,8 +23,9 @@
   	const typeof( ((type *)0)->member ) *__mptr = (ptr);	\
   	(type *)( (char *)__mptr - offsetof(type,member) );})
 
-
+extern "C" {
 #include "interval_tree_generic.h"
+}
 
 /********************************
  * Private data types

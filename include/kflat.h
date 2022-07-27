@@ -327,12 +327,6 @@ int root_addr_set_delete(struct kflat* kflat, const char* name);
 void root_addr_set_destroy(struct kflat* kflat);
 size_t root_addr_set_count(struct kflat* kflat);
 
-struct ifns_node* ifns_search(const char* s);
-int ifns_insert(const char* s, void* arg);
-int ifns_delete(const char* s);
-void ifns_destroy(void);
-size_t ifns_count(void);
-
 struct flatten_job {
     struct flat_node* node;
     size_t offset;
