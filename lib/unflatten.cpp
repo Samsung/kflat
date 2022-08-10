@@ -541,6 +541,7 @@ public:
 
 			size_t node_offset = fix_loc-node->start;
 			uintptr_t ptr = (uintptr_t)( *((void**)((char*)mem + fix_loc)) );
+			printf("M[%zu]: %08lx\n",fix_loc,ptr);
 			struct interval_tree_node *ptr_node = interval_tree_iter_first(&FLCTRL.imap_root, ptr, ptr + 8);
 			assert(ptr_node != NULL);
 

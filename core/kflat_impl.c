@@ -198,7 +198,7 @@ void binary_stream_destroy(struct kflat* kflat) {
 }
 
 static void binary_stream_element_print(struct blstream* p) {
-	flat_infos("(%zu)(%zu)[%zu]{%lx}[...]\n",p->index,p->alignment,p->size,(unsigned long)p);
+	kflat_dbg_printf("(%zu)(%zu)[%zu]{%lx}[...]\n",p->index,p->alignment,p->size,(unsigned long)p);
 }
 
 void binary_stream_element_print_data(struct blstream* p) {
@@ -218,6 +218,7 @@ static int binary_stream_element_write(struct kflat* kflat, struct blstream* p, 
 
 void binary_stream_print(struct kflat* kflat) {
 
+	kflat_dbg_printf("# Binary stream\n");
 	struct blstream* cp = kflat->FLCTRL.bhead;
 	size_t total_size = 0;
     while(cp) {
@@ -226,7 +227,7 @@ void binary_stream_print(struct kflat* kflat) {
     	binary_stream_element_print(p);
     	total_size+=p->size;
     }
-    flat_infos("@ Total size: %zu\n",total_size);
+    kflat_dbg_printf("Total size: %zu\n\n",total_size);
 }
 
 size_t binary_stream_write(struct kflat* kflat, size_t* wcounter_p) {
@@ -257,17 +258,19 @@ size_t binary_stream_size(struct kflat* kflat) {
 void binary_stream_update_pointers(struct kflat* kflat) {
 	struct rb_node * p = rb_first(&kflat->FLCTRL.fixup_set_root.rb_root);
 	int count=0;
+	kflat_dbg_printf("# Pointer update\n");
 	while(p) {
     	struct fixup_set_node* node = (struct fixup_set_node*)p;
     	if ((node->ptr)&&(!(((unsigned long)node->ptr)&1))) {
 			void* newptr = (unsigned char*)node->ptr->node->storage->index+node->ptr->offset;
-			DBGS("@ ptr update at ((%lx)%lx:%zu) : %lx => %lx\n",(unsigned long)node->inode,(unsigned long)node->inode->start,node->offset,
+			kflat_dbg_printf("@ ptr update at ((%lx)%lx:%zu) : %lx => %lx\n",(unsigned long)node->inode,(unsigned long)node->inode->start,node->offset,
 					(unsigned long)newptr,(unsigned long)(((unsigned char*)node->inode->storage->data)+node->offset));
 			memcpy(&((unsigned char*)node->inode->storage->data)[node->offset],&newptr,sizeof(void*));
+			count++;
     	}
     	p = rb_next(p);
-    	count++;
     }
+    kflat_dbg_printf("Updated %d pointers\n\n");
 }
 
 
@@ -814,14 +817,15 @@ EXPORT_SYMBOL_GPL(fixup_set_insert_fptr_force_update);
 
 void fixup_set_print(struct kflat* kflat) {
 	struct rb_node * p = rb_first(&kflat->FLCTRL.fixup_set_root.rb_root);
-	flat_infos("[\n");
+	kflat_dbg_printf("# Fixup set\n");
+	kflat_dbg_printf("[\n");
 	while(p) {
     	struct fixup_set_node* node = (struct fixup_set_node*)p;
     	if (node->ptr) {
 			if (((unsigned long)node->ptr)&1) {
 				uintptr_t newptr = ((unsigned long)node->ptr)&(~1);
 				uintptr_t origptr = node->inode->storage->index+node->offset;
-				flat_infos(" %zu: (%lx:%zu)->(F) | %zu <- %zu\n",
+				kflat_dbg_printf(" %zu: (%lx:%zu)->(F) | %zu -> %zu\n",
 					node->inode->storage->index,
 					(unsigned long)node->inode,node->offset,
 					origptr,newptr);
@@ -829,7 +833,7 @@ void fixup_set_print(struct kflat* kflat) {
 			else {
 				uintptr_t newptr = node->ptr->node->storage->index+node->ptr->offset;
 				uintptr_t origptr = node->inode->storage->index+node->offset;
-				flat_infos(" %zu: (%lx:%zu)->(%lx:%zu) | %zu <- %zu\n",
+				kflat_dbg_printf(" %zu: (%lx:%zu)->(%lx:%zu) | %zu -> %zu\n",
 						node->inode->storage->index,
 						(unsigned long)node->inode,node->offset,
 						(unsigned long)node->ptr->node,node->ptr->offset,
@@ -839,18 +843,18 @@ void fixup_set_print(struct kflat* kflat) {
     	else if (node->inode) {
     		/* Reserved node but never filled */
     		uintptr_t origptr = node->inode->storage->index+node->offset;
-    		flat_infos(" %zu: (%lx:%zu)-> 0 | %zu\n",
+    		kflat_dbg_printf(" %zu: (%lx:%zu)-> 0 | %zu\n",
 					node->inode->storage->index,
 					(unsigned long)node->inode,node->offset,
 					origptr);
     	}
     	else {
     		/* Reserved for dummy pointer */
-    		flat_infos(" (%lx)-> 0 | \n",(unsigned long)node->offset);
+    		kflat_dbg_printf(" (%lx)-> 0 | \n",(unsigned long)node->offset);
     	}
     	p = rb_next(p);
     }
-	flat_infos("]\n");
+	kflat_dbg_printf("]\n\n");
 }
 
 int fixup_set_write(struct kflat* kflat, size_t* wcounter_p) {
@@ -931,6 +935,7 @@ int mem_fragment_index_debug_print(struct kflat* kflat) {
 	size_t index = 0;
 	size_t fragment_size = 0;
 	size_t mcount = 0;
+	kflat_dbg_printf("# Fragment list\n");
 	while(p) {
 		struct flat_node* node = (struct flat_node*)p;
 		fragment_size += node->storage->size;
@@ -938,11 +943,11 @@ int mem_fragment_index_debug_print(struct kflat* kflat) {
 		if ((!p)||(node->last+1!=((struct flat_node*)p)->start)) {
 			if (p) {
 				size_t nindex = ((struct flat_node*)p)->storage->index;
-				flat_infos("MEM: %08zu [%zu]\n",index,nindex-index);
+				kflat_dbg_printf("%08zu [%zu]\n",index,nindex-index);
 				index = nindex;
 			}
 			else {
-				flat_infos("MEM: %08zu [%zu]\n",index,fragment_size);
+				kflat_dbg_printf("%08zu [%zu]\n",index,fragment_size);
 			}
 			fragment_size = 0;
 			mcount++;
@@ -1168,16 +1173,18 @@ size_t root_addr_set_count(struct kflat* kflat) {
 EXPORT_SYMBOL_GPL(root_addr_set_count);
 
 void interval_tree_print(struct rb_root *root) {
+
+	kflat_dbg_printf("# Interval tree\n");
 	struct rb_node * p = rb_first(root);
 	size_t total_size=0;
 	while(p) {
 		struct flat_node* node = (struct flat_node*)p;
-		flat_infos("(%lx)[%lx:%lx](%zu){%lx}\n",(unsigned long)node,(unsigned long)node->start,(unsigned long)node->last,
+		kflat_dbg_printf("(%lx)[%lx:%lx](%zu){%lx}\n",(unsigned long)node,(unsigned long)node->start,(unsigned long)node->last,
 				node->last-node->start+1,(unsigned long)node->storage);
 		total_size+=node->last-node->start+1;
 		p = rb_next(p);
 	};
-	flat_infos("@ Total size: %zu\n",total_size);
+	kflat_dbg_printf("Total size: %zu\n\n",total_size);
 }
 
 int interval_tree_destroy(struct kflat* kflat, struct rb_root *root) {
