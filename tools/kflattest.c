@@ -66,7 +66,7 @@ int64_t name_to_test(char* name) {
         return (~0ULL) >> 1;
 
     for(int i = CIRCLE; i < sizeof(test_cases) / sizeof(test_cases[0]); i++)
-        if(!strcmp(name, test_cases[i].name))
+        if(!strcasecmp(name, test_cases[i].name))
             return 1ULL << (i - 1);
     return -1;
 }
@@ -83,7 +83,7 @@ int run_test(struct args* args, int no) {
     char out_name[128];
     bool success = false;
     const size_t flat_size = 10 * 1024 * 1024;   // 10MB
-    size_t output_size;
+    ssize_t output_size;
     
     log_info("starting test %s...", test_cases[no].name);
 
@@ -100,7 +100,7 @@ int run_test(struct args* args, int no) {
     }
 
     output_size = ioctl(fd, KFLAT_TESTS, KFLAT_TEST_TO_ARG(no, args->flags));
-    if(ret < 0) {
+    if(output_size < 0) {
         log_error("failed to execute KFLAT_TEST ioctl - %s", strerror(errno));
         goto munmap_area;
     }
