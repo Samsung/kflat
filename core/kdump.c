@@ -269,6 +269,56 @@ static inline int pmd_sect(pmd_t pmd) {
 #endif
 
 
+/*
+ * Handle disabled Top-Byte-Ignore (TBI) feature
+ *  Before testing address in walk_addr function, we optionally
+ *  clear the top bits of address using kernel's arch_kasan_reset_tag
+ *  function. This is done, because on newer ARM processors with MTE
+ *  extension, the top byte of address is used for storing TAG and
+ *  should be ignored in VA translation.
+ * 
+ *  Kernel's macro arch_kasan_reset_tag assumes that when kernel is built
+ *  with CONFIG_KASAN_HW_TAGS, it will have TBI feature enabled. However
+ *  on our test devices, there were a few kernel builds that eventhough
+ *  had this kernel config enabled, TBI feature remained disabled.
+ * 
+ *  Therefore we're manually checking the content of MMU configuration
+ *  register (TCR_EL1) to see if TBI is enabled or not and handle
+ *  top-byte clearing accordingly.
+ */
+#ifdef CONFIG_ARM64
+static int tbi_is_enabled = 0;
+
+static inline void tbi_check(void) {
+    uint64_t tcr_el1;
+    asm volatile(
+        "mrs %0, TCR_EL1;" 
+        : "=r"(tcr_el1)
+    );
+
+    if(tcr_el1 & (1ULL << 38))
+        tbi_is_enabled = 1;
+    
+#ifdef CONFIG_KASAN_HW_TAGS
+    if(!tbi_is_enabled)
+        printk(KERN_INFO "kflat: Top-bytes-ignore feature is disabled even"
+            " though CONFIG_KASAN_HW_TAGS is enabled");
+#endif
+}
+
+static inline void* ptr_reset_tag(void* addr) {
+    if(tbi_is_enabled)
+        return arch_kasan_reset_tag(addr);
+    return addr;
+}
+
+#elif CONFIG_X86_64
+static inline void* ptr_reset_tag(void* addr) {
+    return arch_kasan_reset_tag;
+}
+#endif
+
+
 /*******************************************************
  * RESOURCES DISCOVERING
  *******************************************************/
@@ -349,7 +399,7 @@ static size_t walk_addr(pgd_t* swapper_pgd, uint64_t addr, struct page** pagep) 
     pmd_t* pmdp, pmd;
     pte_t* ptep, pte;
 
-    addr = addr & ~PAGE_SIZE;
+    addr = addr & ~(PAGE_SIZE - 1);
     *pagep = NULL;
 
 #ifdef CONFIG_ARM64
@@ -385,12 +435,8 @@ static size_t walk_addr(pgd_t* swapper_pgd, uint64_t addr, struct page** pagep) 
     if(pud_none(pud))
         return PUD_SIZE;
     else if(pud_sect(pud)) {
-        if(!pud_present(pud))
-            return PUD_SIZE;
-        if(!pfn_valid(pud_pfn(pud)))
-            return PUD_SIZE;
-        
-        *pagep = pud_page(pud);
+        if(pud_present(pud) && pfn_valid(pud_pfn(pud)))
+            *pagep = pud_page(pud);
         return PUD_SIZE;
     }
 
@@ -400,24 +446,17 @@ static size_t walk_addr(pgd_t* swapper_pgd, uint64_t addr, struct page** pagep) 
     if(pmd_none(pmd))
         return PMD_SIZE;
     else if(pmd_sect(pmd)) {
-        if(!pmd_present(pmd))
-            return PMD_SIZE;
-        if(!pfn_valid(pmd_pfn(pmd)))
-            return PMD_SIZE;
-        
-        *pagep = pmd_page(pmd);
+        if(pmd_present(pmd) && pfn_valid(pmd_pfn(pmd)))        
+            *pagep = pmd_page(pmd);
         return PMD_SIZE;
     }
 
     // Finally, check PTE table for page entry
     ptep = pte_offset_kernel(pmdp, addr);
     pte = READ_ONCE(*ptep);
-    if(pte_none(pte))
-        return PAGE_SIZE;
-    if(!pfn_valid(pte_pfn(pte)))
-        return PAGE_SIZE;
-    
-    *pagep = pte_page(pte);
+    if(!pte_none(pte) && pfn_valid(pte_pfn(pte)))    
+        *pagep = pte_page(pte);
+
     return PAGE_SIZE;
 }
 
@@ -456,7 +495,9 @@ void kdump_dump_vma(struct kdump_memory_map* kdump) {
 size_t kdump_test_address(void* addr, size_t size) {
     size_t walked_size = 0;
     struct page* page;
-    size_t page_offset = (uint64_t)addr & PAGE_MASK;
+    size_t page_offset = (uint64_t)addr & (~PAGE_MASK);
+
+    addr = ptr_reset_tag(addr);
 
     /* Fast path for NULL pointer addresses */
 	if (addr == NULL)
@@ -464,14 +505,14 @@ size_t kdump_test_address(void* addr, size_t size) {
     
     pgd_t* kernel_pgd = kdump_get_kernel_pgd();
     for(walked_size = 0; walked_size < size;) {
-        int ret_size = walk_addr(kernel_pgd, (uint64_t) addr + walked_size, &page);
+        size_t ret_size = walk_addr(kernel_pgd, (uint64_t) addr + walked_size, &page);
         if(page == NULL || !kdump_is_phys_in_ram(page_to_phys(page)))
             break;
         
         walked_size += ret_size;
     }
 
-    if(walked_size > 0) 
+    if(walked_size > 0)
         walked_size -= page_offset;
 
     return walked_size;
@@ -482,6 +523,11 @@ EXPORT_SYMBOL_GPL(kdump_test_address);
  * (De)initialization
  *******************************************************/
 int kdump_init(void) {
+
+#ifdef CONFIG_ARM64
+    tbi_check();
+#endif
+
     return kdump_collect_iomem_ram();
 }
 

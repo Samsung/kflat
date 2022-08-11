@@ -467,7 +467,22 @@ static inline size_t ptrarrmemlen(const void* const* m) {
 #define OFFADDR(T,_off)	((T*)((unsigned char*)(_ptr)+_off))
 
 #define ADDR_VALID(PTR)				(kdump_test_address((void*) PTR, 1))
-#define ADDR_RANGE_VALID(PTR, SIZE) (kdump_test_address((void*) PTR, SIZE))
+
+static __used bool _addr_range_valid(void* ptr, size_t size) {
+	size_t avail_size;
+	avail_size = kdump_test_address(ptr, size);
+
+	if(avail_size == 0)
+		return false;
+	else if(avail_size >= size)
+		return true;
+	
+	printk_ratelimited(KERN_ERR "kflat: Failed to access %zu bytes of mem@%llx. Only %zu bytes are mapped",
+		size, ptr, avail_size);
+	return false;
+}
+
+#define ADDR_RANGE_VALID(PTR, SIZE) (_addr_range_valid((void*) PTR, SIZE))
 // TODO: Consider checking +x permission
 #define TEXT_ADDR_VALID(PTR)		ADDR_VALID(PTR)
 
@@ -2081,7 +2096,7 @@ FUNCTION_DEFINE_FLATTEN_STRUCT_TYPE_ARRAY_ITER_SELF_CONTAINED(FLTYPE,FLSIZE)
 #define FLATTEN_STRUCT(T,p)	\
 	do {	\
 		DBGTP(FLATTEN_STRUCT,T,p);	\
-		if ((!KFLAT_ACCESSOR->errno)&&(ADDR_VALID(p))) {   \
+		if ((!KFLAT_ACCESSOR->errno)&&(ADDR_RANGE_VALID(p, sizeof(struct T)))) {   \
 			struct fixup_set_node* __inode = fixup_set_search(KFLAT_ACCESSOR,(uintptr_t)p);	\
 			if (!__inode) {	\
 				int err = fixup_set_reserve_address(KFLAT_ACCESSOR,(uintptr_t)p);	\
@@ -2113,7 +2128,7 @@ FUNCTION_DEFINE_FLATTEN_STRUCT_TYPE_ARRAY_ITER_SELF_CONTAINED(FLTYPE,FLSIZE)
 #define FLATTEN_STRUCT_TYPE(T,p)	\
 	do {	\
 		DBGTP(FLATTEN_STRUCT_TYPE,T,p);	\
-		if ((!KFLAT_ACCESSOR->errno)&&(ADDR_VALID(p))) {   \
+		if ((!KFLAT_ACCESSOR->errno)&&(ADDR_RANGE_VALID(p, sizeof(T)))) {   \
 			struct fixup_set_node* __inode = fixup_set_search(KFLAT_ACCESSOR,(uintptr_t)p);	\
 			if (!__inode) {	\
 				int err = fixup_set_reserve_address(KFLAT_ACCESSOR,(uintptr_t)p);	\
@@ -2146,7 +2161,7 @@ FUNCTION_DEFINE_FLATTEN_STRUCT_TYPE_ARRAY_ITER_SELF_CONTAINED(FLTYPE,FLSIZE)
 #define FLATTEN_STRUCT_ITER(T,p)	\
 	do {    \
         DBGTP(FLATTEN_STRUCT_ITER,T,p);  \
-        if ((!KFLAT_ACCESSOR->errno)&&(ADDR_VALID(p))) {   \
+        if ((!KFLAT_ACCESSOR->errno)&&(ADDR_RANGE_VALID(p, sizeof(struct T)))) {   \
 			struct fixup_set_node* __inode = fixup_set_search(KFLAT_ACCESSOR,(uintptr_t)p);	\
 			if (!__inode) {	\
 				int err = fixup_set_reserve_address(KFLAT_ACCESSOR,(uintptr_t)p);	\
@@ -2185,7 +2200,7 @@ FUNCTION_DEFINE_FLATTEN_STRUCT_TYPE_ARRAY_ITER_SELF_CONTAINED(FLTYPE,FLSIZE)
 #define FLATTEN_STRUCT_TYPE_ITER(T,p)	\
 	do {    \
         DBGTP(FLATTEN_STRUCT_TYPE_ITER,T,p);  \
-        if ((!KFLAT_ACCESSOR->errno)&&(ADDR_VALID(p))) {   \
+        if ((!KFLAT_ACCESSOR->errno)&&(ADDR_RANGE_VALID(p, sizeof(T)))) {   \
 			struct fixup_set_node* __inode = fixup_set_search(KFLAT_ACCESSOR,(uintptr_t)p);	\
 			if (!__inode) {	\
 				int err = fixup_set_reserve_address(KFLAT_ACCESSOR,(uintptr_t)p);	\
@@ -2222,7 +2237,7 @@ FUNCTION_DEFINE_FLATTEN_STRUCT_TYPE_ARRAY_ITER_SELF_CONTAINED(FLTYPE,FLSIZE)
 #define FLATTEN_STRUCT_SELF_CONTAINED(T,N,p)	\
 	do {	\
 		DBGTNP(FLATTEN_STRUCT_SELF_CONTAINED,T,N,p);	\
-		if ((!KFLAT_ACCESSOR->errno)&&(ADDR_VALID(p))) {   \
+		if ((!KFLAT_ACCESSOR->errno)&&(ADDR_RANGE_VALID(p, N))) {   \
 			struct fixup_set_node* __inode = fixup_set_search(KFLAT_ACCESSOR,(uintptr_t)p);	\
 			if (!__inode) {	\
 				int err = fixup_set_reserve_address(KFLAT_ACCESSOR,(uintptr_t)p);	\
@@ -2254,7 +2269,7 @@ FUNCTION_DEFINE_FLATTEN_STRUCT_TYPE_ARRAY_ITER_SELF_CONTAINED(FLTYPE,FLSIZE)
 #define FLATTEN_STRUCT_TYPE_SELF_CONTAINED(T,N,p)	\
 	do {	\
 		DBGTNP(FLATTEN_STRUCT_TYPE_SELF_CONTAINED,T,N,p);	\
-		if ((!KFLAT_ACCESSOR->errno)&&(ADDR_VALID(p))) {   \
+		if ((!KFLAT_ACCESSOR->errno)&&(ADDR_RANGE_VALID(p, N))) {   \
 			struct fixup_set_node* __inode = fixup_set_search(KFLAT_ACCESSOR,(uintptr_t)p);	\
 			if (!__inode) {	\
 				int err = fixup_set_reserve_address(KFLAT_ACCESSOR,(uintptr_t)p);	\
@@ -2286,7 +2301,7 @@ FUNCTION_DEFINE_FLATTEN_STRUCT_TYPE_ARRAY_ITER_SELF_CONTAINED(FLTYPE,FLSIZE)
 #define FLATTEN_STRUCT_ITER_SELF_CONTAINED(T,N,p)	\
 	do {    \
         DBGTNP(FLATTEN_STRUCT_ITER_SELF_CONTAINED,T,N,p);  \
-        if ((!KFLAT_ACCESSOR->errno)&&(ADDR_VALID(p))) {   \
+        if ((!KFLAT_ACCESSOR->errno)&&(ADDR_RANGE_VALID(p, N))) {   \
 			struct fixup_set_node* __inode = fixup_set_search(KFLAT_ACCESSOR,(uintptr_t)p);	\
 			if (!__inode) {	\
 				int err = fixup_set_reserve_address(KFLAT_ACCESSOR,(uintptr_t)p);	\
@@ -2323,7 +2338,7 @@ FUNCTION_DEFINE_FLATTEN_STRUCT_TYPE_ARRAY_ITER_SELF_CONTAINED(FLTYPE,FLSIZE)
 #define FLATTEN_STRUCT_TYPE_ITER_SELF_CONTAINED(T,N,p)	\
 	do {    \
         DBGTNP(FLATTEN_STRUCT_TYPE_ITER_SELF_CONTAINED,T,N,p);  \
-        if ((!KFLAT_ACCESSOR->errno)&&(ADDR_VALID(p))) {   \
+        if ((!KFLAT_ACCESSOR->errno)&&(ADDR_RANGE_VALID(p, N))) {   \
 			struct fixup_set_node* __inode = fixup_set_search(KFLAT_ACCESSOR,(uintptr_t)p);	\
 			if (!__inode) {	\
 				int err = fixup_set_reserve_address(KFLAT_ACCESSOR,(uintptr_t)p);	\
@@ -2360,7 +2375,7 @@ FUNCTION_DEFINE_FLATTEN_STRUCT_TYPE_ARRAY_ITER_SELF_CONTAINED(FLTYPE,FLSIZE)
 #define FLATTEN_STRUCT_ARRAY(T,p,n)	\
 	do {	\
 		DBGM3(FLATTEN_STRUCT_ARRAY,T,p,n);	\
-		if ((!KFLAT_ACCESSOR->errno)&&(ADDR_VALID(p))) {   \
+		if ((!KFLAT_ACCESSOR->errno)&&(ADDR_RANGE_VALID(p, (n) * sizeof(struct T)))) {   \
 			int err = fixup_set_insert_force_update(KFLAT_ACCESSOR,__fptr->node,__fptr->offset,flatten_struct_array_##T(KFLAT_ACCESSOR,(p),(n)));	\
 			if ((err) && (err!=EINVAL) && (err!=EEXIST) && (err!=EAGAIN)) {	\
 				KFLAT_ACCESSOR->errno = err;	\
@@ -2372,7 +2387,7 @@ FUNCTION_DEFINE_FLATTEN_STRUCT_TYPE_ARRAY_ITER_SELF_CONTAINED(FLTYPE,FLSIZE)
 #define FLATTEN_STRUCT_TYPE_ARRAY(T,p,n)	\
 	do {	\
 		DBGM3(FLATTEN_STRUCT_TYPE_ARRAY,T,p,n);	\
-		if ((!KFLAT_ACCESSOR->errno)&&(ADDR_VALID(p))) {   \
+		if ((!KFLAT_ACCESSOR->errno)&&(ADDR_RANGE_VALID(p, (n) * sizeof(T)))) {   \
 			int err = fixup_set_insert_force_update(KFLAT_ACCESSOR,__fptr->node,__fptr->offset,flatten_struct_type_array_##T(KFLAT_ACCESSOR,(p),(n)));	\
 			if ((err) && (err!=EINVAL) && (err!=EEXIST) && (err!=EAGAIN)) {	\
 				KFLAT_ACCESSOR->errno = err;	\
@@ -2384,7 +2399,7 @@ FUNCTION_DEFINE_FLATTEN_STRUCT_TYPE_ARRAY_ITER_SELF_CONTAINED(FLTYPE,FLSIZE)
 #define FLATTEN_STRUCT_ARRAY_ITER(T,p,n)	\
 	do {	\
 		DBGM3(FLATTEN_STRUCT_ARRAY_ITER,T,p,n);	\
-    	if ((!KFLAT_ACCESSOR->errno)&&(ADDR_VALID(p))) {	\
+    	if ((!KFLAT_ACCESSOR->errno)&&(ADDR_RANGE_VALID(p, (n) * sizeof(struct T)))) {	\
 			int err = fixup_set_insert_force_update(KFLAT_ACCESSOR,__fptr->node,__fptr->offset,	\
 					flatten_plain_type(KFLAT_ACCESSOR,p,(n)*sizeof(struct T)));	\
 			if ((err) && (err!=EINVAL) && (err!=EEXIST) && (err!=EAGAIN)) {	\
@@ -2425,7 +2440,7 @@ FUNCTION_DEFINE_FLATTEN_STRUCT_TYPE_ARRAY_ITER_SELF_CONTAINED(FLTYPE,FLSIZE)
 #define FLATTEN_STRUCT_ARRAY_ITER_SPECIALIZE(TAG,T,p,n)	\
 	do {	\
 		DBGM3(FLATTEN_STRUCT_ARRAY_ITER_SPECIALIZE,T,p,n);	\
-    	if ((!KFLAT_ACCESSOR->errno)&&(ADDR_VALID(p))) {	\
+    	if ((!KFLAT_ACCESSOR->errno)&&(ADDR_RANGE_VALID(p, (n) * sizeof(struct T)))) {	\
 			int err = fixup_set_insert_force_update(KFLAT_ACCESSOR,__fptr->node,__fptr->offset,	\
 					flatten_plain_type(KFLAT_ACCESSOR,p,(n)*sizeof(struct T)));	\
 			if ((err) && (err!=EINVAL) && (err!=EEXIST) && (err!=EAGAIN)) {	\
@@ -2466,7 +2481,7 @@ FUNCTION_DEFINE_FLATTEN_STRUCT_TYPE_ARRAY_ITER_SELF_CONTAINED(FLTYPE,FLSIZE)
 #define FLATTEN_STRUCT_TYPE_ARRAY_ITER(T,p,n)	\
 	do {	\
 		DBGM3(FLATTEN_STRUCT_TYPE_ARRAY_ITER,T,p,n);	\
-    	if ((!KFLAT_ACCESSOR->errno)&&(ADDR_VALID(p))) {	\
+    	if ((!KFLAT_ACCESSOR->errno)&&(ADDR_RANGE_VALID(p, (n) * sizeof(T)))) {	\
 			int err = fixup_set_insert_force_update(KFLAT_ACCESSOR,__fptr->node,__fptr->offset,	\
 					flatten_plain_type(KFLAT_ACCESSOR,p,(n)*sizeof(T)));	\
 			if ((err) && (err!=EINVAL) && (err!=EEXIST) && (err!=EAGAIN)) {	\
@@ -2507,7 +2522,7 @@ FUNCTION_DEFINE_FLATTEN_STRUCT_TYPE_ARRAY_ITER_SELF_CONTAINED(FLTYPE,FLSIZE)
 #define FLATTEN_STRUCT_ARRAY_ITER_SELF_CONTAINED(T,N,p,n)	\
 	do {	\
 		DBGM4(FLATTEN_STRUCT_ARRAY_ITER_SELF_CONTAINED,T,N,p,n);	\
-    	if ((!KFLAT_ACCESSOR->errno)&&(ADDR_VALID(p))) {	\
+    	if ((!KFLAT_ACCESSOR->errno)&&(ADDR_RANGE_VALID(p, (n) * N))) {	\
 			int err = fixup_set_insert_force_update(KFLAT_ACCESSOR,__fptr->node,__fptr->offset,	\
 					flatten_plain_type(KFLAT_ACCESSOR,p,(n)*N));	\
 			if ((err) && (err!=EINVAL) && (err!=EEXIST) && (err!=EAGAIN)) {	\
@@ -2548,7 +2563,7 @@ FUNCTION_DEFINE_FLATTEN_STRUCT_TYPE_ARRAY_ITER_SELF_CONTAINED(FLTYPE,FLSIZE)
 #define FLATTEN_UNION_ARRAY_ITER_SELF_CONTAINED(T,N,p,n)	\
 	do {	\
 		DBGM4(FLATTEN_UNION_ARRAY_ITER_SELF_CONTAINED,T,N,p,n);	\
-    	if ((!KFLAT_ACCESSOR->errno)&&(ADDR_VALID(p))) {	\
+    	if ((!KFLAT_ACCESSOR->errno)&&(ADDR_RANGE_VALID(p, (n) * N))) {	\
 			int err = fixup_set_insert_force_update(KFLAT_ACCESSOR,__fptr->node,__fptr->offset,	\
 					flatten_plain_type(KFLAT_ACCESSOR,p,(n)*N));	\
 			if ((err) && (err!=EINVAL) && (err!=EEXIST) && (err!=EAGAIN)) {	\
@@ -2589,7 +2604,7 @@ FUNCTION_DEFINE_FLATTEN_STRUCT_TYPE_ARRAY_ITER_SELF_CONTAINED(FLTYPE,FLSIZE)
 #define FLATTEN_STRUCT_TYPE_ARRAY_ITER_SELF_CONTAINED(T,N,p,n)	\
 	do {	\
 		DBGM4(FLATTEN_STRUCT_TYPE_ARRAY_ITER_SELF_CONTAINED,T,N,p,n);	\
-    	if ((!KFLAT_ACCESSOR->errno)&&(ADDR_VALID(p))) {	\
+    	if ((!KFLAT_ACCESSOR->errno)&&(ADDR_RANGE_VALID(p, (n) * N))) {	\
 			int err = fixup_set_insert_force_update(KFLAT_ACCESSOR,__fptr->node,__fptr->offset,	\
 					flatten_plain_type(KFLAT_ACCESSOR,p,(n)*N));	\
 			if ((err) && (err!=EINVAL) && (err!=EEXIST) && (err!=EAGAIN)) {	\
@@ -2630,7 +2645,7 @@ FUNCTION_DEFINE_FLATTEN_STRUCT_TYPE_ARRAY_ITER_SELF_CONTAINED(FLTYPE,FLSIZE)
 #define AGGREGATE_FLATTEN_STRUCT(T,f)	\
 	do {	\
 		DBGTF(AGGREGATE_FLATTEN_STRUCT,T,f,"%lx",(unsigned long)ATTR(f));	\
-    	if ((!KFLAT_ACCESSOR->errno)&&(ADDR_VALID(ATTR(f)))) {	\
+    	if ((!KFLAT_ACCESSOR->errno)&&(ADDR_RANGE_VALID(ATTR(f), sizeof(struct T*)))) {	\
     		size_t _off = offsetof(_container_type,f);	\
     		struct flat_node *__node = interval_tree_iter_first(&KFLAT_ACCESSOR->FLCTRL.imap_root, (uint64_t)_ptr+_off,\
     				(uint64_t)_ptr+_off+sizeof(struct T*)-1);    \
@@ -2677,7 +2692,7 @@ FUNCTION_DEFINE_FLATTEN_STRUCT_TYPE_ARRAY_ITER_SELF_CONTAINED(FLTYPE,FLSIZE)
 #define AGGREGATE_FLATTEN_STRUCT_TYPE(T,f)	\
 	do {	\
 		DBGTF(AGGREGATE_FLATTEN_STRUCT_TYPE,T,f,"%lx",(unsigned long)ATTR(f));	\
-    	if ((!KFLAT_ACCESSOR->errno)&&(ADDR_VALID(ATTR(f)))) {	\
+    	if ((!KFLAT_ACCESSOR->errno)&&(ADDR_RANGE_VALID(ATTR(f), sizeof(T*)))) {	\
     		size_t _off = offsetof(_container_type,f);	\
     		struct flat_node *__node = interval_tree_iter_first(&KFLAT_ACCESSOR->FLCTRL.imap_root, (uint64_t)_ptr+_off,\
     				(uint64_t)_ptr+_off+sizeof(T*)-1);    \
@@ -2760,7 +2775,7 @@ FUNCTION_DEFINE_FLATTEN_STRUCT_TYPE_ARRAY_ITER_SELF_CONTAINED(FLTYPE,FLSIZE)
 #define AGGREGATE_FLATTEN_STRUCT_ITER(T,f)	\
 	do {    \
         DBGTF(AGGREGATE_FLATTEN_STRUCT_ITER,T,f,"%lx",(unsigned long)ATTR(f));    \
-        if ((!KFLAT_ACCESSOR->errno)&&(ADDR_VALID(ATTR(f)))) {  \
+        if ((!KFLAT_ACCESSOR->errno)&&(ADDR_RANGE_VALID(ATTR(f), sizeof(struct T*)))) {  \
         	size_t _off = offsetof(_container_type,f);  \
         	struct flat_node *__node = interval_tree_iter_first(&KFLAT_ACCESSOR->FLCTRL.imap_root, (uint64_t)_ptr+_off,\
         			(uint64_t)_ptr+_off+sizeof(struct T*)-1);    \
@@ -2814,7 +2829,7 @@ FUNCTION_DEFINE_FLATTEN_STRUCT_TYPE_ARRAY_ITER_SELF_CONTAINED(FLTYPE,FLSIZE)
 #define AGGREGATE_FLATTEN_STRUCT_TYPE_ITER(T,f)	\
 	do {    \
         DBGTF(AGGREGATE_FLATTEN_STRUCT_TYPE_ITER,T,f,"%lx",(unsigned long)ATTR(f));    \
-        if ((!KFLAT_ACCESSOR->errno)&&(ADDR_VALID(ATTR(f)))) {  \
+        if ((!KFLAT_ACCESSOR->errno)&&(ADDR_RANGE_VALID(ATTR(f), sizeof(T*)))) {  \
         	size_t _off = offsetof(_container_type,f);  \
         	struct flat_node *__node = interval_tree_iter_first(&KFLAT_ACCESSOR->FLCTRL.imap_root, (uint64_t)_ptr+_off,\
         			(uint64_t)_ptr+_off+sizeof(T*)-1);    \
@@ -3168,7 +3183,7 @@ FUNCTION_DEFINE_FLATTEN_STRUCT_TYPE_ARRAY_ITER_SELF_CONTAINED(FLTYPE,FLSIZE)
 #define AGGREGATE_FLATTEN_STRUCT_ARRAY(T,f,n)	\
 	do {	\
 		DBGM3(AGGREGATE_FLATTEN_STRUCT_ARRAY,T,f,n);	\
-    	if ((!KFLAT_ACCESSOR->errno)&&(ADDR_VALID(ATTR(f)))) {	\
+    	if ((!KFLAT_ACCESSOR->errno)&&(ADDR_RANGE_VALID(ATTR(f), (n)*sizeof(struct T)))) {	\
     		size_t _off = offsetof(_container_type,f);	\
     		struct flat_node *__node = interval_tree_iter_first(&KFLAT_ACCESSOR->FLCTRL.imap_root, (uint64_t)_ptr+_off,\
     				(uint64_t)_ptr+_off+sizeof(struct T*)-1);    \
@@ -3216,7 +3231,7 @@ FUNCTION_DEFINE_FLATTEN_STRUCT_TYPE_ARRAY_ITER_SELF_CONTAINED(FLTYPE,FLSIZE)
 #define AGGREGATE_FLATTEN_STRUCT_TYPE_ARRAY(T,f,n)	\
 	do {	\
 		DBGM3(AGGREGATE_FLATTEN_STRUCT_TYPE_ARRAY,T,f,n);	\
-    	if ((!KFLAT_ACCESSOR->errno)&&(ADDR_VALID(ATTR(f)))) {	\
+    	if ((!KFLAT_ACCESSOR->errno)&&(ADDR_RANGE_VALID(ATTR(f), (n)*sizeof(T)))) {	\
     		size_t _off = offsetof(_container_type,f);	\
     		struct flat_node *__node = interval_tree_iter_first(&KFLAT_ACCESSOR->FLCTRL.imap_root, (uint64_t)_ptr+_off,\
     				(uint64_t)_ptr+_off+sizeof(T*)-1);    \
@@ -3231,7 +3246,7 @@ FUNCTION_DEFINE_FLATTEN_STRUCT_TYPE_ARRAY_ITER_SELF_CONTAINED(FLTYPE,FLSIZE)
 					KFLAT_ACCESSOR->errno = err;	\
 				}	\
 				else {	\
-					if (!err || (err==EAGAIN) {	\
+					if (!err || (err==EAGAIN)) {	\
 						struct fixup_set_node* __struct_inode;	\
 						size_t _i;	\
 						err = 0;	\
@@ -3264,7 +3279,7 @@ FUNCTION_DEFINE_FLATTEN_STRUCT_TYPE_ARRAY_ITER_SELF_CONTAINED(FLTYPE,FLSIZE)
 #define AGGREGATE_FLATTEN_STRUCT_ARRAY_ITER(T,f,n)	\
 	do {	\
 		DBGM3(AGGREGATE_FLATTEN_STRUCT_ARRAY_ITER,T,f,n);	\
-    	if ((!KFLAT_ACCESSOR->errno)&&(ADDR_VALID(ATTR(f)))) {	\
+    	if ((!KFLAT_ACCESSOR->errno)&&(ADDR_RANGE_VALID(ATTR(f),(n)*sizeof(struct T)))) {	\
     		size_t _off = offsetof(_container_type,f);  \
     		struct flat_node *__node = interval_tree_iter_first(&KFLAT_ACCESSOR->FLCTRL.imap_root, (uint64_t)_ptr+_off,\
     				(uint64_t)_ptr+_off+sizeof(struct T*)-1);    \
@@ -3319,7 +3334,7 @@ FUNCTION_DEFINE_FLATTEN_STRUCT_TYPE_ARRAY_ITER_SELF_CONTAINED(FLTYPE,FLSIZE)
 #define AGGREGATE_FLATTEN_STRUCT_TYPE_ARRAY_ITER(T,f,n)	\
 	do {	\
 		DBGM3(AGGREGATE_FLATTEN_STRUCT_TYPE_ARRAY_ITER,T,f,n);	\
-    	if ((!KFLAT_ACCESSOR->errno)&&(ADDR_VALID(ATTR(f)))) {	\
+    	if ((!KFLAT_ACCESSOR->errno)&&(ADDR_RANGE_VALID(ATTR(f),(n)*sizeof(T)))) {	\
     		size_t _off = offsetof(_container_type,f);  \
     		struct flat_node *__node = interval_tree_iter_first(&KFLAT_ACCESSOR->FLCTRL.imap_root, (uint64_t)_ptr+_off,\
     				(uint64_t)_ptr+_off+sizeof(T*)-1);    \
@@ -3389,7 +3404,7 @@ FUNCTION_DEFINE_FLATTEN_STRUCT_TYPE_ARRAY_ITER_SELF_CONTAINED(FLTYPE,FLSIZE)
 #define AGGREGATE_FLATTEN_STRUCT_SELF_CONTAINED(T,N,f,_off)	\
 	do {	\
 		DBGTNF(FLATTEN_STRUCT_TYPE_ITER_SELF_CONTAINED,T,N,f,"%lx:%zu",(unsigned long)OFFATTR(void*,_off),(size_t)_off);	\
-    	if ((!KFLAT_ACCESSOR->errno)&&(ADDR_VALID(OFFATTR(void*,_off)))) {	\
+    	if ((!KFLAT_ACCESSOR->errno)&&(ADDR_RANGE_VALID(OFFATTR(void*,_off), N))) {	\
     		struct flat_node *__node = interval_tree_iter_first(&KFLAT_ACCESSOR->FLCTRL.imap_root, (uint64_t)_ptr+_off,\
     				(uint64_t)_ptr+_off+sizeof(struct T*)-1);    \
     		if (__node==0) {	\
@@ -3435,7 +3450,7 @@ FUNCTION_DEFINE_FLATTEN_STRUCT_TYPE_ARRAY_ITER_SELF_CONTAINED(FLTYPE,FLSIZE)
 #define AGGREGATE_FLATTEN_STRUCT_TYPE_SELF_CONTAINED(T,N,f,_off)	\
 	do {	\
 		DBGTNF(FLATTEN_STRUCT_TYPE_ITER_SELF_CONTAINED,T,N,f,"%lx:%zu",(unsigned long)OFFATTR(void*,_off),(size_t)_off);	\
-    	if ((!KFLAT_ACCESSOR->errno)&&(ADDR_VALID(OFFATTR(void*,_off)))) {	\
+    	if ((!KFLAT_ACCESSOR->errno)&&(ADDR_RANGE_VALID(OFFATTR(void*,_off), N))) {	\
     		struct flat_node *__node = interval_tree_iter_first(&KFLAT_ACCESSOR->FLCTRL.imap_root, (uint64_t)_ptr+_off,\
     				(uint64_t)_ptr+_off+sizeof(T*)-1);    \
     		if (__node==0) {	\
@@ -3481,7 +3496,7 @@ FUNCTION_DEFINE_FLATTEN_STRUCT_TYPE_ARRAY_ITER_SELF_CONTAINED(FLTYPE,FLSIZE)
 #define AGGREGATE_FLATTEN_STRUCT_ITER_SELF_CONTAINED(T,N,f,_off)	\
 	do {    \
         DBGTNF(FLATTEN_STRUCT_TYPE_ITER_SELF_CONTAINED,T,N,f,"%lx:%zu",(unsigned long)OFFATTR(void*,_off),(size_t)_off);    \
-        if ((!KFLAT_ACCESSOR->errno)&&(ADDR_VALID(OFFATTR(void*,_off)))) {  \
+        if ((!KFLAT_ACCESSOR->errno)&&(ADDR_RANGE_VALID(OFFATTR(void*,_off), N))) {  \
         	struct flat_node *__node = interval_tree_iter_first(&KFLAT_ACCESSOR->FLCTRL.imap_root, (uint64_t)_ptr+_off,\
         			(uint64_t)_ptr+_off+sizeof(struct T*)-1);    \
 			if (__node==0) {	\
@@ -3534,7 +3549,7 @@ FUNCTION_DEFINE_FLATTEN_STRUCT_TYPE_ARRAY_ITER_SELF_CONTAINED(FLTYPE,FLSIZE)
 #define AGGREGATE_FLATTEN_STRUCT_TYPE_ITER_SELF_CONTAINED(T,N,f,_off)	\
 	do {    \
         DBGTNF(AGGREGATE_FLATTEN_STRUCT_TYPE_ITER_SELF_CONTAINED,T,N,f,"%lx:%zu",(unsigned long)OFFATTR(void*,_off),(size_t)_off);    \
-        if ((!KFLAT_ACCESSOR->errno)&&(ADDR_VALID(OFFATTR(void*,_off)))) {  \
+        if ((!KFLAT_ACCESSOR->errno)&&(ADDR_RANGE_VALID(OFFATTR(void*,_off), N))) {  \
         	struct flat_node *__node = interval_tree_iter_first(&KFLAT_ACCESSOR->FLCTRL.imap_root, (uint64_t)_ptr+_off,\
         			(uint64_t)_ptr+_off+sizeof(T*)-1);    \
 			if (__node==0) {	\
@@ -3791,7 +3806,7 @@ FUNCTION_DEFINE_FLATTEN_STRUCT_TYPE_ARRAY_ITER_SELF_CONTAINED(FLTYPE,FLSIZE)
 #define AGGREGATE_FLATTEN_STRUCT_ARRAY_SELF_CONTAINED(T,N,f,_off,n)	\
 	do {	\
 		DBGM5(AGGREGATE_FLATTEN_STRUCT_ARRAY_SELF_CONTAINED,T,N,f,_off,n);	\
-    	if ((!KFLAT_ACCESSOR->errno)&&(ADDR_VALID(OFFATTR(void*,_off)))) {	\
+    	if ((!KFLAT_ACCESSOR->errno)&&(ADDR_RANGE_VALID(OFFATTR(void*,_off), (n)*N))) {	\
     		struct flat_node *__node = interval_tree_iter_first(&KFLAT_ACCESSOR->FLCTRL.imap_root, (uint64_t)_ptr+_off,\
     				(uint64_t)_ptr+_off+sizeof(struct T*)-1);    \
 			if (__node==0) {	\
@@ -3837,7 +3852,7 @@ FUNCTION_DEFINE_FLATTEN_STRUCT_TYPE_ARRAY_ITER_SELF_CONTAINED(FLTYPE,FLSIZE)
 #define AGGREGATE_FLATTEN_STRUCT_TYPE_ARRAY_SELF_CONTAINED(T,N,f,_off,n)	\
 	do {	\
 		DBGM5(AGGREGATE_FLATTEN_STRUCT_TYPE_ARRAY_SELF_CONTAINED,T,N,f,_off,n);	\
-    	if ((!KFLAT_ACCESSOR->errno)&&(ADDR_VALID(OFFATTR(void*,_off)))) {	\
+    	if ((!KFLAT_ACCESSOR->errno)&&(ADDR_RANGE_VALID(OFFATTR(void*,_off), (n)*N))) {	\
     		struct flat_node *__node = interval_tree_iter_first(&KFLAT_ACCESSOR->FLCTRL.imap_root, (uint64_t)_ptr+_off,\
     				(uint64_t)_ptr+_off+sizeof(T*)-1);    \
 			if (__node==0) {	\
@@ -3884,7 +3899,7 @@ FUNCTION_DEFINE_FLATTEN_STRUCT_TYPE_ARRAY_ITER_SELF_CONTAINED(FLTYPE,FLSIZE)
 	do {	\
 		DBGM5(AGGREGATE_FLATTEN_STRUCT_ARRAY_ITER_SELF_CONTAINED,T,N,f,_off,n);	\
 		DBGS("AGGREGATE_FLATTEN_STRUCT_ARRAY_ITER_SELF_CONTAINED [%lx:%zu -> %lx]\n",(uintptr_t)_ptr,(size_t)_off,(uintptr_t)OFFATTR(void*,_off));	\
-    	if ((!KFLAT_ACCESSOR->errno)&&(ADDR_VALID(OFFATTR(void*,_off)))) {	\
+    	if ((!KFLAT_ACCESSOR->errno)&&(ADDR_RANGE_VALID(OFFATTR(void*,_off), (n) * (N)))) {	\
     		struct flat_node *__node = interval_tree_iter_first(&KFLAT_ACCESSOR->FLCTRL.imap_root, (uint64_t)_ptr+_off,\
     				(uint64_t)_ptr+_off+sizeof(struct T*)-1);    \
 			if (__node==0) {	\
@@ -3939,7 +3954,7 @@ FUNCTION_DEFINE_FLATTEN_STRUCT_TYPE_ARRAY_ITER_SELF_CONTAINED(FLTYPE,FLSIZE)
 	do {	\
 		DBGM6(AGGREGATE_FLATTEN_STRUCT_ARRAY_ITER_SELF_CONTAINED_SHIFTED,T,N,f,_off,n,_shift);	\
 		DBGS("AGGREGATE_FLATTEN_STRUCT_ARRAY_ITER_SELF_CONTAINED_SHIFTED [%lx:%zu -> %lx]\n",(uintptr_t)_ptr,(size_t)_off,(uintptr_t)OFFATTRN(void*,_off,_shift));	\
-    	if ((!KFLAT_ACCESSOR->errno)&&(ADDR_VALID(OFFATTRN(void*,_off,_shift)))) {	\
+    	if ((!KFLAT_ACCESSOR->errno)&&(ADDR_RANGE_VALID(OFFATTRN(void*,_off,_shift), (n) * (N)))) {	\
     		struct flat_node *__node = interval_tree_iter_first(&KFLAT_ACCESSOR->FLCTRL.imap_root, (uint64_t)_ptr+_off,\
     				(uint64_t)_ptr+_off+sizeof(struct T*)-1);    \
 			if (__node==0) {	\
@@ -4231,7 +4246,7 @@ FUNCTION_DEFINE_FLATTEN_STRUCT_TYPE_ARRAY_ITER_SELF_CONTAINED(FLTYPE,FLSIZE)
 #define AGGREGATE_FLATTEN_STRUCT_TYPE_ARRAY_ITER_SELF_CONTAINED(T,N,f,_off,n)	\
 	do {	\
 		DBGM5(AGGREGATE_FLATTEN_STRUCT_TYPE_ARRAY_ITER_SELF_CONTAINED,T,N,f,_off,n);	\
-    	if ((!KFLAT_ACCESSOR->errno)&&(ADDR_VALID(OFFATTR(void*,_off)))) {	\
+    	if ((!KFLAT_ACCESSOR->errno)&&(ADDR_RANGE_VALID(OFFATTR(void*,_off), (n)*N))) {	\
     		struct flat_node *__node = interval_tree_iter_first(&KFLAT_ACCESSOR->FLCTRL.imap_root, (uint64_t)_ptr+_off,\
     				(uint64_t)_ptr+_off+sizeof(T*)-1);    \
 			if (__node==0) {	\
@@ -4285,7 +4300,7 @@ FUNCTION_DEFINE_FLATTEN_STRUCT_TYPE_ARRAY_ITER_SELF_CONTAINED(FLTYPE,FLSIZE)
 #define AGGREGATE_FLATTEN_STRUCT_TYPE_ARRAY_ITER_SELF_CONTAINED_SHIFTED(T,N,f,_off,n,_shift)	\
 	do {	\
 		DBGM6(AGGREGATE_FLATTEN_STRUCT_TYPE_ARRAY_ITER_SELF_CONTAINED_SHIFTED,T,N,f,_off,n,_shift);	\
-    	if ((!KFLAT_ACCESSOR->errno)&&(ADDR_VALID(OFFATTRN(void*,_off,_shift)))) {	\
+    	if ((!KFLAT_ACCESSOR->errno)&&(ADDR_RANGE_VALID(OFFATTRN(void*,_off,_shift), (n) * N))) {	\
     		struct flat_node *__node = interval_tree_iter_first(&KFLAT_ACCESSOR->FLCTRL.imap_root, (uint64_t)_ptr+_off,\
     				(uint64_t)_ptr+_off+sizeof(T*)-1);    \
 			if (__node==0) {	\
@@ -4344,7 +4359,7 @@ FUNCTION_DEFINE_FLATTEN_STRUCT_TYPE_ARRAY_ITER_SELF_CONTAINED(FLTYPE,FLSIZE)
 #define FLATTEN_TYPE(T,p)	\
 	do {	\
 		DBGM2(FLATTEN_TYPE,T,p);	\
-		if ((!KFLAT_ACCESSOR->errno)&&(ADDR_VALID(p))) {   \
+		if ((!KFLAT_ACCESSOR->errno)&&(ADDR_RANGE_VALID(p, sizeof(T)))) {   \
 			int err = fixup_set_insert_force_update(KFLAT_ACCESSOR,__fptr->node,__fptr->offset,flatten_plain_type(KFLAT_ACCESSOR,(p),sizeof(T)));	\
 			if ((err) && (err!=EINVAL) && (err!=EEXIST) && (err!=EAGAIN)) {	\
 				KFLAT_ACCESSOR->errno = err;	\
@@ -4357,7 +4372,7 @@ FUNCTION_DEFINE_FLATTEN_STRUCT_TYPE_ARRAY_ITER_SELF_CONTAINED(FLTYPE,FLSIZE)
 #define FLATTEN_TYPE_ARRAY(T,p,n)	\
 	do {	\
 		DBGM3(FLATTEN_TYPE_ARRAY,T,p,n);	\
-		if ((!KFLAT_ACCESSOR->errno)&&(ADDR_VALID(p))) {   \
+		if ((!KFLAT_ACCESSOR->errno)&&(ADDR_RANGE_VALID(p, (n)*sizeof(T)))) {   \
 			int err = fixup_set_insert_force_update(KFLAT_ACCESSOR,__fptr->node,__fptr->offset,flatten_plain_type(KFLAT_ACCESSOR,(p),(n)*sizeof(T)));	\
 			if ((err) && (err!=EINVAL) && (err!=EEXIST) && (err!=EAGAIN)) {	\
 				KFLAT_ACCESSOR->errno = err;	\
@@ -4369,7 +4384,7 @@ FUNCTION_DEFINE_FLATTEN_STRUCT_TYPE_ARRAY_ITER_SELF_CONTAINED(FLTYPE,FLSIZE)
 #define FLATTEN_COMPOUND_TYPE_ARRAY(T,N,p,n)	\
 	do {	\
 		DBGM4(FLATTEN_COMPOUND_TYPE_ARRAY,T,N,p,n);	\
-		if ((!KFLAT_ACCESSOR->errno)&&(ADDR_VALID(p))) {   \
+		if ((!KFLAT_ACCESSOR->errno)&&(ADDR_RANGE_VALID(p, (n)*N))) {   \
 			int err = fixup_set_insert_force_update(KFLAT_ACCESSOR,__fptr->node,__fptr->offset,flatten_plain_type(KFLAT_ACCESSOR,(p),(n)*N));	\
 			if ((err) && (err!=EINVAL) && (err!=EEXIST) && (err!=EAGAIN)) {	\
 				KFLAT_ACCESSOR->errno = err;	\
@@ -4405,7 +4420,7 @@ FUNCTION_DEFINE_FLATTEN_STRUCT_TYPE_ARRAY_ITER_SELF_CONTAINED(FLTYPE,FLSIZE)
 #define AGGREGATE_FLATTEN_TYPE(T,f)	\
 	do {  \
 		DBGM2(AGGREGATE_FLATTEN_TYPE,T,f);	\
-        if ((!KFLAT_ACCESSOR->errno)&&(ADDR_VALID(ATTR(f)))) {   \
+        if ((!KFLAT_ACCESSOR->errno)&&(ADDR_RANGE_VALID(ATTR(f), sizeof(T)))) {   \
         	size_t _off = offsetof(_container_type,f);	\
         	struct flat_node *__node = interval_tree_iter_first(&KFLAT_ACCESSOR->FLCTRL.imap_root, (uint64_t)_ptr+_off,\
         			(uint64_t)_ptr+_off+sizeof(T*)-1);    \
@@ -4426,7 +4441,7 @@ FUNCTION_DEFINE_FLATTEN_STRUCT_TYPE_ARRAY_ITER_SELF_CONTAINED(FLTYPE,FLSIZE)
 #define AGGREGATE_FLATTEN_TYPE_ARRAY(T,f,n)	\
 	do {  \
 		DBGM3(AGGREGATE_FLATTEN_TYPE_ARRAY,T,f,n);	\
-        if ((!KFLAT_ACCESSOR->errno)&&(ADDR_VALID(ATTR(f)))) {   \
+        if ((!KFLAT_ACCESSOR->errno)&&(ADDR_RANGE_VALID(ATTR(f), (n) * sizeof(T)))) {   \
         	size_t _off = offsetof(_container_type,f);	\
         	struct flat_node *__node = interval_tree_iter_first(&KFLAT_ACCESSOR->FLCTRL.imap_root, (uint64_t)_ptr+_off,\
 					(uint64_t)_ptr+_off+sizeof(T*)-1);    \
@@ -4488,7 +4503,7 @@ FUNCTION_DEFINE_FLATTEN_STRUCT_TYPE_ARRAY_ITER_SELF_CONTAINED(FLTYPE,FLSIZE)
 #define AGGREGATE_FLATTEN_TYPE_SELF_CONTAINED(T,N,f,_off)	\
 	do {  \
 		DBGM4(AGGREGATE_FLATTEN_TYPE_SELF_CONTAINED,T,N,f,_off);	\
-        if ((!KFLAT_ACCESSOR->errno)&&(ADDR_VALID(OFFATTR(void*,_off)))) {   \
+        if ((!KFLAT_ACCESSOR->errno)&&(ADDR_RANGE_VALID(OFFATTR(void*,_off), N))) {   \
         	struct flat_node *__node = interval_tree_iter_first(&KFLAT_ACCESSOR->FLCTRL.imap_root, (uint64_t)_ptr+_off,\
         			(uint64_t)_ptr+_off+sizeof(T*)-1);    \
 			if (__node==0) {	\
@@ -4509,7 +4524,7 @@ FUNCTION_DEFINE_FLATTEN_STRUCT_TYPE_ARRAY_ITER_SELF_CONTAINED(FLTYPE,FLSIZE)
 	do {  \
 		DBGM4(AGGREGATE_FLATTEN_TYPE_ARRAY_SELF_CONTAINED,T,f,_off,n);	\
 		DBGS("AGGREGATE_FLATTEN_TYPE_ARRAY_SELF_CONTAINED[%lx]\n",(uintptr_t)OFFATTR(void*,_off));	\
-        if ((!KFLAT_ACCESSOR->errno)&&(ADDR_VALID(OFFATTR(void*,_off)))) {   \
+        if ((!KFLAT_ACCESSOR->errno)&&(ADDR_RANGE_VALID(OFFATTR(void*,_off), (n) * sizeof(T)))) {   \
         	struct flat_node *__node = interval_tree_iter_first(&KFLAT_ACCESSOR->FLCTRL.imap_root, (uint64_t)_ptr+_off,\
 					(uint64_t)_ptr+_off+sizeof(T*)-1);    \
 			if (__node==0) {	\
@@ -4530,7 +4545,7 @@ FUNCTION_DEFINE_FLATTEN_STRUCT_TYPE_ARRAY_ITER_SELF_CONTAINED(FLTYPE,FLSIZE)
 	do {  \
 		DBGM5(AGGREGATE_FLATTEN_COMPOUND_TYPE_ARRAY_SELF_CONTAINED,T,N,f,_off,n);	\
 		DBGS("AGGREGATE_FLATTEN_COMPOUND_TYPE_ARRAY_SELF_CONTAINED[%lx]\n",(uintptr_t)OFFATTR(void*,_off));	\
-        if ((!KFLAT_ACCESSOR->errno)&&(ADDR_VALID(OFFATTR(void*,_off)))) {   \
+        if ((!KFLAT_ACCESSOR->errno)&&(ADDR_RANGE_VALID(OFFATTR(void*,_off), (n) * (N)))) {   \
         	struct flat_node *__node = interval_tree_iter_first(&KFLAT_ACCESSOR->FLCTRL.imap_root, (uint64_t)_ptr+_off,\
 					(uint64_t)_ptr+_off+sizeof(T*)-1);    \
 			if (__node==0) {	\
