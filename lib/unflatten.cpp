@@ -295,29 +295,37 @@ public:
 		if ((!arg) || (!strcmp(arg,"-r"))) {
 			printf("# root_addr_count: %zu\n",FLCTRL.HDR.root_addr_count);
 			printf("[ ");
-			for (size_t i = 0; i < FLCTRL.HDR.root_addr_count; ++i) {
-				size_t root_addr_offset;
-				read_file(&root_addr_offset, sizeof(size_t), 1, f);
+		}
+		for (size_t i = 0; i < FLCTRL.HDR.root_addr_count; ++i) {
+			size_t root_addr_offset;
+			read_file(&root_addr_offset, sizeof(size_t), 1, f);
+			if ((!arg) || (!strcmp(arg,"-r"))) {
 				printf("%zu ",root_addr_offset);
 			}
+		}
+		if ((!arg) || (!strcmp(arg,"-r"))) {
 			printf("]\n\n");
 			printf("# root_addr_extended_count: %zu\n",FLCTRL.HDR.root_addr_extended_count);
-			for (size_t i = 0; i < FLCTRL.HDR.root_addr_extended_count; ++i) {
-				size_t name_size, index, size;
-				read_file(&name_size,sizeof(size_t),1,f);
+		}
+		for (size_t i = 0; i < FLCTRL.HDR.root_addr_extended_count; ++i) {
+			size_t name_size, index, size;
+			read_file(&name_size,sizeof(size_t),1,f);
 
-				char* name = new char[name_size];
-				try {
-					read_file((void*)name, name_size, 1, f);
-					read_file(&index, sizeof(size_t), 1, f);
-					read_file(&size, sizeof(size_t), 1, f);
+			char* name = new char[name_size];
+			try {
+				read_file((void*)name, name_size, 1, f);
+				read_file(&index, sizeof(size_t), 1, f);
+				read_file(&size, sizeof(size_t), 1, f);
+				if ((!arg) || (!strcmp(arg,"-r"))) {
 					printf(" %zu [%s:%lu]\n",index,name,size);
-				} catch(...) {
-					delete[] name;
-					throw;
 				}
+			} catch(...) {
 				delete[] name;
+				throw;
 			}
+			delete[] name;
+		}
+		if ((!arg) || (!strcmp(arg,"-r"))) {
 			printf("\n");
 		}
 
@@ -332,25 +340,35 @@ public:
 		if ((!arg) || (!strcmp(arg,"-p"))) {
 			printf("# ptr_count: %zu\n",FLCTRL.HDR.ptr_count);
 			printf("[ ");
-			for (size_t i = 0; i < FLCTRL.HDR.ptr_count; ++i) {
-				size_t fix_loc = *((size_t*)FLCTRL.mem + i);
+		}
+		for (size_t i = 0; i < FLCTRL.HDR.ptr_count; ++i) {
+			size_t fix_loc = *((size_t*)FLCTRL.mem + i);
+			if ((!arg) || (!strcmp(arg,"-p"))) {
 				printf("%zu ",fix_loc);
 			}
-			printf("]\n\n");
-
-			printf("# fptr_count: %zu\n",FLCTRL.HDR.fptr_count);
-			printf("[ ");
-			for (size_t fi = 0; fi < FLCTRL.HDR.fptr_count; ++fi) {
-				size_t fptri = ((uintptr_t*)((char*)FLCTRL.mem + FLCTRL.HDR.ptr_count * sizeof(size_t)))[fi];
-				printf("%zu ",fptri);
-			}
+		}
+		if ((!arg) || (!strcmp(arg,"-p"))) {
 			printf("]\n\n");
 		}
 
+		if ((!arg) || (!strcmp(arg,"-p"))) {
+			printf("# fptr_count: %zu\n",FLCTRL.HDR.fptr_count);
+			printf("[ ");
+		}
+		for (size_t fi = 0; fi < FLCTRL.HDR.fptr_count; ++fi) {
+			size_t fptri = ((uintptr_t*)((char*)FLCTRL.mem + FLCTRL.HDR.ptr_count * sizeof(size_t)))[fi];
+			if ((!arg) || (!strcmp(arg,"-p"))) {
+				printf("%zu ",fptri);
+			}
+		}
+		if ((!arg) || (!strcmp(arg,"-p"))) {
+			printf("]\n\n");
+		}
+
+		unsigned char* memptr =
+				((unsigned char*)FLCTRL.mem)+FLCTRL.HDR.ptr_count*sizeof(size_t)+FLCTRL.HDR.fptr_count*sizeof(size_t)+
+					FLCTRL.HDR.mcount*2*sizeof(size_t);
 		if ((!arg) || (!strcmp(arg,"-m"))) {
-			unsigned char* memptr =
-					((unsigned char*)FLCTRL.mem)+FLCTRL.HDR.ptr_count*sizeof(size_t)+FLCTRL.HDR.fptr_count*sizeof(size_t)+
-						FLCTRL.HDR.mcount*2*sizeof(size_t);
 			std::set<size_t> fixset;
 			for (size_t i=0; i<FLCTRL.HDR.ptr_count; ++i) {
 				size_t fix_loc = *((size_t*)FLCTRL.mem+i);
