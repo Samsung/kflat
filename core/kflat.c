@@ -545,7 +545,7 @@ static const struct file_operations kflat_fops = {
 /*******************************************************
  * MODULE REGISTRATION
  *******************************************************/
-static int dbg_buffer_size = 10 * 1024 * 1024;			// 10MB
+static int dbg_buffer_size = 50 * 1024 * 1024;			// 50MB
 module_param(dbg_buffer_size, int, 0660);
 MODULE_PARM_DESC(dbg_buffer_size, "size of dbg buf used when flattening with debug flag enabled");
 
