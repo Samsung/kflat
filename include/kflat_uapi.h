@@ -10,14 +10,11 @@
 #include <stdlib.h>
 #endif
 
-struct kflat_ioctl_init {
-    size_t  size;
-	int 	debug_flag;
-};
-
 struct kflat_ioctl_enable {
     pid_t   pid;
     char    target_name[128];
+	int		debug_flag;
+	int 	use_stop_machine;
 };
 
 struct kflat_ioctl_disable {
@@ -63,7 +60,6 @@ enum kflat_test_codes {
 #define KFLAT_ARG_TO_CODE(ARG)              (ARG >> 2)
 
 
-#define KFLAT_INIT					_IOW('k', 1, struct kflat_ioctl_init)
 #define KFLAT_PROC_ENABLE			_IOW('k', 2, struct kflat_ioctl_enable)
 #define KFLAT_PROC_DISABLE			_IOR('k', 3, struct kflat_ioctl_disable)
 #define KFLAT_TESTS     			_IOW('k', 4, uint64_t)

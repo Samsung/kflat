@@ -55,6 +55,15 @@ public:
 	int load(FILE* file, get_function_address_t gfa = NULL);
 
 	/**
+	 * @brief Provides information regarding kflat image file
+	 *
+	 * @param file pointer to opened file with kflat image
+	 * @param arg  optional parameter to decide whith kflat image part information to provide
+	 * @return        0 on success, otherwise error code
+	 */
+	int info(FILE* file, const char* arg = 0);
+
+	/**
 	 * @brief free memory occupied by loaded image. Normally, there's no need
 	 *        to invoke this function manually (both destructor and load()) calls
 	 *        it already

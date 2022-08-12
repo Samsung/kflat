@@ -453,18 +453,24 @@ void kdump_dump_vma(struct kdump_memory_map* kdump) {
     printk(KERN_INFO "Kflat: Finished kernel memory dump");
 }
 
-bool kdump_test_address(void* addr) {
+size_t kdump_test_address(void* addr, size_t size) {
+    size_t walked_size = 0;
+    struct page* page;
 
-	/* Fast path for NULL pointer addresses */
-	if (addr==0) {
+    /* Fast path for NULL pointer addresses */
+	if (addr == NULL)
 		return 0;
-	}
-
-	struct page* page;
+    
     pgd_t* kernel_pgd = kdump_get_kernel_pgd();
+    for(walked_size = 0; walked_size < size;) {
+        int ret_size = walk_addr(kernel_pgd, (uint64_t) addr + walked_size, &page);
+        if(page == NULL || !kdump_is_phys_in_ram(page_to_phys(page)))
+            break;
+        
+        walked_size += ret_size;
+    }
 
-    walk_addr(kernel_pgd, (uint64_t)addr, &page);
-    return page != NULL && kdump_is_phys_in_ram(page_to_phys(page));
+    return walked_size;
 }
 EXPORT_SYMBOL_GPL(kdump_test_address);
 

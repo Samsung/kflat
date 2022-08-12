@@ -34,4 +34,13 @@ int kdump_tree_flatten(struct kdump_memory_map* kdump, void* __user buf, size_t 
 int kdump_tree_destroy(struct kdump_memory_map* kdump);
 bool kdump_tree_contains(struct kdump_memory_map* kdump, uint64_t addr, size_t len);
 size_t kdump_tree_total_size(struct kdump_memory_map* kdump);
-bool kdump_test_address(void* addr);
+
+/**
+ * @brief Check whether provided address range is valid
+ * 
+ * @param addr starting address
+ * @param size size of memory range to be checked
+ * @return size_t number of bytes from `addr` pointer that are valid kernel memory.
+ *                i.e. when whole address range is valid, returned_value == size
+ */
+size_t kdump_test_address(void* addr, size_t size);

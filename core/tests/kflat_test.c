@@ -1738,7 +1738,7 @@ int kflat_ioctl_test(struct kflat *kflat, unsigned int cmd, unsigned long arg) {
 	int iter_flag = flags & KFLAT_TEST_ITER;
 	int test_code = KFLAT_ARG_TO_CODE(arg);
 
-	flatten_set_option(kflat, debug_flag);
+	kflat->debug_flag = debug_flag;
 
 	switch(test_code) {
 		case INFO:

@@ -13,7 +13,7 @@
 /*
  * MODULE CONFIGURATION
  */
-#define PROBING_ENABLE_DEBUG 1
+#define PROBING_ENABLE_DEBUG        0
 
 /*
  * Exported functions

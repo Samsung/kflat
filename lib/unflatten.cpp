@@ -10,12 +10,14 @@
 #include <cstdlib>
 #include <cstddef>
 #include <cstring>
+#include <cstdio>
 #include <sys/time.h>
 
 #include <map>
 #include <vector>
 #include <string>
 #include <stdexcept>
+#include <set>
 
 #include "unflatten.hpp"
 
@@ -84,6 +86,17 @@ struct FLCONTROL {
 
 typedef uintptr_t (*get_function_address_t)(const char* fsym);
 
+#define COLOR_STRING_BLACK "\033[0;30m"
+#define COLOR_STRING_RED "\033[0;31m"
+#define COLOR_STRING_GREEN "\033[0;32m"
+#define COLOR_STRING_YELLOW "\033[0;33m"
+#define COLOR_STRING_BLUE "\033[0;34m"
+#define COLOR_STRING_PURPLE "\033[0;35m"
+#define COLOR_STRING_CYAN "\033[0;36m"
+#define COLOR_STRING_WHITE "\033[0;37m"
+
+#define COLOR_STRING COLOR_STRING_RED
+#define COLOR_OFF "\033[0m"
 
 /********************************
  * Private class Unflatten
@@ -259,9 +272,162 @@ private:
 
 public:
 	Unflatten(int _level = LOG_NONE) {
-		memset(&FLCTRL, 0, sizeof(FLCTRL));
+		memset(&FLCTRL.fixup_set_root, 0, sizeof(struct rb_root_cached));
+		memset(&FLCTRL.imap_root, 0, sizeof(struct rb_root_cached));
+		memset(&FLCTRL.HDR, 0, sizeof(struct flatten_header));
+		FLCTRL.rhead = 0;
+		FLCTRL.rtail = 0;
+		FLCTRL.last_accessed_root = 0;
+		FLCTRL.root_addr_count = 0;
+		FLCTRL.mem = 0;
 		need_unload = false;
 		loglevel = (typeof(loglevel))_level;
+	}
+
+	int imginfo(FILE* f, const char* arg) {
+
+		read_file(&FLCTRL.HDR, sizeof(struct flatten_header), 1, f);
+		if (FLCTRL.HDR.magic != FLATTEN_MAGIC)
+			throw std::invalid_argument("Invalid magic while reading flattened image");
+
+		printf("# Image size: %zu\n\n",FLCTRL.HDR.image_size);
+
+		if ((!arg) || (!strcmp(arg,"-r"))) {
+			printf("# root_addr_count: %zu\n",FLCTRL.HDR.root_addr_count);
+			printf("[ ");
+			for (size_t i = 0; i < FLCTRL.HDR.root_addr_count; ++i) {
+				size_t root_addr_offset;
+				read_file(&root_addr_offset, sizeof(size_t), 1, f);
+				printf("%zu ",root_addr_offset);
+			}
+			printf("]\n\n");
+			printf("# root_addr_extended_count: %zu\n",FLCTRL.HDR.root_addr_extended_count);
+			for (size_t i = 0; i < FLCTRL.HDR.root_addr_extended_count; ++i) {
+				size_t name_size, index, size;
+				read_file(&name_size,sizeof(size_t),1,f);
+
+				char* name = new char[name_size];
+				try {
+					read_file((void*)name, name_size, 1, f);
+					read_file(&index, sizeof(size_t), 1, f);
+					read_file(&size, sizeof(size_t), 1, f);
+					printf(" %zu [%s:%lu]\n",index,name,size);
+				} catch(...) {
+					delete[] name;
+					throw;
+				}
+				delete[] name;
+			}
+			printf("\n");
+		}
+
+		size_t memsz = FLCTRL.HDR.memory_size + \
+						FLCTRL.HDR.ptr_count * sizeof(size_t) + \
+						FLCTRL.HDR.fptr_count * sizeof(size_t) + \
+						FLCTRL.HDR.mcount * 2 * sizeof(size_t);
+		FLCTRL.mem = malloc(memsz);
+		assert(FLCTRL.mem != NULL);
+		read_file(FLCTRL.mem, 1, memsz, f);
+
+		if ((!arg) || (!strcmp(arg,"-p"))) {
+			printf("# ptr_count: %zu\n",FLCTRL.HDR.ptr_count);
+			printf("[ ");
+			for (size_t i = 0; i < FLCTRL.HDR.ptr_count; ++i) {
+				size_t fix_loc = *((size_t*)FLCTRL.mem + i);
+				printf("%zu ",fix_loc);
+			}
+			printf("]\n\n");
+
+			printf("# fptr_count: %zu\n",FLCTRL.HDR.fptr_count);
+			printf("[ ");
+			for (size_t fi = 0; fi < FLCTRL.HDR.fptr_count; ++fi) {
+				size_t fptri = ((uintptr_t*)((char*)FLCTRL.mem + FLCTRL.HDR.ptr_count * sizeof(size_t)))[fi];
+				printf("%zu ",fptri);
+			}
+			printf("]\n\n");
+		}
+
+		if ((!arg) || (!strcmp(arg,"-m"))) {
+			unsigned char* memptr =
+					((unsigned char*)FLCTRL.mem)+FLCTRL.HDR.ptr_count*sizeof(size_t)+FLCTRL.HDR.fptr_count*sizeof(size_t)+
+						FLCTRL.HDR.mcount*2*sizeof(size_t);
+			std::set<size_t> fixset;
+			for (size_t i=0; i<FLCTRL.HDR.ptr_count; ++i) {
+				size_t fix_loc = *((size_t*)FLCTRL.mem+i);
+				fixset.insert(fix_loc);
+			}
+			int ptrbyte_count=0;
+			printf("# Memory size: %lu [not fixed]\n",FLCTRL.HDR.memory_size);
+			for (unsigned long i=0; i<FLCTRL.HDR.memory_size; ++i) {
+				if ((i%64)==0) {
+					if (ptrbyte_count>0) printf(COLOR_OFF);
+					int n = printf("%lu:%lu: ",(i/64)*64+(i%64),(i/64)*64+(i%64)+63);
+					for (int j=0; j<16-n; ++j) printf(" ");
+					if (ptrbyte_count>0) printf(COLOR_STRING);
+				}
+				if (fixset.find(i)!=fixset.end()) {
+					printf(COLOR_STRING);
+					ptrbyte_count=8;
+				}
+				printf("%02x ",*((unsigned char*)memptr+i));
+				if ((((i+1)%32)==0) && (i+1<FLCTRL.HDR.memory_size)) {
+					if (ptrbyte_count>0) printf(COLOR_OFF);
+					printf(" | ");
+					if (ptrbyte_count>0) printf(COLOR_STRING);
+				}
+				if ((((i+1)%64)==0) && (i+1<FLCTRL.HDR.memory_size)) {
+					if (ptrbyte_count>0) printf(COLOR_OFF);
+					printf("\n");
+					if (ptrbyte_count>0) printf(COLOR_STRING);
+				}
+				ptrbyte_count--;
+				if (ptrbyte_count<=0) {
+					printf(COLOR_OFF);
+				}
+			}
+			printf(COLOR_OFF);
+			printf("\n\n");
+		}
+
+		if ((!arg) || (!strcmp(arg,"-f"))) {
+			printf("# Fragment count: %lu\n",FLCTRL.HDR.mcount);
+			size_t* minfoptr = (size_t*)((char*)FLCTRL.mem + FLCTRL.HDR.ptr_count * sizeof(size_t) + FLCTRL.HDR.fptr_count * sizeof(size_t));
+			for (size_t i = 0; i < FLCTRL.HDR.mcount; ++i) {
+				size_t index = *minfoptr++;
+				size_t size = *minfoptr++;
+				printf("  %zu:[ %zu ]\n",index,size);
+			}
+			printf("\n");
+		}
+
+		if ((!arg) || (!strcmp(arg,"-a"))) {
+			printf("# Function pointer map size: %zu\n",FLCTRL.HDR.fptrmapsz);
+			if (FLCTRL.HDR.fptr_count > 0 && FLCTRL.HDR.fptrmapsz > 0) {
+				char* fptrmapmem = (char*) malloc(FLCTRL.HDR.fptrmapsz);
+				assert(fptrmapmem != NULL);
+
+				read_file(fptrmapmem, 1, FLCTRL.HDR.fptrmapsz, f);
+				size_t fptrnum = *((size_t*)fptrmapmem);
+				printf("# Function pointer count: %zu\n",fptrnum);
+				fptrmapmem += sizeof(size_t);
+
+				for (size_t kvi=0; kvi < fptrnum; ++kvi) {
+					uintptr_t addr = *((uintptr_t*)fptrmapmem);
+					fptrmapmem += sizeof(uintptr_t);
+
+					size_t sz = *((size_t*)fptrmapmem);
+					fptrmapmem += sizeof(size_t);
+
+					std::string sym((const char*)fptrmapmem, sz);
+					fptrmapmem += sz;
+					printf("  [%s]: %08lx\n",sym.c_str(),addr);
+				}
+				free(fptrmapmem - FLCTRL.HDR.fptrmapsz);
+			}
+		}
+
+		free(FLCTRL.mem);
+		return 0;
 	}
 
 	int load(FILE* f, get_function_address_t gfa = NULL) {
@@ -452,6 +618,10 @@ Flatten::~Flatten() {
 
 int Flatten::load(FILE* file, get_function_address_t gfa) {
 	return engine->load(file, gfa);
+}
+
+int Flatten::info(FILE* file, const char* arg) {
+	return engine->imginfo(file,arg);
 }
 
 void Flatten::unload() {

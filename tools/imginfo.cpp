@@ -379,7 +379,7 @@ static size_t intset_count(const struct rb_root* root) {
 int main(int argc, char* argv[]) {
 	int ret;
 
-	if(argc != 3) {
+	if(argc < 3) {
 		printf("Usage: %s <kflat_image> <test_name>\n", argv[0]);
 		return 1;
 	}
@@ -392,6 +392,15 @@ int main(int argc, char* argv[]) {
 		handler = get_fpointer_test_function_address;
 
 	Flatten flatten;
+	if (!strcmp(argv[2], "INFO")) {
+		if (argc>=4) {
+			ret = flatten.info(in,argv[3]);
+		}
+		else {
+			ret = flatten.info(in);
+		}
+		return ret;
+	}
 	ret = flatten.load(in, handler);
 	assert(ret == 0);
 

@@ -24,6 +24,10 @@ INTERVAL_TREE_DEFINE(struct flat_node, rb,
 		     uintptr_t, __subtree_last,
 		     START, LAST,static,interval_tree)
 
+/*******************************************************
+ * BINARY STREAM
+ *  List based implementation of expandable vector 
+ ******************************************************/
 static struct blstream* create_binary_stream_element(struct kflat* kflat, size_t size) {
 	struct blstream* n;
 	void* m;
@@ -266,6 +270,11 @@ void binary_stream_update_pointers(struct kflat* kflat) {
     }
 }
 
+
+/*******************************************************
+ * B-QUEUE
+ *  List based implementation of two-way queue
+ ******************************************************/
 int bqueue_init(struct kflat* kflat, struct bqueue* q, size_t block_size) {
 
     q->block_size = block_size;

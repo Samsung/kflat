@@ -17,7 +17,7 @@ extern int flatten_base_global_address;
 #define flat_errs(fmt,...) 		printk(KERN_ERR kflat_fmt(fmt), ##__VA_ARGS__);
 #define flat_infos(fmt,...) 	printk(KERN_INFO kflat_fmt(fmt), ##__VA_ARGS__);
 
-#define LINEAR_MEMORY_ALLOCATOR	0
+#define LINEAR_MEMORY_ALLOCATOR	1
 #define KFLAT_LINEAR_MEMORY_INITIAL_POOL_SIZE	(256ULL*1024*1024)
 
 #define DEFAULT_ITER_QUEUE_SIZE (1024*1024*8)
@@ -229,6 +229,7 @@ struct kflat {
 	struct kflat_recipe* 		recipe;
 	struct kdump_memory_map 	mem_map;
 	int 						debug_flag;
+	int 						use_stop_machine;
 };
 
 int kflat_recipe_register(struct kflat_recipe* recipe);
@@ -460,7 +461,8 @@ static inline size_t ptrarrmemlen(const void* const* m) {
 }))
 #define OFFADDR(T,_off)	((T*)((unsigned char*)(_ptr)+_off))
 
-#define ADDR_VALID(PTR)				(kdump_test_address((void*) PTR))
+#define ADDR_VALID(PTR)				(kdump_test_address((void*) PTR, 1))
+#define ADDR_RANGE_VALID(PTR, SIZE) (kdump_test_address((void*) PTR, SIZE))
 // TODO: Consider checking +x permission
 #define TEXT_ADDR_VALID(PTR)		ADDR_VALID(PTR)
 
@@ -4580,50 +4582,12 @@ FUNCTION_DEFINE_FLATTEN_STRUCT_TYPE_ARRAY_ITER_SELF_CONTAINED(FLTYPE,FLSIZE)
 		else DBGS("AGGREGATE_FLATTEN_FUNCTION_POINTER_SELF_CONTAINED: errno(%d), ADDR(%lx)\n",KFLAT_ACCESSOR->errno,(uintptr_t)OFFATTR(void*,_off));	\
 	} while (0)
 
-#define FUNCTION_DEFINE_FLATTEN_UNINTERRUPTIBLE(FLNAME,...)	\
-	static int flatten_without_interruption_##FLNAME(void* arg) {	\
-		\
-		struct flatten_uninterruptible_arg* __arg = (struct flatten_uninterruptible_arg* )arg;	\
-		struct kflat* kflat = __arg->kflat;	\
-		struct flatten_pointer* __fptr = __arg->__fptr;	\
-		const void* __root_ptr = __arg->arg;	\
-		\
-		__VA_ARGS__;	\
-		return 0;	\
-	}
-
-#define FLATTEN_UNINTERRUPTIBLE(FLNAME,kflat,__ptr)	\
-	do {	\
-		struct flatten_uninterruptible_arg ____arg;	\
-		____arg.kflat = kflat;	\
-		____arg.__fptr = __fptr;	\
-		____arg.arg = __ptr;	\
-		stop_machine(flatten_without_interruption_##FLNAME, &____arg, NULL);	\
-	} while(0)
 
 #define FLATTEN_FUNCTION_VARIABLE(__f,__var,__arg)	\
 	do { 	\
 			\
 	}	\
 	while(0);
-
-#define REGISTER_INTERFACE_FUNCTION(__f,__var) \
-	ifns_insert(STR(IF__##__f##__##__var),(flatten_interface_arg_f)__f##_##__var);
-
-#define UNREGISTER_INTERFACE_FUNCTION(__f,__var) \
-	ifns_delete(STR(IF__##__f##__##__var));
-
-#define REGISTER_INTERFACE_FUNCTION_NAME(__f) \
-	ifns_insert(STR(IF__##__f),(flatten_interface_arg_f)__f);
-
-#define UNREGISTER_INTERFACE_FUNCTION_NAME(__f) \
-	ifns_delete(STR(IF__##__f));
-
-#define REGISTER_GLOBAL_ACCESSOR(__fn,__var) \
-	ifns_insert(STR(GV__##__fn##__##__var),(flatten_interface_arg_f)__fn##_##__var);
-
-#define UNREGISTER_GLOBAL_ACCESSOR(__fn,__var) \
-	ifns_delete(STR(GV__##__fn##__##__var));
 
 #define FOR_POINTER(PTRTYPE,v,p,...)	\
 	do {	\

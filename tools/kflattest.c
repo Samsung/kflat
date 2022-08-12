@@ -93,15 +93,6 @@ int run_test(struct args* args, int no) {
         goto exit;
     }
 
-    struct kflat_ioctl_init init = {0};
-    init.size = flat_size;
-    init.debug_flag = args->flags & KFLAT_DEBUG_FLAG;
-    ret = ioctl(fd, KFLAT_INIT, &init);
-    if(ret) {
-        log_error("failed to execute KFLAT_INIT ioctl - %s", strerror(errno));
-        goto close_fd;
-    }
-
     void* area = mmap(NULL, flat_size, PROT_READ, MAP_PRIVATE, fd, 0);
     if(area == MAP_FAILED) {
         log_error("failed to mmap kflat memory - %s", strerror(errno));

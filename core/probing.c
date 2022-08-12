@@ -17,7 +17,7 @@
  * DEBUG MACROS
  *******************************************************/
 #ifdef PROBING_ENABLE_DEBUG
-#define PROBING_DEBUG(MSG, ...)      printk(KERN_DEBUG "srpol-probing: " MSG, ##__VA_ARGS__)
+#define PROBING_DEBUG(MSG, ...)      printk(KERN_DEBUG "kflat-probing: " MSG, ##__VA_ARGS__)
 #else
 #define PROBING_DEBUG(MSG, ...)
 #endif

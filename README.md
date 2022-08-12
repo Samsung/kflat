@@ -138,7 +138,6 @@ Kflat ioctl handlers supports the following commands:
 
 | Command | Details |
 | -- | -- |
-| KFLAT_INIT | Initializes kflat with provided maximum size of output buffer |
 | KFLAT_PROC_ENABLE | Enables selected recipe for process with provided PID |
 | KFLAT_PROC_DISABLE | Disables recipe for process with provided PID |
 | KFLAT_TESTS | Runs selected kflat unit test |
@@ -162,18 +161,14 @@ Kflat mmap handler supports two modes selectable by the value of `offset` argume
 The simplified flow of dumping kernel memory with kflat looks as follow:
 
 ```c
+sizet_t mem_size = 1_MB;        // Max. size of dumped image
 fd = open("/sys/kernel/debug/kflat", O_RDONLY);
 
-struct kflat_ioctl_init init = {
-    .size = 1_MB,       // Output image size
-    .debug_flag = 1,    // Whether to output debug logs to dmesg
-};
-ioctl(fd, KFLAT_INIT, &init);
-
-mem = mmap(NULL, init.size, PROT_READ, MAP_PRIVATE, fd, KFLAT_MMAP_FLATTEN);
+mem = mmap(NULL, mem_size, PROT_READ, MAP_PRIVATE, fd, KFLAT_MMAP_FLATTEN);
 
 struct kflat_ioctl_enable enable = {
     .pid = getpid(),
+    .debug_flag = 1,    // Whether to output debug logs to dmesg
 };
 strcpy(enable.target_name, "target_recipe");
 ioctl(fd, KFLAT_PROC_ENABLE, &enable);

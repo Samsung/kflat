@@ -15,6 +15,7 @@
 #include <linux/printk.h>
 #include <linux/slab.h>
 #include <linux/spinlock.h>
+#include <linux/stop_machine.h>
 #include <linux/vmalloc.h>
 
 
@@ -136,6 +137,51 @@ void kflat_put_current(struct kflat* kflat) {
 		kflat_put(kflat);
 }
 
+
+/*******************************************************
+ * STOP_MACHINE SUPPORT
+ *  Some structures that user wishes to dump with kflat
+ *  may be heavily used by kernel. In such cases, there's
+ *  huge chance that kflat code will be exposed to data
+ *  races while accessing such structures without
+ *  synchronization.
+ * 
+ *  To overcome this issue, user can request kflat to use
+ *  kernel's stop_machine functionality which basically stops
+ *  all other CPUs and disables interrupts, therefore giving
+ *  kflat exclusive access to the targeted structure.
+ ******************************************************/
+struct stopm_args {
+	struct kflat* kflat;
+	struct probe_regs* regs;
+	void (*handler)(struct kflat*, struct probe_regs*);
+};
+
+static int _stop_machine_func(void* arg) {
+	pr_info("--- Stop machine started ---");
+
+	struct stopm_args* stopm = (struct stopm_args*) arg;
+	stopm->handler(stopm->kflat, stopm->regs);
+
+	pr_info("-- Stop machine finishing ---");
+	return 0;
+}
+
+static int flatten_stop_machine(struct kflat* kflat, struct probe_regs* regs) {
+	int err;
+	struct stopm_args arg = {
+			.kflat = kflat,
+			.regs = regs,
+			.handler = kflat->recipe->handler
+	};
+
+	err = stop_machine(_stop_machine_func, (void*) &arg, NULL);
+	if(err)
+		pr_err("@Flatten stop_machine failed: %d", err);
+	return err;
+}
+
+
 /*******************************************************
  * PROBING DELEGATE
  *  This functions will be invoked after kprobe successfully
@@ -152,7 +198,7 @@ asmlinkage __used uint64_t probing_delegate(struct probe_regs* regs) {
 	struct kflat* kflat;
 	struct probe* probe_priv;
 
-	pr_info("kflat started");
+	pr_info("flatten started");
 
 	// Use _kflat_access_current, because refcount was already incremented
 	//  in probing_pre_handler function.
@@ -163,13 +209,18 @@ asmlinkage __used uint64_t probing_delegate(struct probe_regs* regs) {
 	probe_priv->triggered = 1;
 
 	flatten_init(kflat);
-	kflat->recipe->handler(kflat, regs);
 
-	flat_infos("@Flatten done: %d\n", kflat->errno);
+	// Invoke recipe via stop_machine if user asked for that
+	if(kflat->use_stop_machine)
+		flatten_stop_machine(kflat, regs);
+	else
+		kflat->recipe->handler(kflat, regs);
+
+	pr_info("flatten done: %d\n", kflat->errno);
 	if (!kflat->errno) {
 		err = flatten_write(kflat);
 		if(err)
-			flat_errs("@Flatten write failed: %d\n", kflat->errno);
+			pr_err("flatten write failed: %d\n", kflat->errno);
 	}
 	flatten_fini(kflat);
 
@@ -181,7 +232,7 @@ asmlinkage __used uint64_t probing_delegate(struct probe_regs* regs) {
 	kflat_put_current(kflat);
 	probe_priv = NULL;
 
-	pr_info("kflat finished; returning to %llx...", return_addr);
+	pr_info("flatten finished - returning to interrupted function");
 	return return_addr;
 }
 
@@ -213,7 +264,6 @@ static int kflat_ioctl_locked(struct kflat *kflat, unsigned int cmd,
 {
 	int ret;
 	union {
-		struct kflat_ioctl_init init;
 		struct kflat_ioctl_enable enable;
 		struct kflat_ioctl_disable disable;
 		struct kflat_ioctl_mem_map map;
@@ -221,23 +271,11 @@ static int kflat_ioctl_locked(struct kflat *kflat, unsigned int cmd,
 	struct kflat_recipe* recipe;
 
 	switch (cmd) {
-	case KFLAT_INIT:
-		if (kflat->mode != KFLAT_MODE_DISABLED)
-			return -EBUSY;
-
-		if(copy_from_user(&args.init, (void*)arg, sizeof(args.init)))
-			return -EFAULT;
-		if(args.init.size == 0)
-			return -EINVAL;
-
-		kflat->size = args.init.size;
-		kflat->debug_flag = args.init.debug_flag;
-		kflat->mode = KFLAT_MODE_ENABLED;
-		return 0;
-
 	case KFLAT_PROC_ENABLE:
 		if (kflat->area == NULL)
 			return -EINVAL;
+		if (kflat->mode == KFLAT_MODE_ENABLED)
+			return -EBUSY;
 
 		if(copy_from_user(&args.enable, (void*) arg, sizeof(args.enable)))
 			return -EFAULT;
@@ -245,7 +283,17 @@ static int kflat_ioctl_locked(struct kflat *kflat, unsigned int cmd,
 			return -EINVAL;
 
 		kflat->pid = args.enable.pid;
+		kflat->debug_flag = !!args.enable.debug_flag;
+		kflat->use_stop_machine = !!args.enable.use_stop_machine;
 		args.enable.target_name[sizeof(args.enable.target_name) - 1] = '\0';
+
+#if LINEAR_MEMORY_ALLOCATOR == 0
+		if(kflat->use_stop_machine) {
+			pr_err("KFLAT is not compiled with LINEAR_MEMORY_ALLOCATOR option, "
+				"which is required to enable stop_machine flag");
+			return -EINVAL;
+		}
+#endif
 
 		recipe = kflat_recipe_get(args.enable.target_name);
 		if(recipe == NULL)
@@ -256,10 +304,14 @@ static int kflat_ioctl_locked(struct kflat *kflat, unsigned int cmd,
 		kflat->recipe = recipe;
 
 		ret = probing_arm(&kflat->probing, kflat->recipe->symbol, kflat->pid);
-		if(ret)
+		if(ret) {
+			kflat_recipe_put(kflat->recipe);
+			kflat->recipe = NULL;
 			return ret;
+		}
 
 		kflat_register(kflat);	//tODO: ERROR handling
+		kflat->mode = KFLAT_MODE_ENABLED;
 		return 0;
 
 	case KFLAT_PROC_DISABLE:
@@ -271,12 +323,10 @@ static int kflat_ioctl_locked(struct kflat *kflat, unsigned int cmd,
 		kflat_unregister(kflat);
 
 		args.disable.size = *(size_t*)kflat->area  + sizeof(size_t);
-		args.disable.invoked = args.disable.size > 0;
+		args.disable.invoked = args.disable.size > sizeof(size_t);
 		args.disable.error = kflat->errno;
-		if(copy_to_user((void*)arg, &args.disable, sizeof(args.disable))) {
-			printk(KERN_INFO "Kflat: failed to copy_to_user");
+		if(copy_to_user((void*)arg, &args.disable, sizeof(args.disable)))
 			return -EFAULT;
-		}
 		return 0;
 
 	case KFLAT_TESTS:
@@ -312,29 +362,33 @@ static long kflat_ioctl(struct file *filep, unsigned int cmd, unsigned long arg)
 }
 
 static int kflat_mmap_flatten(struct kflat *kflat, struct vm_area_struct *vma) {
+	int ret = 0;
 	void *area;
 	size_t alloc_size, off;
 	struct page *page;
 
 	alloc_size = vma->vm_end - vma->vm_start;
-	if(vma->vm_pgoff || alloc_size != kflat->size)
+	if(vma->vm_pgoff)
 		return -EINVAL;
+	if(vma->vm_flags & (VM_EXEC | VM_WRITE))
+		return -EPERM;
 
-	if(kflat->mode != KFLAT_MODE_ENABLED) {
-		pr_err("kflat must be intialized before mmaping memory");
-		return -EINVAL;
-	} else if(kflat->area != NULL) {
+	mutex_lock(&kflat->lock);
+
+	if(kflat->area != NULL) {
 		pr_err("cannot mmap kflat device twice");
-		return -EBUSY;
+		ret = -EBUSY;
+		goto exit;
 	}
 
 	area = vmalloc_user(alloc_size);
-	if (!area)
-		return -ENOMEM;
+	if (!area) {
+		ret = -ENOMEM;
+		goto exit;
+	}
 
-	mutex_lock(&kflat->lock);
 	kflat->area = area;
-	mutex_unlock(&kflat->lock);
+	kflat->size = alloc_size;
 	
 	vma->vm_flags |= VM_DONTEXPAND;
 	for (off = 0; off < alloc_size; off += PAGE_SIZE) {
@@ -342,7 +396,10 @@ static int kflat_mmap_flatten(struct kflat *kflat, struct vm_area_struct *vma) {
 		if (vm_insert_page(vma, vma->vm_start + off, page))
 			WARN_ONCE(1, "vm_insert_page() failed");
 	}
-	return 0;
+
+exit:
+	mutex_unlock(&kflat->lock);
+	return ret;
 }
 
 static int kflat_mmap_kdump(struct kflat* kflat, struct vm_area_struct* vma) {
@@ -386,6 +443,7 @@ static const struct file_operations kflat_fops = {
 	.owner = THIS_MODULE,
 	.open = kflat_open,
 	.unlocked_ioctl = kflat_ioctl,
+	.compat_ioctl = kflat_ioctl,
 	.mmap = kflat_mmap,
 	.release = kflat_close,
 };

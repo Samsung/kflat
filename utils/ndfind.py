@@ -112,6 +112,9 @@ class DerefInfo:
 			if type.str != T.str:
 				continue
 
+			if type.classname=="record_forward":
+				continue
+
 			if type.hash.split(':')[3] != T.hash.split(':')[3]:
 				continue
 

@@ -37,12 +37,36 @@ static void _log_generic(FILE* stream, const char* color, const char* prefix,
         fprintf(stdout, "[%s%s" LOG_DEFAULT_COLOR "][" 
                         LOG_TIME_COLOR "%7.3lf" LOG_DEFAULT_COLOR "] "
                         LOG_FUNC_COLOR "%-*s|" LOG_DEFAULT_COLOR " ",
-                        color, prefix, log_time(), 15 - strlen(prefix), func);
+                        color, prefix, log_time(), 15 - (int) strlen(prefix), func);
     else
         fprintf(stdout, "[%s][%7.3lf] %-10s| ", prefix, log_time(), func);
 
     vfprintf(stdout, fmt, args);
     fputs("\n", stdout);
+}
+
+void log_generic(const char* color, const char* prefix, const char* func, const char* fmt, ...) {
+    va_list args;
+    va_start(args, fmt);
+    _log_generic(stdout, color, prefix, func, fmt, args);
+    va_end(args);
+}
+
+void _log_abort(const char* func, const char* fmt, ...) {
+    va_list args;
+    char* err_msg;
+
+    va_start(args, fmt);
+    _log_generic(stdout, LOG_ERR_COLOR, "X", func, fmt, args);
+    va_end(args);
+
+    if(supports_colors)
+        err_msg = "---|  " LOG_ERR_COLOR "Program aborted" LOG_DEFAULT_COLOR "  |---\n";
+    else
+        err_msg = "---|  Program aborted  |---\n";
+    fputs(err_msg, stdout);
+
+    exit(1);
 }
 
 
@@ -53,27 +77,4 @@ void init_logging(void) {
         supports_colors = true;
 
     start_time = log_time();
-}
-
-void log_info(const char* fmt, ...) {
-    va_list args;
-    va_start(args, fmt);
-    _log_generic(stdout, LOG_INFO_COLOR, "+", __func__, fmt, args);
-    va_end(args);
-}
-
-void log_error(const char* fmt, ...) {
-    va_list args;
-    va_start(args, fmt);
-    _log_generic(stderr, LOG_ERR_COLOR, "!", __func__, fmt, args);
-    va_end(args);
-}
-
-void log_abort(const char* fmt, ...) {
-    va_list args;
-    va_start(args, fmt);
-    _log_generic(stderr, LOG_ERR_COLOR, "ABORT", __func__, fmt, args);
-    va_end(args);
-
-    exit(1);
 }

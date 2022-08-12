@@ -398,6 +398,15 @@ LINUXINCLUDE := ${LINUXINCLUDE}
 	def collect_call_tree(self, name: str):
 
 		discovered = set()
+		def count_params_and_rets(func) -> int:
+			# returns number of arguments AND return values
+			has_return = 0
+			for deref in func.derefs:
+				if deref.kindname == 'return':
+					has_return = 1
+					break
+			return func.nargs + has_return
+
 		def add_subfuncs(func):
 			calls = set(func.calls)
 			for id in func.calls:
@@ -406,6 +415,10 @@ LINUXINCLUDE := ${LINUXINCLUDE}
 				try:
 					f = self.ftdb.funcs.entry_by_id(id)
 				except libftdb.error:
+					continue
+
+				if count_params_and_rets(f) == 0:
+					# Skip functions not changing context
 					continue
 				discovered.add(f.id)
 				add_subfuncs(f)
