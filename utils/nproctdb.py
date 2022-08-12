@@ -19,7 +19,7 @@ import ndfind
 try:
 	import libftdb
 except ImportError:
-	sys.exit("Failed to import libftdb module. Make sure your PYTHON_PATH"
+	sys.exit("Failed to import libftdb module. Make sure your PYTHONPATH"
 			 " env is pointing to the output directory of CAS repo")
 
 __authors__ = "Bartosz Zator, Pawel Wieczorek @ Samsung R&D Poland - Mobile Security Group"
@@ -161,17 +161,17 @@ class RecipeGenerator(object):
 %s
 );"""
 	template_flatten_struct_array_storage_recipe = """{for (int __i=0; __i<%d; ++__i) {
-    const struct %s* __p = /* ATTR(%s) */ (const struct %s*)(OFFADDR(unsigned char*,%d)+%d*__i);
+    const struct %s* __p = /* ATTR(%s) */ (const struct %s*)(OFFADDR(unsigned char,%d)+%d*__i);
       /* AGGREGATE_FLATTEN_STRUCT_STORAGE(%s,__p); */
     AGGREGATE_FLATTEN_STRUCT_STORAGE_ITER(%s,__p); %s%s
 }}"""
 	template_flatten_union_array_storage_recipe = """{for (int __i=0; __i<%d; ++__i) {
-    const union %s* __p = /* ATTR(%s) */ (const union %s*)(OFFADDR(unsigned char*,%d)+%d*__i);
+    const union %s* __p = /* ATTR(%s) */ (const union %s*)(OFFADDR(unsigned char,%d)+%d*__i);
       /* AGGREGATE_FLATTEN_STRUCT_STORAGE(%s,__p); */
     AGGREGATE_FLATTEN_UNION_STORAGE_ITER(%s,__p); %s%s
 }}"""
 	template_flatten_struct_type_array_storage_recipe = """{for (int __i=0; __i<%d; ++__i) {
-    const %s* __p = /* ATTR(%s) */ (const %s*)(OFFADDR(unsigned char*,%d)+%d*__i);
+    const %s* __p = /* ATTR(%s) */ (const %s*)(OFFADDR(unsigned char,%d)+%d*__i);
       /* AGGREGATE_FLATTEN_STRUCT_TYPE_STORAGE(%s,__p); */
     AGGREGATE_FLATTEN_STRUCT_TYPE_STORAGE_ITER(%s,__p); %s%s
 }}"""
