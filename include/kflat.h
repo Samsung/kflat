@@ -2645,7 +2645,7 @@ FUNCTION_DEFINE_FLATTEN_STRUCT_TYPE_ARRAY_ITER_SELF_CONTAINED(FLTYPE,FLSIZE)
 #define AGGREGATE_FLATTEN_STRUCT(T,f)	\
 	do {	\
 		DBGTF(AGGREGATE_FLATTEN_STRUCT,T,f,"%lx",(unsigned long)ATTR(f));	\
-    	if ((!KFLAT_ACCESSOR->errno)&&(ADDR_RANGE_VALID(ATTR(f), sizeof(struct T*)))) {	\
+    	if ((!KFLAT_ACCESSOR->errno)&&(ADDR_RANGE_VALID(ATTR(f), sizeof(struct T)))) {	\
     		size_t _off = offsetof(_container_type,f);	\
     		struct flat_node *__node = interval_tree_iter_first(&KFLAT_ACCESSOR->FLCTRL.imap_root, (uint64_t)_ptr+_off,\
     				(uint64_t)_ptr+_off+sizeof(struct T*)-1);    \
@@ -2692,7 +2692,7 @@ FUNCTION_DEFINE_FLATTEN_STRUCT_TYPE_ARRAY_ITER_SELF_CONTAINED(FLTYPE,FLSIZE)
 #define AGGREGATE_FLATTEN_STRUCT_TYPE(T,f)	\
 	do {	\
 		DBGTF(AGGREGATE_FLATTEN_STRUCT_TYPE,T,f,"%lx",(unsigned long)ATTR(f));	\
-    	if ((!KFLAT_ACCESSOR->errno)&&(ADDR_RANGE_VALID(ATTR(f), sizeof(T*)))) {	\
+    	if ((!KFLAT_ACCESSOR->errno)&&(ADDR_RANGE_VALID(ATTR(f), sizeof(T)))) {	\
     		size_t _off = offsetof(_container_type,f);	\
     		struct flat_node *__node = interval_tree_iter_first(&KFLAT_ACCESSOR->FLCTRL.imap_root, (uint64_t)_ptr+_off,\
     				(uint64_t)_ptr+_off+sizeof(T*)-1);    \
@@ -2775,7 +2775,7 @@ FUNCTION_DEFINE_FLATTEN_STRUCT_TYPE_ARRAY_ITER_SELF_CONTAINED(FLTYPE,FLSIZE)
 #define AGGREGATE_FLATTEN_STRUCT_ITER(T,f)	\
 	do {    \
         DBGTF(AGGREGATE_FLATTEN_STRUCT_ITER,T,f,"%lx",(unsigned long)ATTR(f));    \
-        if ((!KFLAT_ACCESSOR->errno)&&(ADDR_RANGE_VALID(ATTR(f), sizeof(struct T*)))) {  \
+        if ((!KFLAT_ACCESSOR->errno)&&(ADDR_RANGE_VALID(ATTR(f), sizeof(struct T)))) {  \
         	size_t _off = offsetof(_container_type,f);  \
         	struct flat_node *__node = interval_tree_iter_first(&KFLAT_ACCESSOR->FLCTRL.imap_root, (uint64_t)_ptr+_off,\
         			(uint64_t)_ptr+_off+sizeof(struct T*)-1);    \
@@ -2829,7 +2829,7 @@ FUNCTION_DEFINE_FLATTEN_STRUCT_TYPE_ARRAY_ITER_SELF_CONTAINED(FLTYPE,FLSIZE)
 #define AGGREGATE_FLATTEN_STRUCT_TYPE_ITER(T,f)	\
 	do {    \
         DBGTF(AGGREGATE_FLATTEN_STRUCT_TYPE_ITER,T,f,"%lx",(unsigned long)ATTR(f));    \
-        if ((!KFLAT_ACCESSOR->errno)&&(ADDR_RANGE_VALID(ATTR(f), sizeof(T*)))) {  \
+        if ((!KFLAT_ACCESSOR->errno)&&(ADDR_RANGE_VALID(ATTR(f), sizeof(T)))) {  \
         	size_t _off = offsetof(_container_type,f);  \
         	struct flat_node *__node = interval_tree_iter_first(&KFLAT_ACCESSOR->FLCTRL.imap_root, (uint64_t)_ptr+_off,\
         			(uint64_t)_ptr+_off+sizeof(T*)-1);    \
@@ -2964,7 +2964,7 @@ FUNCTION_DEFINE_FLATTEN_STRUCT_TYPE_ARRAY_ITER_SELF_CONTAINED(FLTYPE,FLSIZE)
 		const struct T* _fp;	\
 		DBGTFMF(AGGREGATE_FLATTEN_STRUCT_MIXED_POINTER,T,f,"%lx",(unsigned long)ATTR(f),pre_f,post_f);	\
 		_fp = pre_f((const struct T*)ATTR(f));	\
-    	if ((!KFLAT_ACCESSOR->errno)&&(ADDR_VALID(_fp))) {	\
+    	if ((!KFLAT_ACCESSOR->errno)&&(ADDR_RANGE_VALID(_fp,sizeof(struct T)))) {	\
     		size_t _off = offsetof(_container_type,f);	\
 			struct flat_node *__node = interval_tree_iter_first(&KFLAT_ACCESSOR->FLCTRL.imap_root, (uint64_t)_ptr+_off,\
 					(uint64_t)_ptr+_off+sizeof(struct T*)-1);    \
@@ -3014,7 +3014,7 @@ FUNCTION_DEFINE_FLATTEN_STRUCT_TYPE_ARRAY_ITER_SELF_CONTAINED(FLTYPE,FLSIZE)
 		const struct T* _fp;	\
 		DBGTFMF(AGGREGATE_FLATTEN_STRUCT_TYPE_MIXED_POINTER,T,f,"%lx",(unsigned long)ATTR(f),pre_f,post_f);	\
 		_fp = pre_f((const T*)ATTR(f));	\
-		if ((!KFLAT_ACCESSOR->errno)&&(ADDR_VALID(_fp))) {	\
+		if ((!KFLAT_ACCESSOR->errno)&&(ADDR_RANGE_VALID(_fp,sizeof(T)))) {	\
 			size_t _off = offsetof(_container_type,f);	\
 			struct flat_node *__node = interval_tree_iter_first(&KFLAT_ACCESSOR->FLCTRL.imap_root, (uint64_t)_ptr+_off,\
 					(uint64_t)_ptr+_off+sizeof(T*)-1);    \
@@ -3070,7 +3070,7 @@ FUNCTION_DEFINE_FLATTEN_STRUCT_TYPE_ARRAY_ITER_SELF_CONTAINED(FLTYPE,FLSIZE)
 		const struct T* _fp;	\
 		DBGTFMF(AGGREGATE_FLATTEN_STRUCT_MIXED_POINTER_ITER,T,f,"%lx",(unsigned long)ATTR(f),pf,ff);  \
 		_fp = pre_f((const struct T*)ATTR(f)); \
-        if ((!KFLAT_ACCESSOR->errno)&&(ADDR_VALID(_fp))) {  \
+        if ((!KFLAT_ACCESSOR->errno)&&(ADDR_RANGE_VALID(_fp,sizeof(struct T)))) {  \
         	size_t _off = offsetof(_container_type,f);  \
         	struct flat_node *__node = interval_tree_iter_first(&KFLAT_ACCESSOR->FLCTRL.imap_root, (uint64_t)_ptr+_off,\
         			(uint64_t)_ptr+_off+sizeof(struct T*)-1);    \
@@ -3124,7 +3124,7 @@ FUNCTION_DEFINE_FLATTEN_STRUCT_TYPE_ARRAY_ITER_SELF_CONTAINED(FLTYPE,FLSIZE)
 		const struct T* _fp;	\
 		DBGTFMF(AGGREGATE_FLATTEN_STRUCT_TYPE_MIXED_POINTER_ITER,T,f,"%lx",(unsigned long)ATTR(f),pf,ff);  \
 		_fp = pre_f((const T*)ATTR(f)); \
-        if ((!KFLAT_ACCESSOR->errno)&&(ADDR_VALID(_fp))) {  \
+        if ((!KFLAT_ACCESSOR->errno)&&(ADDR_RANGE_VALID(_fp,sizeof(T)))) {  \
         	size_t _off = offsetof(_container_type,f);  \
         	struct flat_node *__node = interval_tree_iter_first(&KFLAT_ACCESSOR->FLCTRL.imap_root, (uint64_t)_ptr+_off,\
         			(uint64_t)_ptr+_off+sizeof(T*)-1);    \
@@ -3605,7 +3605,7 @@ FUNCTION_DEFINE_FLATTEN_STRUCT_TYPE_ARRAY_ITER_SELF_CONTAINED(FLTYPE,FLSIZE)
 		const struct T* _fp;	\
 		DBGTNFOMF(AGGREGATE_FLATTEN_STRUCT_MIXED_POINTER_SELF_CONTAINED,T,N,f,"%lx:%zu",(unsigned long)OFFATTR(void*,_off),(size_t)_off,pre_f,post_f);	\
 		_fp = pre_f((const struct T*)OFFATTR(void*,_off));	\
-    	if ((!KFLAT_ACCESSOR->errno)&&(ADDR_VALID(_fp))) {	\
+    	if ((!KFLAT_ACCESSOR->errno)&&(ADDR_RANGE_VALID(_fp,N))) {	\
 			struct flat_node *__node = interval_tree_iter_first(&KFLAT_ACCESSOR->FLCTRL.imap_root, (uint64_t)_ptr+_off,\
 					(uint64_t)_ptr+_off+sizeof(struct T*)-1);    \
 			if (__node==0) {	\
@@ -3654,7 +3654,7 @@ FUNCTION_DEFINE_FLATTEN_STRUCT_TYPE_ARRAY_ITER_SELF_CONTAINED(FLTYPE,FLSIZE)
 		const struct T* _fp;	\
 		DBGTNFOMF(AGGREGATE_FLATTEN_STRUCT_TYPE_MIXED_POINTER_SELF_CONTAINED,T,N,f,"%lx:%zu",(unsigned long)OFFATTR(void*,_off),(size_t)_off,pre_f,post_f);	\
 		_fp = pre_f((const T*)OFFATTR(void*,_off));	\
-		if ((!KFLAT_ACCESSOR->errno)&&(ADDR_VALID(_fp))) {	\
+		if ((!KFLAT_ACCESSOR->errno)&&(ADDR_RANGE_VALID(_fp,N))) {	\
 			struct flat_node *__node = interval_tree_iter_first(&KFLAT_ACCESSOR->FLCTRL.imap_root, (uint64_t)_ptr+_off,\
 					(uint64_t)_ptr+_off+sizeof(T*)-1);    \
 			if (__node==0) {	\
@@ -3702,7 +3702,7 @@ FUNCTION_DEFINE_FLATTEN_STRUCT_TYPE_ARRAY_ITER_SELF_CONTAINED(FLTYPE,FLSIZE)
 		const struct T* _fp;	\
 		DBGTNFOMF(AGGREGATE_FLATTEN_STRUCT_MIXED_POINTER_ITER_SELF_CONTAINED,T,N,f,"%lx:%zu",(unsigned long)OFFATTR(void*,_off),(size_t)_off,pf,ff);  \
 		_fp = pre_f((const struct T*)OFFATTR(void*,_off)); \
-        if ((!KFLAT_ACCESSOR->errno)&&(ADDR_VALID(_fp))) {  \
+        if ((!KFLAT_ACCESSOR->errno)&&(ADDR_RANGE_VALID(_fp,N))) {  \
         	struct flat_node *__node = interval_tree_iter_first(&KFLAT_ACCESSOR->FLCTRL.imap_root, (uint64_t)_ptr+_off,\
         			(uint64_t)_ptr+_off+sizeof(struct T*)-1);    \
 			if (__node==0) {	\
@@ -3755,7 +3755,7 @@ FUNCTION_DEFINE_FLATTEN_STRUCT_TYPE_ARRAY_ITER_SELF_CONTAINED(FLTYPE,FLSIZE)
 		const struct T* _fp;	\
 		DBGTNFOMF(AGGREGATE_FLATTEN_STRUCT_TYPE_MIXED_POINTER_ITER_SELF_CONTAINED,T,N,f,"%lx:%zu",(unsigned long)OFFATTR(void*,_off),(size_t)_off,pf,ff);  \
 		_fp = pre_f((const T*)OFFATTR(void*,_off)); \
-        if ((!KFLAT_ACCESSOR->errno)&&(ADDR_VALID(_fp))) {  \
+        if ((!KFLAT_ACCESSOR->errno)&&(ADDR_RANGE_VALID(_fp,N))) {  \
         	struct flat_node *__node = interval_tree_iter_first(&KFLAT_ACCESSOR->FLCTRL.imap_root, (uint64_t)_ptr+_off,\
         			(uint64_t)_ptr+_off+sizeof(T*)-1);    \
 			if (__node==0) {	\
@@ -4015,7 +4015,7 @@ FUNCTION_DEFINE_FLATTEN_STRUCT_TYPE_ARRAY_ITER_SELF_CONTAINED(FLTYPE,FLSIZE)
 		const struct T* _fp;	\
 		DBGTNFOMF(AGGREGATE_FLATTEN_STRUCT_MIXED_POINTER_ARRAY_ITER_SELF_CONTAINED,T,N,f,"%lx:%zu",(unsigned long)OFFATTR(void*,_off),(size_t)_off,pf,ff);  \
 		_fp = pre_f((const T*)OFFATTR(void*,_off)); \
-    	if ((!KFLAT_ACCESSOR->errno)&&(ADDR_VALID(_fp))) {	\
+    	if ((!KFLAT_ACCESSOR->errno)&&(ADDR_RANGE_VALID(_fp,(n)*(N)))) {	\
     		struct flat_node *__node = interval_tree_iter_first(&KFLAT_ACCESSOR->FLCTRL.imap_root, (uint64_t)_ptr+_off,\
     				(uint64_t)_ptr+_off+sizeof(struct T*)-1);    \
 			if (__node==0) {	\
@@ -4072,7 +4072,7 @@ FUNCTION_DEFINE_FLATTEN_STRUCT_TYPE_ARRAY_ITER_SELF_CONTAINED(FLTYPE,FLSIZE)
 		const struct T* _fp = 0;	\
 		if (_p) _fp = _p+_shift;	\
 		DBGTNFOMF(AGGREGATE_FLATTEN_STRUCT_MIXED_POINTER_ARRAY_ITER_SELF_CONTAINED_SHIFTED,T,N,f,"%lx:%zu",_fp,(size_t)_off,pf,ff);  \
-    	if ((!KFLAT_ACCESSOR->errno)&&(ADDR_VALID(_fp))) {	\
+    	if ((!KFLAT_ACCESSOR->errno)&&(ADDR_RANGE_VALID(_fp,(n)*(N)))) {	\
     		struct flat_node *__node = interval_tree_iter_first(&KFLAT_ACCESSOR->FLCTRL.imap_root, (uint64_t)_ptr+_off,\
     				(uint64_t)_ptr+_off+sizeof(struct T*)-1);    \
 			if (__node==0) {	\
@@ -4132,7 +4132,7 @@ FUNCTION_DEFINE_FLATTEN_STRUCT_TYPE_ARRAY_ITER_SELF_CONTAINED(FLTYPE,FLSIZE)
 	do {	\
 		DBGM5(AGGREGATE_FLATTEN_UNION_ARRAY_ITER_SELF_CONTAINED,T,N,f,_off,n);	\
 		DBGS("AGGREGATE_FLATTEN_UNION_ARRAY_ITER_SELF_CONTAINED [%lx:%zu -> %lx]\n",(uintptr_t)_ptr,(size_t)_off,(uintptr_t)OFFATTR(void*,_off));	\
-    	if ((!KFLAT_ACCESSOR->errno)&&(ADDR_VALID(OFFATTR(void*,_off)))) {	\
+    	if ((!KFLAT_ACCESSOR->errno)&&(ADDR_RANGE_VALID(OFFATTR(void*,_off),(n)*(N)))) {	\
     		struct flat_node *__node = interval_tree_iter_first(&KFLAT_ACCESSOR->FLCTRL.imap_root, (uint64_t)_ptr+_off,\
     				(uint64_t)_ptr+_off+sizeof(union T*)-1);    \
 			if (__node==0) {	\
@@ -4187,7 +4187,7 @@ FUNCTION_DEFINE_FLATTEN_STRUCT_TYPE_ARRAY_ITER_SELF_CONTAINED(FLTYPE,FLSIZE)
 	do {	\
 		DBGM6(AGGREGATE_FLATTEN_UNION_ARRAY_ITER_SELF_CONTAINED_SHIFTED,T,N,f,_off,n,_shift);	\
 		DBGS("AGGREGATE_FLATTEN_UNION_ARRAY_ITER_SELF_CONTAINED_SHIFTED [%lx:%zu -> %lx]\n",(uintptr_t)_ptr,(size_t)_off,(uintptr_t)OFFATTRN(void*,_off,_shift));	\
-    	if ((!KFLAT_ACCESSOR->errno)&&(ADDR_VALID(OFFATTRN(void*,_off,_shift)))) {	\
+    	if ((!KFLAT_ACCESSOR->errno)&&(ADDR_RANGE_VALID(OFFATTRN(void*,_off,_shift),(n)*(N)))) {	\
     		struct flat_node *__node = interval_tree_iter_first(&KFLAT_ACCESSOR->FLCTRL.imap_root, (uint64_t)_ptr+_off,\
     				(uint64_t)_ptr+_off+sizeof(union T*)-1);    \
 			if (__node==0) {	\
