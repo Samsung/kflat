@@ -270,7 +270,7 @@ void binary_stream_update_pointers(struct kflat* kflat) {
     	}
     	p = rb_next(p);
     }
-    kflat_dbg_printf("Updated %d pointers\n\n");
+    kflat_dbg_printf("Updated %d pointers\n\n",count);
 }
 
 
