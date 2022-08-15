@@ -1372,6 +1372,8 @@ void flatten_init(struct kflat* kflat) {
 	kflat->mpool = 0;
 	kflat->bqueue_mpool = 0;
 #endif
+
+	kflat_dbg_buf_clear();
 }
 EXPORT_SYMBOL_GPL(flatten_init);
 

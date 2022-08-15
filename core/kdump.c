@@ -456,6 +456,7 @@ void kdump_dump_vma(struct kdump_memory_map* kdump) {
 size_t kdump_test_address(void* addr, size_t size) {
     size_t walked_size = 0;
     struct page* page;
+    size_t page_offset = (uint64_t)addr & PAGE_MASK;
 
     /* Fast path for NULL pointer addresses */
 	if (addr == NULL)
@@ -469,6 +470,9 @@ size_t kdump_test_address(void* addr, size_t size) {
         
         walked_size += ret_size;
     }
+
+    if(walked_size > 0) 
+        walked_size -= page_offset;
 
     return walked_size;
 }

@@ -41,6 +41,98 @@ static void kflat_put(struct kflat *kflat) {
 }
 
 /*******************************************************
+ * DEBUG AREA
+ *  When running kflat with debug flag enabled it is necessary
+ *  to dump a lot of data describing what's going on under the
+ *  hood. Here is a simple implementation of printk-like function
+ *  using buffer of an arbitrary size
+ *******************************************************/
+static struct {
+	void* mem;
+	size_t size;
+	size_t offset;
+} _dbg_buffer;
+
+DEFINE_MUTEX(kflat_dbg_lock);
+
+static int kflat_dbg_buf_init(const size_t buffer_size) {
+	int rv = 0;
+	
+	mutex_lock(&kflat_dbg_lock);
+
+	if(_dbg_buffer.mem != NULL)
+		vfree(_dbg_buffer.mem);
+
+	_dbg_buffer.mem = vmalloc(buffer_size);
+	if(_dbg_buffer.mem == NULL) {
+		WARN_ONCE(1, "Failed to allocate buffer for kflat debug logs");
+		rv = -ENOMEM;
+		goto exit;
+	}
+	_dbg_buffer.size = buffer_size;
+	_dbg_buffer.offset = 0;
+
+exit:
+	mutex_unlock(&kflat_dbg_lock);
+	return rv;
+}
+
+static void kflat_dbg_buf_deinit(void) {
+	mutex_lock(&kflat_dbg_lock);
+
+	vfree(_dbg_buffer.mem);
+	_dbg_buffer.mem = NULL;
+	_dbg_buffer.offset = 0;
+	_dbg_buffer.size = 0;
+
+	mutex_unlock(&kflat_dbg_lock);
+}
+
+void kflat_dbg_buf_clear(void) {
+	mutex_lock(&kflat_dbg_lock);
+	_dbg_buffer.offset = 0;
+	mutex_unlock(&kflat_dbg_lock);
+}
+
+static ssize_t kflat_dbg_buf_read(struct file* file, char* __user buffer, size_t size, loff_t* ppos) {
+	ssize_t ret = 0;
+
+	mutex_lock(&kflat_dbg_lock);
+	if(_dbg_buffer.mem == NULL || _dbg_buffer.offset == 0)
+		goto exit;
+
+	ret = simple_read_from_buffer(buffer, size, ppos, _dbg_buffer.mem, _dbg_buffer.offset);
+exit:
+	mutex_unlock(&kflat_dbg_lock);
+	return ret;
+}
+
+void kflat_dbg_printf(const char* fmt, ...) {
+	long avail_size, written;
+	va_list args;
+
+	mutex_lock(&kflat_dbg_lock);
+
+	if(_dbg_buffer.mem == NULL)
+		goto exit;
+
+	avail_size = _dbg_buffer.size - _dbg_buffer.offset;
+	if(avail_size < 0)
+		goto exit;
+
+	va_start(args, fmt);
+	written = vscnprintf(_dbg_buffer.mem + _dbg_buffer.offset, avail_size, fmt, args);
+	va_end(args);
+
+	_dbg_buffer.offset += written;
+
+exit:
+	mutex_unlock(&kflat_dbg_lock);
+	return;
+}
+EXPORT_SYMBOL_GPL(kflat_dbg_printf);
+
+/*******************************************************
  * CLIENTS REGISTRY
  *  The simple data structure for storing per user
  *  information
@@ -446,12 +538,17 @@ static const struct file_operations kflat_fops = {
 	.compat_ioctl = kflat_ioctl,
 	.mmap = kflat_mmap,
 	.release = kflat_close,
+	.read = kflat_dbg_buf_read,
 };
 
 
 /*******************************************************
  * MODULE REGISTRATION
  *******************************************************/
+static int dbg_buffer_size = 10 * 1024 * 1024;			// 10MB
+module_param(dbg_buffer_size, int, 0660);
+MODULE_PARM_DESC(dbg_buffer_size, "size of dbg buf used when flattening with debug flag enabled");
+
 static struct dentry* kflat_dbgfs_node;
 
 static int __init kflat_init(void) {
@@ -465,14 +562,26 @@ static int __init kflat_init(void) {
 	node = debugfs_create_file_unsafe("kflat", 0600, NULL, NULL, &kflat_fops);
 	if (node == NULL) {
 		pr_err("failed to create kflat in debugfs\n");
-		return -ENOMEM;
+		rv = -ENOMEM;
+		goto fail_debugfs;
 	}
+
+	rv = kflat_dbg_buf_init(dbg_buffer_size);
+	if(rv)
+		goto fail_dbg_buf;
 
 	kflat_dbgfs_node = node;
 	return 0;
+
+fail_dbg_buf:
+	debugfs_remove(kflat_dbgfs_node);
+fail_debugfs:
+	kdump_exit();
+	return rv;
 }
 
 static void __exit kflat_exit(void) {
+	kflat_dbg_buf_deinit();
 	debugfs_remove(kflat_dbgfs_node);
 	kdump_exit();
 }

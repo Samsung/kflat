@@ -15,7 +15,7 @@ extern int flatten_base_global_address;
 
 #define kflat_fmt(fmt) 			"kflat: " fmt
 #define flat_errs(fmt,...) 		printk(KERN_ERR kflat_fmt(fmt), ##__VA_ARGS__);
-#define flat_infos(fmt,...) 	printk(KERN_INFO kflat_fmt(fmt), ##__VA_ARGS__);
+#define flat_infos(fmt,...) 	kflat_dbg_printf(kflat_fmt(fmt), ##__VA_ARGS__);
 
 #define LINEAR_MEMORY_ALLOCATOR	1
 #define KFLAT_LINEAR_MEMORY_INITIAL_POOL_SIZE	(256ULL*1024*1024)
@@ -338,6 +338,11 @@ struct flatten_job {
     const struct flatten_base* fp;
     flatten_struct_mixed_convert_t convert;
 };
+
+/* Debug printing functions */
+
+void kflat_dbg_buf_clear(void);
+void kflat_dbg_printf(const char* fmt, ...);
 
 /* Main interface functions */
 
