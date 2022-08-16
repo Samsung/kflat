@@ -308,13 +308,13 @@ static inline void tbi_check(void) {
 
 static inline void* ptr_reset_tag(void* addr) {
     if(tbi_is_enabled)
-        return arch_kasan_reset_tag(addr);
+        return kasan_reset_tag(addr);
     return addr;
 }
 
 #elif CONFIG_X86_64
 static inline void* ptr_reset_tag(void* addr) {
-    return arch_kasan_reset_tag;
+    return kasan_reset_tag(addr);
 }
 #endif
 
