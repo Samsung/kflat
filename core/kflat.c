@@ -570,6 +570,7 @@ static int __init kflat_init(void) {
 	if(rv)
 		goto fail_dbg_buf;
 
+	kflat_lookup_kallsyms_name = probing_get_kallsyms();
 	kflat_dbgfs_node = node;
 	return 0;
 

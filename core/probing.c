@@ -103,7 +103,7 @@ int probing_arm(struct probe* probing, const char* symbol, pid_t callee) {
 
     ret = register_kprobe(kprobe);
     if(ret) {
-        PROBING_DEBUG("failed to arm new kprobe - ret(%d)", ret);
+        pr_err("failed to arm new kprobe - ret(%d)", ret);
         kfree(kprobe);
         return ret;
     }
@@ -124,4 +124,30 @@ void probing_disarm(struct probe* probing) {
 
     probing->is_armed = 0;
     probing->kprobe = NULL;
+}
+
+
+/*******************************************************
+ * Cheating
+ * 
+ *  We really need an access to kallsyms_lookup_name for
+ *  dumping global variables
+ *******************************************************/
+void* probing_get_kallsyms(void) {
+    int ret;
+    void* result;
+    struct kprobe kprobe;
+
+    memset(&kprobe, 0, sizeof(kprobe));
+    kprobe.symbol_name = "kallsyms_lookup_name";
+
+    ret = register_kprobe(&kprobe);
+    if(ret) {
+        pr_err("failed to extract pointer to kallsyms_lookup_name - ret(%d)", ret);
+        return NULL;
+    }
+
+    result = kprobe.addr;
+    unregister_kprobe(&kprobe);
+    return result;
 }

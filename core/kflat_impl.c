@@ -1532,12 +1532,33 @@ EXPORT_SYMBOL_GPL(flatten_clear_option);
 
 
 /*******************************************************
+ * GLOBAL VARIABLES SUPPORT
+ *******************************************************/
+unsigned long (*kflat_lookup_kallsyms_name)(const char* name);
+
+void* flatten_global_address_by_name(const char* name) {
+	void* addr;
+
+	if(kflat_lookup_kallsyms_name == NULL) {
+		pr_warn("failed to obtain an address of global variable '%s' - kallsyms is not initialized", name);
+		return NULL;
+	}
+	
+	addr = (void*) kflat_lookup_kallsyms_name(name);
+	
+	if(addr == NULL)
+		pr_warn("failed to obtain an address of global variables '%s'", name);
+	return addr;
+}
+EXPORT_SYMBOL_GPL(flatten_global_address_by_name);
+
+
+/*******************************************************
  * DYNAMIC OBJECTS RESOLUTION
  *******************************************************/
 /*
- * Original implementation of kmem_cache_debug_flags can be found in mm/slab.h
- *  We need to redeclare it here, because __slub_debug_enabled is not exported
- *  to modules.
+ * Original implementation of kmem_cache_debug_flags can be 
+ * 	found in mm/slab.h
  */
 static inline bool _kmem_cache_debug_flags(struct kmem_cache *s, slab_flags_t flags) {
 #ifdef CONFIG_SLUB_DEBUG_ON
@@ -1574,10 +1595,6 @@ static bool _flatten_get_heap_obj(struct page* page, void* ptr, void** start, vo
 	if((ptr - offset) < page_address(page))
 		return false;
 
-	/*
-	 * Finally, kindly ask allocator to provide us the size of 
-	 *  an object
-	 */
 	object_size = slab_ksize(cache);
 	if(object_size <= offset)
 		return false;
@@ -1644,10 +1661,6 @@ static bool _flatten_get_heap_obj(struct slab* slab, void* ptr,
 	if((ptr - offset) < slab_address(slab))
 		return false;
 
-	/*
-	 * Finally, kindly ask allocator to provide us the size of 
-	 *  an object
-	 */
 	object_size = slab_ksize(cache);
 	if(object_size <= offset)
 		return false;
@@ -1670,7 +1683,6 @@ bool flatten_get_object(void* ptr, void** start, void** end) {
 		return false;
 
 	if(folio_test_slab(folio))
-		// This is heap (SLAB) object
 		return _flatten_get_heap_obj(folio_slab(folio), ptr, start, end);
 	else
 		return false;
@@ -1678,65 +1690,6 @@ bool flatten_get_object(void* ptr, void** start, void** end) {
 #endif
 
 EXPORT_SYMBOL_GPL(flatten_get_object);
-
-/*******************************************************
- * GLOBAL VARIABLES SUPPORT
- *******************************************************/
-struct _flatten_module_priv {
-	const char* name;
-	uint64_t offset;
-	uint64_t result;
-};
-
-static int _find_module_offset(const char* name, void* base_addr, void* priv) {
-	struct module* module = NULL;
-	void* globals_address;
-	struct _flatten_module_priv* module_priv = (struct _flatten_module_priv*) priv;
-
-	if(!strcmp(name, module_priv->name)) {
-		// Access full content of module structure and lookup the start of globals
-		module = container_of((void*) name, struct module, name);
-		globals_address = module->core_layout.base + module->core_layout.ro_size + 0xc00;
-
-		module_priv->result = module_priv->offset + (uint64_t) globals_address;
-		return 1;
-	}
-	return 0;
-}
-
-/*
- * flatten_global_address - get VA of kernel global variable beloning to
- *		`module` and located at `offset` from base address
- *	`module` can be set to NULL or 'vmlinux', to access globals from kernel image
- */
-#ifdef CONFIG_ANDROID_DEBUG_SYMBOLS 
-#include <linux/android_debug_symbols.h>
-void* flatten_global_address(const char* module, uint64_t offset) {
-	struct _flatten_module_priv priv;
-
-	if(module == NULL || !strcmp(module, "vmlinux")) {
-		WARN_ONCE(1, "Accessing global variables from vmlinux is not currently supported");
-		return NULL;
-		//return KERNEL_START + offset;
-	}
-	
-	priv.name = module;
-	priv.offset = offset;
-	priv.result = 0;
-	android_debug_for_each_module(_find_module_offset, &priv);
-
-	return (void*) priv.result;
-}
-#else
-#warning "Support for globals variable is currently supported only on Android kernel"
-
-void* flatten_global_address(const char* module, uint64_t offset) {
-	(void)_find_module_offset;
-	return NULL;
-}
-#endif
-EXPORT_SYMBOL_GPL(flatten_global_address);
-
 
 /*******************************************************
  * KFLAT RECIPES REGISTRY

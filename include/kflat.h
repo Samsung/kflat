@@ -398,7 +398,9 @@ enum flatten_option {
 void flatten_set_option(struct kflat* kflat, int option);
 void flatten_clear_option(struct kflat* kflat, int option);
 
+extern unsigned long (*kflat_lookup_kallsyms_name)(const char* name);
 bool flatten_get_object(void* ptr, void** start, void** end);
+void* flatten_global_address_by_name(const char* name);
 void* flatten_global_address(const char* module, uint64_t offset);
 
 static inline struct flatten_pointer* make_flatten_pointer(struct kflat* kflat, struct flat_node* node, size_t offset) {

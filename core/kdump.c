@@ -301,7 +301,7 @@ static inline void tbi_check(void) {
     
 #ifdef CONFIG_KASAN_HW_TAGS
     if(!tbi_is_enabled)
-        printk(KERN_INFO "kflat: Top-bytes-ignore feature is disabled even"
+        printk(KERN_NOTICE "kflat: Top-bytes-ignore feature is disabled even"
             " though CONFIG_KASAN_HW_TAGS is enabled");
 #endif
 }
