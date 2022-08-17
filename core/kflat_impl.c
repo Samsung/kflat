@@ -1547,7 +1547,7 @@ void* flatten_global_address_by_name(const char* name) {
 	addr = (void*) kflat_lookup_kallsyms_name(name);
 	
 	if(addr == NULL)
-		pr_warn("failed to obtain an address of global variables '%s'", name);
+		pr_warn("failed to obtain an address of global variable '%s'", name);
 	return addr;
 }
 EXPORT_SYMBOL_GPL(flatten_global_address_by_name);
