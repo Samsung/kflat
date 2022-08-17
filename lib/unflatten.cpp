@@ -368,7 +368,7 @@ public:
 		unsigned char* memptr =
 				((unsigned char*)FLCTRL.mem)+FLCTRL.HDR.ptr_count*sizeof(size_t)+FLCTRL.HDR.fptr_count*sizeof(size_t)+
 					FLCTRL.HDR.mcount*2*sizeof(size_t);
-		if ((!arg) || (!strcmp(arg,"-m"))) {
+		if ((!arg) || (!strcmp(arg,"-m")) || (!strcmp(arg,"-M"))) {
 			std::set<size_t> fixset;
 			for (size_t i=0; i<FLCTRL.HDR.ptr_count; ++i) {
 				size_t fix_loc = *((size_t*)FLCTRL.mem+i);
@@ -378,32 +378,50 @@ public:
 			printf("# Memory size: %lu [not fixed]\n",FLCTRL.HDR.memory_size);
 			for (unsigned long i=0; i<FLCTRL.HDR.memory_size; ++i) {
 				if ((i%64)==0) {
-					if (ptrbyte_count>0) printf(COLOR_OFF);
+					if ((arg) && (!strcmp(arg,"-m"))) {
+						if (ptrbyte_count>0) printf(COLOR_OFF);
+					}
 					int n = printf("%lu:%lu: ",(i/64)*64+(i%64),(i/64)*64+(i%64)+63);
 					for (int j=0; j<16-n; ++j) printf(" ");
-					if (ptrbyte_count>0) printf(COLOR_STRING);
+					if ((arg) && (!strcmp(arg,"-m"))) {
+						if (ptrbyte_count>0) printf(COLOR_STRING);
+					}
 				}
 				if (fixset.find(i)!=fixset.end()) {
-					printf(COLOR_STRING);
+					if ((arg) && (!strcmp(arg,"-m"))) {
+						printf(COLOR_STRING);
+					}
 					ptrbyte_count=8;
 				}
 				printf("%02x ",*((unsigned char*)memptr+i));
 				if ((((i+1)%32)==0) && (i+1<FLCTRL.HDR.memory_size)) {
-					if (ptrbyte_count>0) printf(COLOR_OFF);
+					if ((arg) && (!strcmp(arg,"-m"))) {
+						if (ptrbyte_count>0) printf(COLOR_OFF);
+					}
 					printf(" | ");
-					if (ptrbyte_count>0) printf(COLOR_STRING);
+					if ((arg) && (!strcmp(arg,"-m"))) {
+						if (ptrbyte_count>0) printf(COLOR_STRING);
+					}
 				}
 				if ((((i+1)%64)==0) && (i+1<FLCTRL.HDR.memory_size)) {
-					if (ptrbyte_count>0) printf(COLOR_OFF);
+					if ((arg) && (!strcmp(arg,"-m"))) {
+						if (ptrbyte_count>0) printf(COLOR_OFF);
+					}
 					printf("\n");
-					if (ptrbyte_count>0) printf(COLOR_STRING);
+					if ((arg) && (!strcmp(arg,"-m"))) {
+						if (ptrbyte_count>0) printf(COLOR_STRING);
+					}
 				}
 				ptrbyte_count--;
 				if (ptrbyte_count<=0) {
-					printf(COLOR_OFF);
+					if ((arg) && (!strcmp(arg,"-m"))) {
+						printf(COLOR_OFF);
+					}
 				}
 			}
-			printf(COLOR_OFF);
+			if ((arg) && (!strcmp(arg,"-m"))) {
+				printf(COLOR_OFF);
+			}
 			printf("\n\n");
 		}
 

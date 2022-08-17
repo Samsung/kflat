@@ -101,6 +101,7 @@ It will print the contents of the entire image file with some possibility for ex
 imginfo <path_to_img> INFO -r		// prints root pointer information
 imginfo <path_to_img> INFO -p		// prints pointer location information
 imginfo <path_to_img> INFO -m		// prints memory information
+imginfo <path_to_img> INFO -M		// prints memory information (no colors to highlight pointers)
 imginfo <path_to_img> INFO -f		// prints information about memory fragments
 imginfo <path_to_img> INFO -a		// prints information about function pointer map
 ```
