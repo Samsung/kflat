@@ -265,7 +265,18 @@ void binary_stream_update_pointers(struct kflat* kflat) {
 			void* newptr = (unsigned char*)node->ptr->node->storage->index+node->ptr->offset;
 			kflat_dbg_printf("@ ptr update at ((%lx)%lx:%zu) : %lx => %lx\n",(unsigned long)node->inode,(unsigned long)node->inode->start,node->offset,
 					(unsigned long)newptr,(unsigned long)(((unsigned char*)node->inode->storage->data)+node->offset));
-			memcpy(&((unsigned char*)node->inode->storage->data)[node->offset],&newptr,sizeof(void*));
+			size_t size_to_cpy = sizeof(void*);
+			struct blstream* __storage = node->inode->storage;
+			size_t __ptr_offset = node->offset;
+			while(size_to_cpy>0) {
+				size_t cpy_size = (size_to_cpy>(__storage->size-__ptr_offset))?(__storage->size-__ptr_offset):(size_to_cpy);
+				memcpy(&((unsigned char*)__storage->data)[__ptr_offset],(unsigned char*)&newptr+(sizeof(void*)-size_to_cpy),cpy_size);
+				size_to_cpy-=cpy_size;
+				if (size_to_cpy>0) {
+					__storage = __storage->next;
+					__ptr_offset = 0;
+				}
+			}
 			count++;
     	}
     	p = rb_next(p);
