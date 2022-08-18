@@ -1606,33 +1606,18 @@ static bool _flatten_get_heap_obj(struct page* page, void* ptr, void** start, vo
 	return true;
 }
 
-/*
- * flatten_get_object - check whether `ptr` points to the heap object and
- *		if so retrieve its start and end address
- *  For instance, if there's an array `char tab[32]` allocated on heap,
- *   invoking this func with &tab[10] will set `start` to &tab[0] and
- *   `end` to &tab[31].
- *  Returns false, when pointer does not point to valid heap location
- */
-bool flatten_get_object(void* ptr, void** start, void** end) {
+void* flatten_find_heap_object(void* ptr) {
 	struct page* page;
-
-	if(!virt_addr_valid(ptr))
-		return false;
 
 	page = compound_head(kmap_to_page(ptr));
 	if(page == NULL)
-		return false;
+		return NULL;
 
-	if(PageSlab(page)) {
-		// This is heap (SLAB) object
-		return _flatten_get_heap_obj(page, ptr, start, end);
-	} else {
-		// This is vmalloc area
-		//  xxx TODO: Add support for this bastard
-		return false;
-	}
+	if(PageSlab(page))
+		return page;
+	return NULL;
 }
+
 #else
 static bool _flatten_get_heap_obj(struct slab* slab, void* ptr, 
 									void** start, void** end) {
@@ -1672,23 +1657,47 @@ static bool _flatten_get_heap_obj(struct slab* slab, void* ptr,
 	return true;
 }
 
-bool flatten_get_object(void* ptr, void** start, void** end) {
+void* flatten_find_heap_object(void* ptr) {
 	struct folio* folio;
+	
+	if(folio == NULL)
+		return NULL;
+
+	if(folio_test_slab(folio))
+		return folio_slab(folio);
+	return NULL;
+}
+
+#endif
+
+/*
+ * flatten_get_object - check whether `ptr` points to the heap object and
+ *		if so retrieve its start and end address
+ *  For instance, if there's an array `char tab[32]` allocated on heap,
+ *   invoking this func with &tab[10] will set `start` to &tab[0] and
+ *   `end` to &tab[31].
+ *  Returns false, when pointer does not point to valid memory location
+ */
+bool flatten_get_object(void* ptr, void** start, void** end) {
 
 	if(!virt_addr_valid(ptr))
 		return false;
 
-	folio = page_folio(kmap_to_page(ptr));
-	if(folio == NULL)
-		return false;
-
-	if(folio_test_slab(folio))
-		return _flatten_get_heap_obj(folio_slab(folio), ptr, start, end);
-	else
-		return false;
+	void* obj = flatten_find_heap_object(ptr);
+	if(obj != NULL) {
+		return _flatten_get_heap_obj(obj, ptr, start, end);
+	} else {
+		size_t size = kdump_test_address(ptr, INT_MAX);
+		if(size == 0)
+			return false;
+		
+		if(start)
+			*start = ptr;	// xxx TODO: Find the start of vmalloc area
+		if(end)
+			*end = ptr + size;
+		return true;
+	}
 }
-#endif
-
 EXPORT_SYMBOL_GPL(flatten_get_object);
 
 /*******************************************************

@@ -1256,6 +1256,7 @@ def main():
 			type, pos = arg.split('@')
 			if pos.isdigit():
 				func_args_to_dump.append((type, int(pos)))
+			# TODO: Arrays support
 			globals_to_dump.append((type, pos))
 
 	# Now it's time to generate recipes
