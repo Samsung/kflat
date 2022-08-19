@@ -72,4 +72,4 @@ int main() {
 ```
 
 ## Copyrights
-This library uses code extracted from Linux kernel source code (files `rbtree.c` and `include/*`) under license GPL-2.0.
+This library uses code extracted from Linux kernel source code (files `rbtree.c` and `include_priv/*`) under license GPL-2.0.

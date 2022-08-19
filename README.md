@@ -156,7 +156,7 @@ Kflat mmap handler supports two modes selectable by the value of `offset` argume
 | KFLAT_MMAP_KDUMP _(1)_ | Mmaped memory will be exposing whole kernel-space memory stored in RAM. This feature can be used to conveniently dump kernel memory on devices with `/dev/kmem` disabled. |
 | _Other_ | Device will return `-EINVAL` | 
 
-### Example use of kernel API*
+### Example use of kernel API
 
 The simplified flow of dumping kernel memory with kflat looks as follow:
 

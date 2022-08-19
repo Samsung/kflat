@@ -49,7 +49,7 @@ public:
 	 *        called multiple times to load one image after another
 	 * 
 	 * @param file pointer to opened file with kflat image
-	 * @param gfa  optional pointer to function resolving function addresses
+	 * @param gfa  optional pointer to function resolving func pointers
 	 * @return        0 on success, otherwise error code
 	 */
 	int load(FILE* file, get_function_address_t gfa = NULL);
@@ -110,12 +110,12 @@ CFlatten flatten_init(int level);
 void flatten_deinit(CFlatten flatten);
 
 /**
- * @brief Load new kflat image from file. This method can be safelly
- *        called multiple timse without need of using flatten_unload
+ * @brief Load new kflat image from file. This method can be safely
+ *        called multiple times without need of using flatten_unload
  * 
  * @param flatten library instance
  * @param file    pointer to opened file with kflat image
- * @param gfa     optional pointer to function resolving function addresses
+ * @param gfa     optional pointer to function resolving func pointers
  * @return        0 on success, -1 if an error occurred
  */
 int flatten_load(CFlatten flatten, FILE* file, get_function_address_t gfa);
