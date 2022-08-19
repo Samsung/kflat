@@ -392,6 +392,8 @@ static int kdump_is_phys_in_ram(uint64_t addr) {
 /*******************************************************
  * PAGE WALKING
  *******************************************************/
+#define SIZE_TO_NEXT_PAGE(ADDR, LEVEL)      (LEVEL ## _SIZE - (addr & ~LEVEL ## _MASK))
+
 static size_t walk_addr(pgd_t* swapper_pgd, uint64_t addr, struct page** pagep) {
     pgd_t* pgdp, pgd;
     p4d_t* p4dp, p4d;
@@ -399,21 +401,20 @@ static size_t walk_addr(pgd_t* swapper_pgd, uint64_t addr, struct page** pagep) 
     pmd_t* pmdp, pmd;
     pte_t* ptep, pte;
 
-    addr = addr & ~(PAGE_SIZE - 1);
     *pagep = NULL;
 
 #ifdef CONFIG_ARM64
 
     // Check whether address belongs to kernel VA space
     if(addr < PAGE_OFFSET)
-        return PGDIR_SIZE;
+        return SIZE_TO_NEXT_PAGE(addr, PGDIR);
 
 #elif CONFIG_X86_64
 
     // Check whether provided address is canonical
     uint64_t top_bits = (int64_t)addr >> __VIRTUAL_MASK_SHIFT;
     if(top_bits != -1ULL && top_bits != 0)
-        return PGDIR_SIZE;
+        return SIZE_TO_NEXT_PAGE(addr, PGDIR);
 
 #endif
 
@@ -421,34 +422,34 @@ static size_t walk_addr(pgd_t* swapper_pgd, uint64_t addr, struct page** pagep) 
     pgdp = pgd_offset_pgd(swapper_pgd, addr);
     pgd = READ_ONCE(*pgdp);
     if(pgd_none(pgd) || pgd_bad(pgd))
-        return PGDIR_SIZE;
+        return SIZE_TO_NEXT_PAGE(addr, PGDIR);
 
     // Proceed to second level table
     p4dp = p4d_offset(pgdp, addr);
     p4d = READ_ONCE(*p4dp);
     if(p4d_none(p4d) || p4d_bad(p4d))
-        return P4D_SIZE;
+        return SIZE_TO_NEXT_PAGE(addr, P4D);
 
     // Check PUD table - look out for Huge page entries
     pudp = pud_offset(p4dp, addr);
     pud = READ_ONCE(*pudp);
     if(pud_none(pud))
-        return PUD_SIZE;
+        return SIZE_TO_NEXT_PAGE(addr, PUD);
     else if(pud_sect(pud)) {
         if(pud_present(pud) && pfn_valid(pud_pfn(pud)))
             *pagep = pud_page(pud);
-        return PUD_SIZE;
+        return SIZE_TO_NEXT_PAGE(addr, PUD);
     }
 
     // Check PMD table - again, be aware of huge pages
     pmdp = pmd_offset(pudp, addr);
     pmd = READ_ONCE(*pmdp);
     if(pmd_none(pmd))
-        return PMD_SIZE;
+        return SIZE_TO_NEXT_PAGE(addr, PMD);
     else if(pmd_sect(pmd)) {
         if(pmd_present(pmd) && pfn_valid(pmd_pfn(pmd)))        
             *pagep = pmd_page(pmd);
-        return PMD_SIZE;
+        return SIZE_TO_NEXT_PAGE(addr, PMD);
     }
 
     // Finally, check PTE table for page entry
@@ -457,7 +458,7 @@ static size_t walk_addr(pgd_t* swapper_pgd, uint64_t addr, struct page** pagep) 
     if(!pte_none(pte) && pfn_valid(pte_pfn(pte)))    
         *pagep = pte_page(pte);
 
-    return PAGE_SIZE;
+    return SIZE_TO_NEXT_PAGE(addr, PAGE);
 }
 
 static void walk_page_range(struct kdump_memory_map* kdump, pgd_t* swapper_pgd, uint64_t start, uint64_t end) {
@@ -498,6 +499,7 @@ size_t kdump_test_address(void* addr, size_t size) {
     size_t page_offset = (uint64_t)addr & (~PAGE_MASK);
 
     addr = ptr_reset_tag(addr);
+    addr = (void*)((unsigned long)addr & ~(PAGE_SIZE - 1)); 
 
     /* Fast path for NULL pointer addresses */
 	if (addr == NULL)
