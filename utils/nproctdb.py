@@ -13,6 +13,7 @@ import io
 import json
 import os
 import sys
+from typing import List, Tuple
 
 import ndfind
 
@@ -28,17 +29,20 @@ __authors__ = "Bartosz Zator, Pawel Wieczorek @ Samsung R&D Poland - Mobile Secu
 ##################################
 # Global helpers
 ##################################
-def indent(s,n=1):
-	return "\n".join([" "*n*RecipeGenerator.TABSIZE+x for x in s.split("\n")])
+def indent(s, n=1):
+	return "\n".join([" " * n * RecipeGenerator.TABSIZE + x for x in s.split("\n")])
 
-def ptrNestedRefName(refname,ptrLevel,nestedPtr=False,refoffset=0):
-	if ptrLevel>0:
-		return "__"+"_".join(refname.split("."))+"_"+str(ptrLevel)
-	else:
-		if not nestedPtr:
-			return refname
-		else:
-			return "/*ATTR(%s)*/ OFFATTR(void**,%d)"%(refname,refoffset)
+def ptrNestedRefName(refname, ptrLevel, nestedPtr=False, refoffset=0):
+	if ptrLevel > 0:
+		return "__" + "_".join(refname.split(".")) + "_" + str(ptrLevel)
+	elif not nestedPtr:
+		return refname
+	return "/*ATTR(%s)*/ OFFATTR(void**,%d)" % (refname, refoffset)
+
+def ptrNestedRefNameOrRoot(refname, ptrLevel, nestedPtr=False, refoffset=0):
+	if ptrLevel > 0:
+		return "__" + "_".join(refname.split(".")) + "_" + str(ptrLevel)
+	return "__root_ptr"
 
 def unionMemberInfo(inUnion):
 	return "   /* VERIFY union member */" if inUnion else ""
@@ -64,6 +68,7 @@ class RecipeBase(object):
 		self.to_check = to_check
 		self.check_union = check_union
 		self.to_fix = to_fix
+
 	def __attrs__(self):
 		s=""
 		attrs = list()
@@ -75,9 +80,10 @@ class RecipeBase(object):
 			attrs.append("UNION")
 		if self.to_fix:
 			attrs.append("FIX")
-		if len(attrs)>0:
-			s="/* %s */\n"%(" - ".join(attrs))
+		if len(attrs) > 0:
+			s = "/* %s */\n" % (" - ".join(attrs))
 		return s
+
 class RecordRecipe(RecipeBase):
 	# Flatten struct recipe
 	def __init__(self,T,RT,recipe,include,loc,simple,to_check,check_union,to_fix):
@@ -87,12 +93,6 @@ class RecordRecipe(RecipeBase):
 		self.loc = loc
 	def __str__(self):
 		s = super(RecordRecipe, self).__attrs__()
-		# s+="#if 0 /* Record info */\n"
-		# s+=self.RT.defstring+"\n"
-		# if self.include:
-		# 	s+="Include file: (%s)\n"%(self.include)
-		# s+="Location: (%s)\n"%(self.loc)
-		# s+="#endif\n\n"
 		s+=self.recipe+"\n"
 		return s
 
@@ -104,10 +104,6 @@ class TypenameRecipe(RecipeBase):
 		self.RT = RT
 	def __str__(self):
 		s = super(TypenameRecipe, self).__attrs__()
-		# s+="#if 0 /* Typename info */\n"
-		# s+="%s => struct %s\n"%(self.typename,self.RT.str)
-		# s+=self.RT.defstring+"\n"
-		# s+="#endif\n\n"
 		s+=self.recipe+"\n"
 		return s
 
@@ -120,14 +116,6 @@ class RecordTypeRecipe(RecipeBase):
 		self.includes = includes # Can be None
 	def __str__(self):
 		s = super(RecordTypeRecipe, self).__attrs__()
-		# s+="#if 0 /* Record type info */\n"
-		# s+="%s => struct %s\n"%(self.TPD.name,self.RT.str)
-		# s+=self.RT.defstring+"\n"
-		# if self.includes:
-		# 	s+="Include files:\n"
-		# 	for include in self.includes:
-		# 		s+="  %s\n"%(include)
-		# s+="#endif\n\n"
 		s+=self.recipe+"\n"
 		return s
 
@@ -175,6 +163,20 @@ class RecipeGenerator(object):
       /* AGGREGATE_FLATTEN_STRUCT_TYPE_STORAGE(%s,__p); */
     AGGREGATE_FLATTEN_STRUCT_TYPE_STORAGE_ITER(%s,__p); %s%s
 }}"""
+	template_flatten_struct_array_iter_self_contained = \
+		"FUNCTION_DEFINE_FLATTEN_%s_ARRAY_ITER_SELF_CONTAINED(%s,%d);"
+	template_flatten_struct_type_array_iter_self_contained = \
+		"FUNCTION_DEFINE_FLATTEN_STRUCT_TYPE_ARRAY_ITER_SELF_CONTAINED(%s,%d);"
+	template_flatten_declare_struct_array_iter_self_contained = \
+		"FUNCTION_DECLARE_FLATTEN_%s_ARRAY_ITER_SELF_CONTAINED(%s);"
+	template_flatten_declare_struct_type_array_iter_self_contained = \
+		"FUNCTION_DECLARE_FLATTEN_STRUCT_TYPE_ARRAY_ITER_SELF_CONTAINED(%s);"
+	template_flatten_struct_array_pointer_self_contained = \
+		"FLATTEN_%s_ARRAY_ITER_SELF_CONTAINED(%s,%d,%s,%s);"
+	template_flatten_struct_type_array_pointer_self_contained = \
+		"FLATTEN_STRUCT_TYPE_ARRAY_ITER_SELF_CONTAINED(%s,%d,%s,%s);"
+	template_flatten_struct_type_array_pointer_self_contained =\
+		"FLATTEN_STRUCT_TYPE_ARRAY_ITER_SELF_CONTAINED(%s,%d,%s,%s);"
 
 
 	## Arguments:
@@ -233,19 +235,17 @@ static void handler_{0}(struct kflat* kflat, struct probe_regs* regs) {{
 """
 
 	template_output_global_handler = """
-	// Dump global {1}
+	// Dump global {0}
 	do {{
-		void* addr = flatten_global_address_by_name("{1}");
+		void* addr = flatten_global_address_by_name("{0}");
 		if(addr == NULL) {{
-			pr_err("skipping global {1} ...");
+			pr_err("skipping global {0} ...");
 			break;
 		}}
-		
-		struct {0} *global = (struct {0}*) addr;
 
-		FOR_ROOT_POINTER(global,
+		FOR_ROOT_POINTER(addr,
 			UNDER_ITER_HARNESS(
-				FLATTEN_STRUCT_ITER_SELF_CONTAINED({0}, 1, global);
+				{2}
 			);
 		);
 	}} while(0);
@@ -405,13 +405,70 @@ LINUXINCLUDE := ${LINUXINCLUDE}
 		self.global_base_addr = 0
 		self.structs_spec = {}
 
+	def parse_arguments(self, args: List[str]) -> Tuple[list, list, set]:
+		"""
+		Accepted input format:
+			func_args: <type>@<number>			- device@1, device
+			globals: <global_name>:location		- poolinfo_table:char/random.c
+		"""
+		func_args_to_dump = []
+		globals_to_dump = []
+		deps = set()
+
+		def _find_RI_for_func(type: str) -> tuple:
+			results = [
+				(x.id, x.str)
+				for x in self.ftdb.types
+				if x.classname == 'record' and x.str == type and not self.DI.isTypeConst(x)
+			]
+			if len(results) == 0:
+				print(f"EE- Failed to locate structure type named - '{type}'")
+				exit(1)
+			elif len(results) > 1:
+				print(f"EE- Failed to uniquely identify structure type named - '{type}'")
+				exit(1)
+			return results[0]
+
+		def _find_RI_for_global(name: str, loc_suffix: str) -> tuple:
+			results = [
+				(x.type, x.name)
+				for x in self.ftdb.globals
+				if x.name == name and x.file.endswith(loc_suffix)
+			]
+			if len(results) == 0:
+				print(f"EE- Failed to locate structure type named - '{name}' @ {loc_suffix}")
+				exit(1)
+			elif len(results) > 1:
+				print(f"EE- Failed to uniquely identify structure type named - '{name}' @ {loc_suffix}")
+				exit(1)
+			type = self.ftdb.types[results[0][0]]
+			nonConstType = self.DI.typeToNonConst(type)
+			print(results[0][1], type.str, nonConstType.str)
+			return (nonConstType.id, nonConstType.str)
+
+		for arg in args:
+			if '@' in arg:
+				type, pos = arg.split('@')
+				func_args_to_dump.append((type, int(pos)))
+				deps.add(_find_RI_for_func(type))
+			elif ':' in arg:
+				name, loc = arg.split(':')
+				dep = _find_RI_for_global(name, loc)
+				globals_to_dump.append((dep[1], dep[0], name, "TODO:MODULE.ko"))
+				deps.add(dep)
+			else:
+				# default to first function argument
+				func_args_to_dump.append((arg, 1))
+				deps.add(_find_RI_for_func(arg))
+		return func_args_to_dump, globals_to_dump, deps
+
 	def parse_structures_config(self, name: str) -> None:
 
 		try:
 			with open(name, 'r') as f:
 				config = json.load(f)
 		except IOError:
-			print(f"EE  Cannot open configuration file {name}")
+			print(f"EE- Cannot open configuration file {name}")
 			exit(1)
 
 		try:
@@ -420,7 +477,7 @@ LINUXINCLUDE := ${LINUXINCLUDE}
 				for spec in specs:
 					self.structs_spec[name].add(spec['name'])
 		except KeyError:
-			print("EE  Invalid format of config file")
+			print("EE- Invalid format of config file")
 			exit(1)
 
 	def collect_call_tree(self, name: str):
@@ -436,7 +493,6 @@ LINUXINCLUDE := ${LINUXINCLUDE}
 			return func.nargs + has_return
 
 		def add_subfuncs(func):
-			calls = set(func.calls)
 			for id in func.calls:
 				if id in discovered:
 					continue
@@ -453,11 +509,11 @@ LINUXINCLUDE := ${LINUXINCLUDE}
 		
 		targets = [x for x in self.ftdb.funcs if x.name == name]
 		if len(targets) == 0:
-			print(f"EE  Function named '{name}' was not found in db.json")
+			print(f"EE- Function named '{name}' was not found in db.json")
 			exit(1)
 		elif len(targets) > 1:
-			print(f"EE  Function name '{name}' is ambiguous")
-			print(f"EE  TODO: Add support for selecting function in such case")
+			print(f"EE- Function name '{name}' is ambiguous")
+			print(f"EE- TODO: Add support for selecting function in such case")
 			exit(1)
 		target = targets[0]
 		add_subfuncs(target)
@@ -848,6 +904,230 @@ LINUXINCLUDE := ${LINUXINCLUDE}
 			self.builtin_pointers.append((TPDptrT,TRT,refname))
 			return pteT.str+"*"
 
+	def generate_flatten_record_trigger(self,out,T,TPD,refname,tab=0):
+		if TPD:
+			recipe = indent(RecipeGenerator.template_flatten_struct_type_array_pointer_self_contained%(TPD.name,TPD.size//8,refname,str(1)),tab)
+			out.write(recipe+"\n")
+			return TPD.name
+		if T.str=="":
+			anonstruct_type_name = self.get_anonstruct_typename(T)
+			recipe = indent(RecipeGenerator.template_flatten_struct_type_array_pointer_self_contained%(anonstruct_type_name,T.size//8,refname,str(1)),tab)
+			out.write(recipe+"\n")
+			return anonstruct_type_name
+			
+		if T.classname=="record_forward":
+			RL = [x for x in self.ftdb.types if x.classname=="record" and x.str == T.str]
+			if len(RL) <= 0:
+				return None
+			T = RL[0]
+		recipe = indent(RecipeGenerator.template_flatten_struct_array_pointer_dynamic_recipe_self_contained%(
+			"STRUCT" if T.isunion is False else "UNION",T.str,T.size//8,refname,str(1)),tab)
+		out.write(recipe+"\n")
+		return "struct %s"%(T.str)
+
+	def generate_flatten_pointer_trigger(self,out,T,TPD,gvname,tab=0,ptrLevel=0,arrsize=1):
+		TPD = None
+		if T.classname=="typedef":
+			TPD = T
+			T = self.walkTPD(T)
+		
+		if T.classname=="attributed" and "__attribute__((noderef))" in T.attrcore:
+			# Global variable points to user memory
+			return None
+		if T.classname=="record" or T.classname=="record_forward":
+			# pointer to struct
+			rtp = self.generate_flatten_record_trigger(out,T,TPD,ptrNestedRefName(gvname,ptrLevel))
+			if rtp is None:
+				return None
+			else:
+				return rtp+"*"
+		
+		elif T.classname=="incomplete_array" or T.classname=="const_array":
+			out.write(indent("/* TODO: implement flattening trigger for global member '%s' */"%(gvname),tab)+"\n")
+			return None
+		elif T.classname=="pointer":
+			PTE = self.ftdb.types[T.refs[0]]
+			TPDE = None
+			if PTE.classname=="typedef":
+				TPDE = PTE
+				PTE = self.walkTPD(PTE)
+			ptrout = io.StringIO()
+			ptrtp = self.generate_flatten_pointer_trigger(ptrout,PTE,TPDE,gvname,tab+1,ptrLevel+1)
+			out.write(RecipeGenerator.template_flatten_pointer_array_recipe%(ptrtp,ptrNestedRefName(gvname,ptrLevel+1),ptrNestedRefNameOrRoot(gvname,ptrLevel),str(arrsize)
+				,indent(ptrout.getvalue().rstrip(),tab+1))+"\n")
+			if ptrtp is None or ptrtp=="":
+				# We have multi-level pointers to function or pointers to incomplete arrays (strange things like that); ask the user to fix this flattening recipe
+				return None
+			return ptrtp+"*"
+		elif T.classname=="enum" or T.classname=="enum_forward":
+			# pointer to enum
+			if TPD:
+				recipe = indent(RecipeGenerator.template_flatten_compound_type_array_pointer_recipe%(
+					TPD.name,T.size//8,ptrNestedRefName(gvname,ptrLevel),str(1),"",""),tab)+"\n"
+				out.write(recipe+"\n")
+				return TPD.name+"*"
+			else:
+				if T.str=="":
+					anonenum_type_name = self.get_anonenum_typename(T)
+					recipe = indent(RecipeGenerator.template_flatten_compound_type_array_pointer_recipe%(
+						anonenum_type_name,T.size//8,ptrNestedRefName(gvname,ptrLevel),str(1),"",""),tab)+"\n"
+					out.write(recipe+"\n")
+					return anonenum_type_name+"*"
+				else:
+					recipe = indent(RecipeGenerator.template_flatten_compound_type_array_pointer_recipe%(
+						"enum %s"%(T.str),T.size//8,ptrNestedRefName(gvname,ptrLevel),str(1),"",""),tab)+"\n"
+					out.write(recipe+"\n")
+					return "enum %s*"%(T.str)
+		elif T.classname=="builtin" and T.str=="char":
+			# char* - treat it as if it was a C string
+			recipe = indent(RecipeGenerator.template_flatten_string_pointer_recipe%(
+				ptrNestedRefName(gvname,ptrLevel),"",""),tab)+"\n"
+			out.write(recipe+"\n")
+			return "char*"
+		elif T.classname=="builtin" and T.str=="void":
+			# void*
+			recipe = indent(RecipeGenerator.template_flatten_type_array_pointer_recipe%(
+				"unsigned char",ptrNestedRefName(gvname,ptrLevel),str(1),"",""),tab)+"\n"
+			out.write(recipe+"\n")
+			return "unsigned char*"
+		elif T.classname=="function":
+			# pointer to function
+			recipe = indent(RecipeGenerator.template_flatten_fptr_pointer_recipe%(ptrNestedRefName(gvname,ptrLevel),""),tab)+"\n"
+			out.write(recipe+"\n")
+			return "void*"
+		else:
+			# pointer to builtin
+			recipe = indent(RecipeGenerator.template_flatten_type_array_pointer_recipe%(
+				T.str,ptrNestedRefName(gvname,ptrLevel),str(1),"",""),tab)+"\n"
+			out.write(recipe+"\n")
+			return T.str+"*"
+
+
+	def generate_flatten_trigger(self,TID,gvname,out):
+		T = self.ftdb.types[TID]
+		TPD = None
+		if T.classname=="typedef":
+			TPD = T
+			T = self.walkTPD(T)
+		resolved_record_forward = None
+		if T.classname=="record_forward":
+			rTs = [x for x in self.ftdb.types if x.classname=="record" and x.str==T.str]
+			if len(rTs)>0:
+				resolved_record_forward = rTs[0]
+		if T.size<=0 and T.classname=="record":
+			# Pointer to structure of size 0 (no need to serialize anything)
+			return None
+		elif T.size<=0 and T.classname=="record_forward" and resolved_record_forward is not None and resolved_record_forward.size<=0:
+			# Pointer to structure of size 0 through record forward (no need to serialize anything)
+			return None
+		else:
+			if resolved_record_forward:
+				T = resolved_record_forward
+			if T.classname=="builtin":
+				trigger = RecipeGenerator.template_flatten_type_array_pointer_recipe%(T.str,"__root_ptr",str(1),"","")
+				out.write(trigger+"\n")
+				return T.str+"*"
+			elif T.classname=="enum":
+				if TPD:
+					trigger = RecipeGenerator.template_flatten_compound_type_array_pointer_recipe%(TPD.name,T.size//8,"__root_ptr",str(1),"","")
+					out.write(trigger+"\n")
+					return TPD.name+"*"
+				else:
+					if T.str=="":
+						anonenum_type_name = self.get_anonenum_typename(T)
+						trigger = RecipeGenerator.template_flatten_compound_type_array_pointer_recipe%(anonenum_type_name,T.size//8,"__root_ptr",str(1),"","")
+						out.write(trigger+"\n")
+						return anonenum_type_name+"*"
+					else:
+						trigger = RecipeGenerator.template_flatten_compound_type_array_pointer_recipe%("enum %s"%(T.str),T.size//8,"__root_ptr",str(1),"","")
+						out.write(trigger+"\n")
+						return "enum %s*"%(T.str)
+			elif T.classname=="pointer":
+				ptrtp = self.generate_flatten_pointer_trigger(out,T,TPD,gvname)
+				if not ptrtp:
+					self.complex_triggers.append((T,TPD))
+				return ptrtp
+			elif T.classname=="record":
+				if TPD:
+					trigger = RecipeGenerator.template_flatten_struct_type_array_pointer_self_contained%(
+									TPD.name,T.size//8,"__root_ptr",str(1))
+					out.write(trigger+"\n")
+					return "%s*"%(TPD.name)
+				else:
+					if T.str=="":
+						anonstruct_type_name = self.get_anonstruct_typename(T)
+						trigger = RecipeGenerator.template_flatten_struct_type_array_pointer_self_contained%(
+									anonstruct_type_name,T.size//8,"__root_ptr",str(1))
+						out.write(trigger+"\n")
+						return "%s*"%(anonstruct_type_name)
+					else:
+						trigger = RecipeGenerator.template_flatten_struct_array_pointer_self_contained%(
+									"STRUCT" if T.isunion is False else "UNION",T.str,T.size//8,"__root_ptr",str(1))
+						out.write(trigger+"\n")
+						return "%s %s*"%("struct" if T.isunion is False else "union",T.str)
+			elif T.classname=="incomplete_array":
+				return None
+			elif T.classname=="const_array":
+				if T.size<=0:
+					return None
+				AT = self.ftdb.types[T.refs[0]]
+				ATPD = None
+				if AT.classname=="typedef":
+					ATPD = AT
+					AT = self.walkTPD(AT)
+				if AT.classname=="builtin":
+					trigger = RecipeGenerator.template_flatten_type_array_pointer_recipe%(AT.str,"__root_ptr",str(T.size//AT.size),"","")
+					out.write(trigger+"\n")
+					return AT.str+"*"
+				if AT.classname=="enum":
+					if ATPD:
+						trigger = RecipeGenerator.template_flatten_compound_type_array_pointer_recipe%(ATPD.name,AT.size//8,"__root_ptr",str(T.size//AT.size),"","")
+						out.write(trigger+"\n")
+						return ATPD.name+"*"
+					else:
+						if AT.str=="":
+							anonenum_type_name = self.get_anonenum_typename(AT)
+							trigger = RecipeGenerator.template_flatten_compound_type_array_pointer_recipe%(anonenum_type_name,AT.size//8,"__root_ptr",str(T.size//AT.size),"","")
+							out.write(trigger+"\n")
+							return anonenum_type_name+"*"
+						else:
+							trigger = RecipeGenerator.template_flatten_compound_type_array_pointer_recipe%("enum %s"%(AT.str),AT.size//8,"__root_ptr",str(T.size//AT.size),"","")
+							out.write(trigger+"\n")
+							return "enum %s*"%(AT.str)
+				elif AT.classname=="pointer":
+					ptrtp = self.generate_flatten_pointer_trigger(out,AT,ATPD,gvname,0,0,T.size//AT.size)
+					return ptrtp
+				elif AT.classname=="record":
+					if ATPD:
+						trigger = RecipeGenerator.template_flatten_struct_type_array_pointer_self_contained%(
+							ATPD.name,AT.size//8,"__root_ptr",str(T.size/AT.size))
+						out.write(trigger+"\n")
+						return "%s*"%(ATPD.name)
+					else:
+						if AT.str=="":
+							anonstruct_type_name = self.get_anonstruct_typename(AT)
+							trigger = RecipeGenerator.template_flatten_struct_type_array_pointer_self_contained%(
+								anonstruct_type_name,AT.size//8,"__root_ptr",str(T.size//AT.size))
+							out.write(trigger+"\n")
+							return "%s*"%(anonstruct_type_name)
+						else:
+							try:
+								trigger = RecipeGenerator.template_flatten_struct_array_pointer_self_contained%(
+									"STRUCT" if AT.isunion is False else "UNION",AT.str,AT.size//8,"__root_ptr",str(T.size//AT.size))
+							except Exception as e:
+								print(json.dumps(T.json(),indent=4))
+								print(json.dumps(AT.json(),indent=4))
+								print(gvname)
+								raise e
+							out.write(trigger+"\n")
+							return "%s %s*"%("struct" if AT.isunion is False else "union",AT.str)
+				else:
+					return None
+			else:
+				# What else could be here?
+				# (PW) Why the hell you're asking me?
+				return None
+
 	"""
 	TID - id of the struct type (might be record forward) or typedef which eventually collapses to struct type
 	"""
@@ -880,7 +1160,7 @@ LINUXINCLUDE := ${LINUXINCLUDE}
 					return set([])
 			else:
 				TRT = TPD
-		else:
+		elif T.classname == "record" or T.classname == "record_forward":
 			if T.str!="":
 				if T.str in self.ignore_structs:
 					self.ignore_count+=1
@@ -905,6 +1185,19 @@ LINUXINCLUDE := ${LINUXINCLUDE}
 					return set([])
 			else:
 				TRT = T
+		else:
+			# Ignore all others
+			print(f"WW- Ignored non-struct harness - {T}")
+			self.gen_count += 1
+			self.structs_done.append((T.str, ""))
+			self.structs_done_match.add((T.str,T.isunion))
+			self.structs_missing.add((T.str,T.isunion))
+			results = set()
+			for ref in T.refs:
+				type = self.ftdb.types[ref]
+				nonConstType = self.DI.typeToNonConst(type)
+				results.add((nonConstType.id, nonConstType.str))
+			return results
 		# TRT - the underlying record type for which the harness is generated
 		do_recipes = True
 		if TPD:
@@ -1240,37 +1533,14 @@ def main():
 	print("--- Generating deref info")
 	RG.parse_deref_info()
 
-	deps = set([])
 	deps_done = set([])
 	anon_typedefs = list()
 	record_typedefs = set()
-	func_args_to_dump = []
-	globals_to_dump = []
 
 	# Parse input structures lists
-	for arg in args.struct:
-		if '@' not in arg:
-			# default to first function argument
-			func_args_to_dump.append((arg, 1))
-		else:
-			type, pos = arg.split('@')
-			if pos.isdigit():
-				func_args_to_dump.append((type, int(pos)))
-			# TODO: Arrays support
-			globals_to_dump.append((type, pos))
-
-	# Now it's time to generate recipes
-	targetsList = [x[0] for x in func_args_to_dump + globals_to_dump]
-	Ri = [x.id for x in RG.ftdb.types if x.classname=="record" and x.str in targetsList and not RG.DI.isTypeConst(x)]
-	if len(Ri) < len(targetsList):
-		print(f"EE- Failed to locate one of the input structures: [{args.struct}]")
-		exit(1)
-	for R in Ri:
-		T = RG.ftdb.types[R]
-		deps.add((T.id,T.str))
-
+	func_args_to_dump, globals_to_dump, deps = RG.parse_arguments(args.struct)
 	if len(deps) == 0:
-		print(f'EE- Failed to locate any of the provided structures!')
+		print(f'EE- No structures to generate recipes for')
 		exit(1)
 	
 	print(f"--- Generating recipes for {len(deps)} structures ...")
@@ -1470,19 +1740,21 @@ def main():
 			drmap["typename_recipes"] = ["%s\n"%(str(RR))]
 			objs.append("typename_recipes.o")
 
+	print(globals_to_dump)
 	for x in set(RG.structs_done_match) - set(RG.structs_missing):
 		name = x[0]
-		if name not in targetsList:
-			continue
 		
+		# TODO: Match by ID rather than by name
 		arg = [x for x in func_args_to_dump if x[0] == name]
-		globs = [x for x in globals_to_dump if x[0] == name]
 		if len(arg) > 0:
 			func_args_stream.write(RecipeGenerator.template_output_arg_handler.format(arg[0][0], arg[0][1]))
-		elif len(globs) > 0:
-			globals_stream.write(RecipeGenerator.template_output_global_handler.format(globs[0][0], globs[0][1]))
-		else:
-			assert False
+
+	for glob in globals_to_dump:
+		out = io.StringIO()
+		RG.generate_flatten_trigger(glob[1], glob[2], out)
+		# TODO: module from glob[3]
+		globals_stream.write(RecipeGenerator.template_output_global_handler.format(
+			glob[2], glob[0], out.getvalue().strip()))
 	
 	recipe_register_stream.write(f"\tKFLAT_RECIPE(\"{args.func}\", handler_{args.func}),\n")
 	recipe_handlers_stream.write(
