@@ -4658,6 +4658,7 @@ FUNCTION_DEFINE_FLATTEN_STRUCT_TYPE_ARRAY_ITER_SELF_CONTAINED(FLTYPE,FLSIZE)
 		DBGM1(FOR_ROOT_POINTER,p);	\
 		if ((!KFLAT_ACCESSOR->errno)&&(ADDR_VALID(p))) {	\
 			struct flatten_pointer* __fptr = make_flatten_pointer(KFLAT_ACCESSOR,0,0);	\
+			const void* __root_ptr __attribute__((unused)) = (const void*) p;	\
 			flatten_set_option(KFLAT_ACCESSOR,KFLAT_OPTION_IN_PROGRESS);	\
 			if (__fptr) {	\
 				__VA_ARGS__;	\
