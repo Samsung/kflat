@@ -429,9 +429,9 @@ LINUXINCLUDE := ${LINUXINCLUDE}
 				exit(1)
 			return results[0]
 
-		def _find_RI_for_global(name: str, loc_suffix: str) -> tuple:
+		def _find_RI_for_global(name: str, loc_suffix: str) -> Tuple[tuple, str]:
 			results = [
-				(x.type, x.name)
+				x
 				for x in self.ftdb.globals
 				if x.name == name and x.file.endswith(loc_suffix)
 			]
@@ -441,10 +441,19 @@ LINUXINCLUDE := ${LINUXINCLUDE}
 			elif len(results) > 1:
 				print(f"EE- Failed to uniquely identify structure type named - '{name}' @ {loc_suffix}")
 				exit(1)
-			type = self.ftdb.types[results[0][0]]
+			result = results[0]
+			type = self.ftdb.types[result.type]
+			module = ''
+			if len(result.mids) == 0:
+				print(f"WW- Global '{name}' belongs to the unknown module (.mids is empty)")
+			elif len(result.mids) > 1:
+				print(f'WW- Global \'{name}\' has multiple entries in .mids section. '
+					'Let the God decide which one will be used')
+			else:
+				module = self.ftdb.modules[result.mids[0]].split('/')[-1]
+
 			nonConstType = self.DI.typeToNonConst(type)
-			print(results[0][1], type.str, nonConstType.str)
-			return (nonConstType.id, nonConstType.str)
+			return (nonConstType.id, nonConstType.str), module
 
 		for arg in args:
 			if '@' in arg:
@@ -453,8 +462,8 @@ LINUXINCLUDE := ${LINUXINCLUDE}
 				deps.add(_find_RI_for_func(type))
 			elif ':' in arg:
 				name, loc = arg.split(':')
-				dep = _find_RI_for_global(name, loc)
-				globals_to_dump.append((dep[1], dep[0], name, "TODO:MODULE.ko"))
+				dep, module = _find_RI_for_global(name, loc)
+				globals_to_dump.append((dep[1], dep[0], name, module))
 				deps.add(dep)
 			else:
 				# default to first function argument
@@ -1187,7 +1196,7 @@ LINUXINCLUDE := ${LINUXINCLUDE}
 				TRT = T
 		else:
 			# Ignore all others
-			print(f"WW- Ignored non-struct harness - {T}")
+			print(f"WW- Ignored non-struct harness - ID: {T.id}; class: {T.classname}; name: {T.str}")
 			self.gen_count += 1
 			self.structs_done.append((T.str, ""))
 			self.structs_done_match.add((T.str,T.isunion))
@@ -1740,7 +1749,6 @@ def main():
 			drmap["typename_recipes"] = ["%s\n"%(str(RR))]
 			objs.append("typename_recipes.o")
 
-	print(globals_to_dump)
 	for x in set(RG.structs_done_match) - set(RG.structs_missing):
 		name = x[0]
 		
@@ -1752,9 +1760,11 @@ def main():
 	for glob in globals_to_dump:
 		out = io.StringIO()
 		RG.generate_flatten_trigger(glob[1], glob[2], out)
-		# TODO: module from glob[3]
+		var_name = glob[2]
+		if glob[3] not in ['', 'vmlinux'] :
+			var_name += ':' + glob[3]
 		globals_stream.write(RecipeGenerator.template_output_global_handler.format(
-			glob[2], glob[0], out.getvalue().strip()))
+			var_name, glob[0], out.getvalue().strip()))
 	
 	recipe_register_stream.write(f"\tKFLAT_RECIPE(\"{args.func}\", handler_{args.func}),\n")
 	recipe_handlers_stream.write(
