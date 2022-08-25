@@ -1377,13 +1377,13 @@ void flatten_init(struct kflat* kflat) {
 	kflat->msize = KFLAT_LINEAR_MEMORY_INITIAL_POOL_SIZE;
 	kflat->mpool = kvzalloc(KFLAT_LINEAR_MEMORY_INITIAL_POOL_SIZE,GFP_KERNEL);
 	if (!kflat->mpool) {
-		flat_errs("Failed to allocate initial kflat memory pool of size %zu\n",KFLAT_LINEAR_MEMORY_INITIAL_POOL_SIZE);
+		flat_errs("Failed to allocate initial kflat memory pool of size %lluu\n",KFLAT_LINEAR_MEMORY_INITIAL_POOL_SIZE);
 		kflat->errno = ENOMEM;
 	}
 	kflat->bqueue_msize = KFLAT_LINEAR_MEMORY_INITIAL_POOL_SIZE;
 	kflat->bqueue_mpool = kvzalloc(KFLAT_LINEAR_MEMORY_INITIAL_POOL_SIZE,GFP_KERNEL);
 	if (!kflat->bqueue_mpool) {
-		flat_errs("Failed to allocate initial kflat bqueue memory pool of size %zu\n",KFLAT_LINEAR_MEMORY_INITIAL_POOL_SIZE);
+		flat_errs("Failed to allocate initial kflat bqueue memory pool of size %lluu\n",KFLAT_LINEAR_MEMORY_INITIAL_POOL_SIZE);
 		kflat->errno = ENOMEM;
 	}
 #else

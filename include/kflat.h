@@ -480,7 +480,7 @@ static __used bool _addr_range_valid(void* ptr, size_t size) {
 		return true;
 	
 	printk_ratelimited(KERN_ERR "kflat: Failed to access %zu bytes of mem@%llx. Only %zu bytes are mapped",
-		size, ptr, avail_size);
+		size, (unsigned long long)ptr, avail_size);
 	return false;
 }
 

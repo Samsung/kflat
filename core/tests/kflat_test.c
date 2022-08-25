@@ -1264,12 +1264,15 @@ static int kflat_rbnode_test_iter(struct kflat *kflat, int debug_flag) {
 	flat_infos("intset size: %lu\n",intset_count(&iroot));
 
 	for (i=0; i<15; ++i) {
-		flat_infos("myTree[%d]: %016lx   (i)P[%016lx]L[%016lx]R[%016lx]  (s)P[%016lx]L[%016lx]R[%016lx]\n",i,&tarr[i],
-				rbnode_remove_color((void*)tarr[i].inode.__rb_parent_color),tarr[i].inode.rb_left,tarr[i].inode.rb_right,
-				rbnode_remove_color((void*)tarr[i].snode.__rb_parent_color),tarr[i].snode.rb_left,tarr[i].snode.rb_right);
+		flat_infos("myTree[%d]: %016lx   (i)P[%016lx]L[%016lx]R[%016lx]  (s)P[%016lx]L[%016lx]R[%016lx]\n",
+				i, (unsigned long) &tarr[i],
+				(unsigned long) rbnode_remove_color((void*)tarr[i].inode.__rb_parent_color),
+				(unsigned long) tarr[i].inode.rb_left, (unsigned long) tarr[i].inode.rb_right,
+				(unsigned long) rbnode_remove_color((void*)tarr[i].snode.__rb_parent_color),
+				(unsigned long) tarr[i].snode.rb_left, (unsigned long) tarr[i].snode.rb_right);
 	}
-	flat_infos("iroot: %016lx\n",&iroot);
-	flat_infos("sroot: %016lx\n",&sroot);
+	flat_infos("iroot: %016lx\n", (unsigned long) &iroot);
+	flat_infos("sroot: %016lx\n", (unsigned long) &sroot);
 
 	flat_infos("myTreeNode size: %zu\n",sizeof(struct myTreeNode));
 	flat_infos("offsetof(myTreeNode.i): %zu\n",offsetof(struct myTreeNode,i));
@@ -1718,8 +1721,8 @@ static int kflat_info_test(struct kflat *kflat) {
 
 	int err = 0;
 
-	flat_infos("ADDR_VALID(0): %d\n",ADDR_VALID(0));
-	err = (ADDR_VALID(0)!=0);
+	flat_infos("ADDR_VALID(0): %zu\n", ADDR_VALID(0));
+	err = (ADDR_VALID(0) != 0);
 
 	return err;
 }
