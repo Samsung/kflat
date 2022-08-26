@@ -13,7 +13,7 @@ import io
 import json
 import os
 import sys
-from typing import List, Tuple
+from typing import List, Optional, Tuple
 
 import ndfind
 
@@ -405,7 +405,7 @@ LINUXINCLUDE := ${LINUXINCLUDE}
 		self.global_base_addr = 0
 		self.structs_spec = {}
 
-	def parse_arguments(self, args: List[str]) -> Tuple[list, list, set]:
+	def parse_arguments(self, args: List[str], globals_file: Optional[str] = None) -> Tuple[list, list, set]:
 		"""
 		Accepted input format:
 			func_args: <type>@<number>			- device@1, device
@@ -429,12 +429,9 @@ LINUXINCLUDE := ${LINUXINCLUDE}
 				exit(1)
 			return results[0]
 
-		def _find_RI_for_global(name: str, loc_suffix: str) -> Tuple[tuple, str]:
-			results = [
-				x
-				for x in self.ftdb.globals
-				if x.name == name and x.file.endswith(loc_suffix)
-			]
+		def _find_RI_for_global(name: str = '', loc_suffix: str = '') -> Tuple[tuple, str]:
+			results = [x for x in self.ftdb.globals
+						if x.name == name and x.file.endswith(loc_suffix)]
 			if len(results) == 0:
 				print(f"EE- Failed to locate structure type named - '{name}' @ {loc_suffix}")
 				exit(1)
@@ -469,6 +466,17 @@ LINUXINCLUDE := ${LINUXINCLUDE}
 				# default to first function argument
 				func_args_to_dump.append((arg, 1))
 				deps.add(_find_RI_for_func(arg))
+
+		if globals_file:
+			with open(globals_file, 'r') as f:
+				for hash in f.read().split('\n'):
+					if hash == '':
+						continue
+					name = hash.split('/')[0]
+					loc = "/".join(hash.split('/')[-3:]) if '/' in hash else ''
+					dep, module = _find_RI_for_global(name, loc)
+					globals_to_dump.append((dep[1], dep[0], name, module))
+					deps.add(dep)
 		return func_args_to_dump, globals_to_dump, deps
 
 	def parse_structures_config(self, name: str) -> None:
@@ -1194,7 +1202,7 @@ LINUXINCLUDE := ${LINUXINCLUDE}
 					return set([])
 			else:
 				TRT = T
-		else:
+		if T.classname not in ['record', 'record_forward', 'typedef'] or TRT.classname not in ['record', 'record_forward']:
 			# Ignore all others
 			print(f"WW- Ignored non-struct harness - ID: {T.id}; class: {T.classname}; name: {T.str}")
 			self.gen_count += 1
@@ -1515,7 +1523,6 @@ LINUXINCLUDE := ${LINUXINCLUDE}
 ####################################
 
 def main():
-	# FIXME:
 	global RG
 
 	parser = argparse.ArgumentParser(description="Automated generator of KFLAT flattening recipes")
@@ -1527,6 +1534,7 @@ def main():
 	parser.add_argument("-o", dest="output", action="store", help="output directory", type=str, default='recipe_gen')
 	parser.add_argument("-c", dest="config", action="store", help="script layout config", type=str)
 
+	parser.add_argument("--globals-list", action="store", type=str, help="File with list of hashes of globals that should be flattened")
 	parser.add_argument("--ignore-structs", action="store", help="Do not generate descriptions for the following structs (delimited by ',')")
 
 	# TODO: Consider removing include dirs
@@ -1547,7 +1555,7 @@ def main():
 	record_typedefs = set()
 
 	# Parse input structures lists
-	func_args_to_dump, globals_to_dump, deps = RG.parse_arguments(args.struct)
+	func_args_to_dump, globals_to_dump, deps = RG.parse_arguments(args.struct, args.globals_list)
 	if len(deps) == 0:
 		print(f'EE- No structures to generate recipes for')
 		exit(1)
