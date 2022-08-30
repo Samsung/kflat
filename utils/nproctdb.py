@@ -716,8 +716,6 @@ LINUXINCLUDE := ${LINUXINCLUDE}
 		if pteEXT:
 			PTEoff=-pteEXT[1]
 			PTEinfo = RecipeGenerator.template_container_of_replacement_member_recipe%("\n".join(["  *  %s"%(x) for x in pteEXT[2]]))
-		if self.debug:
-			print("%sg_record rT[%s:%s] TPDrT[%s]"%(" "*tab,rT.classname,rT.str,TPDrT is not None))
 		if TPDrT:
 			if not nestedPtr:
 				recipe = indent(RecipeGenerator.template_flatten_struct_type_member_recipe%(
@@ -731,8 +729,6 @@ LINUXINCLUDE := ${LINUXINCLUDE}
 						TPDrT.name,TPDrT.size//8,refname,str(n),
 						unionMemberInfo(inUnion),self.safeInfo(safe)
 					),tab)
-			if self.debug:
-				print("%s\"%s\""%(" "*tab,recipe))
 			out.write(recipe+"\n")
 			self.struct_deps.add((TPDrT.id,TPDrT.name))
 			self.record_typedefs.add((TPDrT.name,rT.str,rT.id))
@@ -753,8 +749,6 @@ LINUXINCLUDE := ${LINUXINCLUDE}
 							anonstruct_type_name,rT.size//8,refname,str(n),
 							unionMemberInfo(inUnion),self.safeInfo(safe)
 						),tab)
-				if self.debug:
-					print("%s\"%s\""%(" "*tab,recipe))
 				out.write(recipe+"\n")
 				self.struct_deps.add((rT.id,anonstruct_type_name))
 				return anonstruct_type_name
@@ -774,8 +768,6 @@ LINUXINCLUDE := ${LINUXINCLUDE}
 				if rT.classname=="record_forward":
 					if len([x for x in self.ftdb.types if x.classname=="record" and x.str==rT.str])<=0:
 						recipe = "/* MISSING STRUCT: %s */"%(rT.str)
-				if self.debug:
-					print("%s\"%s\""%(" "*tab,recipe))
 				out.write(recipe+"\n")
 				self.struct_deps.add((rT.id,rT.str))
 				return "struct %s"%(rT.str)
@@ -793,8 +785,6 @@ LINUXINCLUDE := ${LINUXINCLUDE}
 	# ptrLevel -
 	# inUnion -
 	def generate_flatten_pointer(self,out,ptrT,pteT,pteEXT,refname,refoffset,TRT,tab,TPDptrT=None,TPDpteT=None,ptrLevel=0,inUnion=False):
-		if self.debug:
-			print("%sg_pointer: [%s]"%(" "*tab,pteT.classname))
 		if pteT.classname=="attributed" and "__attribute__((noderef))" in pteT.attrcore:
 			out.write(indent("/* Member '%s' points to __user memory */"%(refname),tab)+"\n")
 			self.user_memory_pointer_members.append((TPDptrT,TRT,refname))
@@ -937,7 +927,7 @@ LINUXINCLUDE := ${LINUXINCLUDE}
 			if len(RL) <= 0:
 				return None
 			T = RL[0]
-		recipe = indent(RecipeGenerator.template_flatten_struct_array_pointer_dynamic_recipe_self_contained%(
+		recipe = indent(RecipeGenerator.template_flatten_struct_array_pointer_self_contained%(
 			"STRUCT" if T.isunion is False else "UNION",T.str,T.size//8,refname,str(1)),tab)
 		out.write(recipe+"\n")
 		return "struct %s"%(T.str)
@@ -1142,7 +1132,6 @@ LINUXINCLUDE := ${LINUXINCLUDE}
 					return None
 			else:
 				# What else could be here?
-				# (PW) Why the hell you're asking me?
 				return None
 
 	"""
@@ -1212,8 +1201,9 @@ LINUXINCLUDE := ${LINUXINCLUDE}
 			results = set()
 			for ref in T.refs:
 				type = self.ftdb.types[ref]
-				nonConstType = self.DI.typeToNonConst(type)
-				results.add((nonConstType.id, nonConstType.str))
+				if self.DI.isTypeConst(type):
+					type = self.DI.typeToNonConst(type)
+				results.add((type.id, type.str))
 			return results
 		# TRT - the underlying record type for which the harness is generated
 		do_recipes = True
@@ -1521,12 +1511,11 @@ LINUXINCLUDE := ${LINUXINCLUDE}
 ####################################
 # Program Entry point
 ####################################
-
 def main():
 	global RG
 
 	parser = argparse.ArgumentParser(description="Automated generator of KFLAT flattening recipes")
-	parser.add_argument("struct", help="struct type for which kflat recipes will be generated", nargs='+')
+	parser.add_argument("struct", help="struct type for which kflat recipes will be generated", nargs='*')
 	parser.add_argument("func", help="function name for which dereference information should be processed")
 
 	parser.add_argument("-v", dest="verbose", action="store_true", help="print verbose (debug) information")
