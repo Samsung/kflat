@@ -4653,32 +4653,12 @@ FUNCTION_DEFINE_FLATTEN_STRUCT_TYPE_ARRAY_ITER_SELF_CONTAINED(FLTYPE,FLSIZE)
 		else DBGS("FOREACH_POINTER: errno(%d), ADDR(%lx)\n",KFLAT_ACCESSOR->errno,(uintptr_t)p);	\
 	} while(0)
 
-#define FOR_ROOT_POINTER(p,...)	\
-	do {	\
-		DBGM1(FOR_ROOT_POINTER,p);	\
-		if ((!KFLAT_ACCESSOR->errno)&&(ADDR_VALID(p))) {	\
-			struct flatten_pointer* __fptr = make_flatten_pointer(KFLAT_ACCESSOR,0,0);	\
-			const void* __root_ptr __attribute__((unused)) = (const void*) p;	\
-			flatten_set_option(KFLAT_ACCESSOR,KFLAT_OPTION_IN_PROGRESS);	\
-			if (__fptr) {	\
-				__VA_ARGS__;	\
-				kflat_free(__fptr);	\
-			}	\
-			else {	\
-				KFLAT_ACCESSOR->errno = ENOMEM;	\
-			}	\
-			flatten_clear_option(KFLAT_ACCESSOR,KFLAT_OPTION_IN_PROGRESS);	\
-		}	\
-		if (!KFLAT_ACCESSOR->errno) {	\
-			KFLAT_ACCESSOR->errno = root_addr_append(KFLAT_ACCESSOR, (uintptr_t)(p) );	\
-		}	\
-	} while(0)
-
 #define FOR_EXTENDED_ROOT_POINTER(p,__name,__size,...)	\
 	do {	\
 		DBGM3(FOR_EXTENDED_ROOT_POINTER,p,__name,__size);	\
 		if ((!KFLAT_ACCESSOR->errno)&&(ADDR_VALID(p))) {	\
 			struct flatten_pointer* __fptr = make_flatten_pointer(KFLAT_ACCESSOR,0,0);	\
+			const void* __root_ptr __attribute__((unused)) = (const void*) p;       \
 			flatten_set_option(KFLAT_ACCESSOR,KFLAT_OPTION_IN_PROGRESS);	\
 			if (__fptr) {	\
 				__VA_ARGS__;	\
@@ -4690,12 +4670,17 @@ FUNCTION_DEFINE_FLATTEN_STRUCT_TYPE_ARRAY_ITER_SELF_CONTAINED(FLTYPE,FLSIZE)
 			flatten_clear_option(KFLAT_ACCESSOR,KFLAT_OPTION_IN_PROGRESS);	\
 		}	\
 		if (!KFLAT_ACCESSOR->errno) {	\
-			int err = root_addr_append_extended(KFLAT_ACCESSOR, (uintptr_t)(p), __name, __size );	\
-			if ((err) && (err!=EEXIST))	{	\
-				KFLAT_ACCESSOR->errno = err;	\
+			if(__name != NULL)	{ \
+				int err = root_addr_append_extended(KFLAT_ACCESSOR, (uintptr_t)(p), __name, __size );	\
+				if ((err) && (err!=EEXIST))		\
+					KFLAT_ACCESSOR->errno = err;	\
+			} else {	\
+				KFLAT_ACCESSOR->errno = root_addr_append(KFLAT_ACCESSOR, (uintptr_t)(p) );	\
 			}	\
 		}	\
 	} while(0)
+
+#define FOR_ROOT_POINTER(p,...) FOR_EXTENDED_ROOT_POINTER(p, NULL, 0, ##__VA_ARGS__)
 
 #define UNDER_ITER_HARNESS(...)	\
 		do {	\
