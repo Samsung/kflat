@@ -81,7 +81,7 @@ struct FLCONTROL {
 	struct root_addrnode* last_accessed_root;
 	size_t root_addr_count;
 	void* mem;
-	std::map<std::string, uintptr_t> root_addr_map;
+	std::map<std::string, std::pair<size_t, size_t>> root_addr_map;
 };
 
 typedef uintptr_t (*get_function_address_t)(const char* fsym);
@@ -218,10 +218,42 @@ private:
 		return (char*)flatten_memory_start() + FLCTRL.last_accessed_root->root_addr;
 	}
 
-	void root_addr_append(uintptr_t root_addr) {
+	void* root_pointer_named(const char* name, size_t* size) {
+		size_t root_addr;
+
+		try {
+			auto& entry = FLCTRL.root_addr_map.at(name);
+			
+			if(size)
+				*size = entry.second;
+			root_addr = entry.first;
+		} catch(std::out_of_range& _) {
+			return NULL;
+		}
+
+		// TODO: Remove this copy&paste
+		if (root_addr == (size_t) -1)
+			return NULL;
+
+		if (interval_tree_iter_first(&FLCTRL.imap_root, 0, ULONG_MAX)) {
+			struct interval_tree_node *node = interval_tree_iter_first(
+					&FLCTRL.imap_root, root_addr, root_addr + 8);
+			assert(node != NULL);
+
+			size_t node_offset = root_addr - node->start;
+			return (char*)node->mptr + node_offset;
+		}
+		
+		return (char*)flatten_memory_start() + root_addr;
+	}
+
+	void root_addr_append(uintptr_t root_addr, const char* name = nullptr, size_t size = 0) {
 		struct root_addrnode* v = (struct root_addrnode*)calloc(1, sizeof(struct root_addrnode));
 		assert(v != NULL);
 		v->root_addr = root_addr;
+		v->name = name;
+		v->size = size;
+		v->index = FLCTRL.root_addr_count;
 		if (!FLCTRL.rhead) {
 			FLCTRL.rhead = v;
 			FLCTRL.rtail = v;
@@ -237,23 +269,8 @@ private:
 		if (FLCTRL.root_addr_map.find(name) != FLCTRL.root_addr_map.end())
 			return EEXIST;
 
-		struct root_addrnode* v = (struct root_addrnode*)calloc(1, sizeof(struct root_addrnode));
-		assert(v != NULL);
-		v->root_addr = root_addr;
-		v->name = name;
-		v->index = FLCTRL.root_addr_count;
-		v->size = size;
-		if (!FLCTRL.rhead) {
-			FLCTRL.rhead = v;
-			FLCTRL.rtail = v;
-		}
-		else {
-			FLCTRL.rtail->next = v;
-			FLCTRL.rtail = FLCTRL.rtail->next;
-		}
-		FLCTRL.root_addr_count++;
-		
-		FLCTRL.root_addr_map.insert(std::pair<std::string,uintptr_t>(name,root_addr));
+		root_addr_append(root_addr, name, size);
+		FLCTRL.root_addr_map.insert({name, {root_addr, size}});
 		return 0;
 	}
 
@@ -635,6 +652,10 @@ public:
 		return root_pointer_seq(idx);
 	}
 
+	void* get_named_root(const char* name, size_t* size) {
+		return root_pointer_named(name, size);
+	}
+
 	~Unflatten() {
 		if(need_unload)
 			unload();
@@ -670,6 +691,10 @@ void* Flatten::get_next_root() {
 
 void* Flatten::get_seq_root(size_t idx) {
 	return engine->get_seq_root(idx);
+}
+
+void* Flatten::get_named_root(const char* name, size_t* size) {
+	return engine->get_named_root(name, size);
 }
 
 /********************************
@@ -721,6 +746,14 @@ void* flatten_root_pointer_next(CFlatten flatten) {
 void* flatten_root_pointer_seq(CFlatten flatten, size_t idx) {
 	try {
 		return ((Unflatten*)flatten)->get_seq_root(idx);
+	} catch(...) {
+		return NULL;
+	}
+}
+
+void* flatten_root_pointer_named(CFlatten flatten, const char* name, size_t* idx) {
+	try {
+		return ((Unflatten*)flatten)->get_named_root(name, idx);
 	} catch(...) {
 		return NULL;
 	}

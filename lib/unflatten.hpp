@@ -84,6 +84,16 @@ public:
 	 * @return generic pointer to requested flattened object
 	 */
 	void* get_seq_root(size_t idx);
+
+	/**
+	 * @brief retrieve named root pointer
+	 * 
+	 * @param name the name of root pointer provided to EXTENDED_ROOT_POINTER macro
+	 * @param size[opt] place where size of flattened object will be stored
+	 * @return generic pointer to named object or NULL in case of an error
+	 */
+	void* get_named_root(const char* name, size_t* size);
+	
 };
 
 extern "C" {
@@ -145,6 +155,16 @@ void* flatten_root_pointer_next(CFlatten flatten);
  * @return        generic pointer to flattened object or NULL if an error occurred
  */
 void* flatten_root_pointer_seq(CFlatten flatten, size_t idx);
+
+/**
+ * @brief Retrieve the pointer to the named flattened object
+ * 
+ * @param flatten 	library instance
+ * @param name 		name of the object to retrieve
+ * @param idx[opt]	place where the size of target object will be stored 
+ * @return void* 	generic pointer to the named flattened object or NULL
+ */
+void* flatten_root_pointer_named(CFlatten flatten, const char* name, size_t* idx);
 
 #ifdef __cplusplus
 }

@@ -34,6 +34,13 @@ Flatten::get_next_root();
  *   (size_t) idx:  ID of object to retrieve from image
  */
 Flatten::get_seq_root(size_t idx);
+
+/*
+ * get_named_root - retrieve the pointer to flattened object named `name`
+ *   (char*)   name:  name of target object
+ *   (size_t*) size:  optional pointer to where the size of object will be stored
+ */
+Flatten::get_named_root(const char* name, size_t* size);
 ```
 
 ### C Interface
@@ -46,6 +53,7 @@ void flatten_deinit(CFlatten flatten);
 int flatten_load(CFlatten flatten, FILE* file, get_function_address_t gfa);
 void* flatten_root_pointer_next(CFlatten flatten);
 void* flatten_root_pointer_seq(CFlatten flatten, size_t idx);
+void* flatten_root_pointer_named(CFlatten flatten, const char* name, size_t* idx);
 ```
 
 Any exception thrown by underlying C++ code is caught and converted to `-1` or `NULL`, depending on the function return value type.
