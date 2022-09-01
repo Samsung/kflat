@@ -221,12 +221,15 @@ static void handler_{0}(struct kflat* kflat, struct probe_regs* regs) {{
 }}
 """
 
+	# 0 - type of argument
+	# 1 - position of argument
+	# 2 - size of argument
 	template_output_arg_handler = """
 	// Dump argument no. {1}
 	{{
 		struct {0} *target = (struct {0}*) regs->arg{1};
 		
-		FOR_ROOT_POINTER(target,
+		FOR_EXTENDED_ROOT_POINTER(target, "_func_arg_{1}", {2},
 			UNDER_ITER_HARNESS(
 				FLATTEN_STRUCT_ITER_SELF_CONTAINED({0}, 1, target);
 			);
@@ -234,6 +237,10 @@ static void handler_{0}(struct kflat* kflat, struct probe_regs* regs) {{
 	}}
 """
 
+	# 0 - name of global variable inc. kernel module
+	# 1 - name of global var
+	# 2 - size of global var
+	# 3 - flattening commands
 	template_output_global_handler = """
 	// Dump global {0}
 	do {{
@@ -243,9 +250,9 @@ static void handler_{0}(struct kflat* kflat, struct probe_regs* regs) {{
 			break;
 		}}
 
-		FOR_ROOT_POINTER(addr,
+		FOR_EXTENDED_ROOT_POINTER(addr, "{1}", {2},
 			UNDER_ITER_HARNESS(
-				{2}
+				{3}
 			);
 		);
 	}} while(0);
@@ -415,9 +422,9 @@ LINUXINCLUDE := ${LINUXINCLUDE}
 		globals_to_dump = []
 		deps = set()
 
-		def _find_RI_for_func(type: str) -> tuple:
+		def _find_RI_for_func(type: str) -> Tuple[tuple, int]:
 			results = [
-				(x.id, x.str)
+				x
 				for x in self.ftdb.types
 				if x.classname == 'record' and x.str == type and not self.DI.isTypeConst(x)
 			]
@@ -427,7 +434,9 @@ LINUXINCLUDE := ${LINUXINCLUDE}
 			elif len(results) > 1:
 				print(f"EE- Failed to uniquely identify structure type named - '{type}'")
 				exit(1)
-			return results[0]
+
+			res = results[0]
+			return (res.id, res.str), res.size // 8
 
 		def _find_RI_for_global(name: str = '', loc_suffix: str = '') -> Tuple[tuple, str]:
 			results = [x for x in self.ftdb.globals
@@ -450,22 +459,24 @@ LINUXINCLUDE := ${LINUXINCLUDE}
 				module = self.ftdb.modules[result.mids[0]].split('/')[-1]
 
 			nonConstType = self.DI.typeToNonConst(type)
-			return (nonConstType.id, nonConstType.str), module
+			return (nonConstType.id, nonConstType.str), module, type.size // 8, result.hash
 
 		for arg in args:
 			if '@' in arg:
 				type, pos = arg.split('@')
-				func_args_to_dump.append((type, int(pos)))
-				deps.add(_find_RI_for_func(type))
+				dep, size = _find_RI_for_func(type)
+				func_args_to_dump.append((type, int(pos), size))
+				deps.add(dep)
 			elif ':' in arg:
 				name, loc = arg.split(':')
-				dep, module = _find_RI_for_global(name, loc)
-				globals_to_dump.append((dep[1], dep[0], name, module))
+				dep, module, size, hash = _find_RI_for_global(name, loc)
+				globals_to_dump.append((dep[1], dep[0], name, module, size, hash))
 				deps.add(dep)
 			else:
 				# default to first function argument
-				func_args_to_dump.append((arg, 1))
-				deps.add(_find_RI_for_func(arg))
+				dep, size = _find_RI_for_func(arg)
+				func_args_to_dump.append((arg, 1, size))
+				deps.add(dep)
 
 		if globals_file:
 			with open(globals_file, 'r') as f:
@@ -474,8 +485,8 @@ LINUXINCLUDE := ${LINUXINCLUDE}
 						continue
 					name = hash.split('/')[0]
 					loc = "/".join(hash.split('/')[-3:]) if '/' in hash else ''
-					dep, module = _find_RI_for_global(name, loc)
-					globals_to_dump.append((dep[1], dep[0], name, module))
+					dep, module, size, hash = _find_RI_for_global(name, loc)
+					globals_to_dump.append((dep[1], dep[0], name, module, size, hash))
 					deps.add(dep)
 		return func_args_to_dump, globals_to_dump, deps
 
@@ -1086,7 +1097,7 @@ LINUXINCLUDE := ${LINUXINCLUDE}
 					trigger = RecipeGenerator.template_flatten_type_array_pointer_recipe%(AT.str,"__root_ptr",str(T.size//AT.size),"","")
 					out.write(trigger+"\n")
 					return AT.str+"*"
-				if AT.classname=="enum":
+				elif AT.classname=="enum":
 					if ATPD:
 						trigger = RecipeGenerator.template_flatten_compound_type_array_pointer_recipe%(ATPD.name,AT.size//8,"__root_ptr",str(T.size//AT.size),"","")
 						out.write(trigger+"\n")
@@ -1129,6 +1140,7 @@ LINUXINCLUDE := ${LINUXINCLUDE}
 							out.write(trigger+"\n")
 							return "%s %s*"%("struct" if AT.isunion is False else "union",AT.str)
 				else:
+					print(f"EE- Unsupported harness - {AT.id}; {AT.classname}")
 					return None
 			else:
 				# What else could be here?
@@ -1752,7 +1764,8 @@ def main():
 		# TODO: Match by ID rather than by name
 		arg = [x for x in func_args_to_dump if x[0] == name]
 		if len(arg) > 0:
-			func_args_stream.write(RecipeGenerator.template_output_arg_handler.format(arg[0][0], arg[0][1]))
+			arg = arg[0]
+			func_args_stream.write(RecipeGenerator.template_output_arg_handler.format(arg[0], arg[1], arg[2]))
 
 	for glob in globals_to_dump:
 		out = io.StringIO()
@@ -1761,7 +1774,7 @@ def main():
 		if glob[3] not in ['', 'vmlinux'] :
 			var_name += ':' + glob[3]
 		globals_stream.write(RecipeGenerator.template_output_global_handler.format(
-			var_name, glob[0], out.getvalue().strip()))
+			var_name, glob[5], glob[4], out.getvalue().strip()))
 	
 	recipe_register_stream.write(f"\tKFLAT_RECIPE(\"{args.func}\", handler_{args.func}),\n")
 	recipe_handlers_stream.write(
