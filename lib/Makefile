@@ -1,4 +1,4 @@
-CFLAGS = -Iinclude_priv/ -Wall -O3 -fPIC -ggdb3
+CFLAGS = -Iinclude_priv/ -Wall -O3 -fPIC
 LDFLAGS = --shared -fPIC
 
 #
@@ -10,10 +10,10 @@ rbtree.o: rbtree.c
 unflatten.o: unflatten.cpp unflatten.hpp
 	$(CXX) $(CFLAGS) -c -o $@ $<
 
-libunflatten.so: unflatten.o rbtree.o
+libunflatten_$(ARCH).so: unflatten.o rbtree.o
 	$(CXX) $(LDFLAGS) -o $@ $^
 
-libunflatten.a: unflatten.o rbtree.o
+libunflatten_$(ARCH).a: unflatten.o rbtree.o
 	ar rcs $@ $^
 
 #
@@ -21,22 +21,22 @@ libunflatten.a: unflatten.o rbtree.o
 #  library files for easier testing on host machine
 #
 ifeq ($(ARCH), arm64)
-rbtree_x86.o: rbtree.c
+rbtree_x86_64.o: rbtree.c
 	g++ $(CFLAGS) -c -o $@ $^
 
-unflatten_x86.o: unflatten.cpp unflatten.hpp
+unflatten_x86_64.o: unflatten.cpp unflatten.hpp
 	g++ $(CFLAGS) -c -o $@ $<
 
-libunflatten_x86.so: unflatten_x86.o rbtree_x86.o
+libunflatten_x86_64.so: unflatten_x86_64.o rbtree_x86_64.o
 	g++ $(LDFLAGS) -o $@ $^
 
-libunflatten_x86.a: unflatten_x86.o rbtree_x86.o
+libunflatten_x86_64.a: unflatten_x86_64.o rbtree_x86_64.o
 	ar rcs $@ $^
 
-all: libunflatten.a libunflatten.so libunflatten_x86.a libunflatten_x86.so
+all: libunflatten_arm64.a libunflatten_arm64.so libunflatten_x86_64.a libunflatten_x86_64.so
 
 else
-all: libunflatten.a libunflatten.so
+all: libunflatten_x86_64.a libunflatten_x86_64.so
 
 endif
 

@@ -161,10 +161,10 @@ void* flatten_root_pointer_seq(CFlatten flatten, size_t idx);
  * 
  * @param flatten 	library instance
  * @param name 		name of the object to retrieve
- * @param idx[opt]	place where the size of target object will be stored 
+ * @param size[opt]	place where the size of target object will be stored 
  * @return void* 	generic pointer to the named flattened object or NULL
  */
-void* flatten_root_pointer_named(CFlatten flatten, const char* name, size_t* idx);
+void* flatten_root_pointer_named(CFlatten flatten, const char* name, size_t* size);
 
 #ifdef __cplusplus
 }
