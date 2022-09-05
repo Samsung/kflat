@@ -105,7 +105,7 @@ class DerefInfo:
 		return 'c' in T.qualifiers
 
 	def typeToNonConst(self, T) -> object:
-		if T is None:
+		if T is None or not self.isTypeConst(T):
 			return T
 		
 		for type in self.ftdb.types:
