@@ -505,7 +505,7 @@ public:
 		for (size_t i = 0; i < FLCTRL.HDR.root_addr_extended_count; ++i) {
 			size_t name_size, index, size;
 			read_file(&name_size,sizeof(size_t),1,f);
-			
+
 			char* name = new char[name_size];
 			try {
 				read_file((void*)name, name_size, 1, f);
@@ -704,7 +704,11 @@ CFlatten flatten_init(int level) {
 	CFlatten flatten;
 	try {
 		flatten = new Unflatten(level);
+	} catch(std::exception& ex) { 
+		fprintf(stderr, "[UnflattenLib] Failed to initalize kflat - `%s`\n", ex.what());
+		return NULL;
 	} catch(...) {
+		fprintf(stderr, "[UnflattenLib] Failed to initalize kflat - exception occurred\n");
 		return NULL;
 	}
 	return flatten;
@@ -722,7 +726,11 @@ void flatten_deinit(CFlatten flatten) {
 int flatten_load(CFlatten flatten, FILE* file, get_function_address_t gfa) {
 	try {
 		return ((Unflatten*)flatten)->load(file, gfa);
+	} catch(std::exception& ex) { 
+		fprintf(stderr, "[UnflattenLib] Failed to load image - `%s`\n", ex.what());
+		return -1;
 	} catch(...) {
+		fprintf(stderr, "[UnflattenLib] Failed to load image - exception occurred\n");
 		return -1;
 	}
 }
@@ -738,7 +746,11 @@ void flatten_unload(CFlatten flatten) {
 void* flatten_root_pointer_next(CFlatten flatten) {
 	try {
 		return ((Unflatten*)flatten)->get_next_root();
+	} catch(std::exception& ex) { 
+		fprintf(stderr, "[UnflattenLib] Failed to get next root pointer - `%s`\n", ex.what());
+		return NULL;
 	} catch(...) {
+		fprintf(stderr, "[UnflattenLib] Failed to get next root pointer - exception occurred\n");
 		return NULL;
 	}
 }
@@ -746,7 +758,11 @@ void* flatten_root_pointer_next(CFlatten flatten) {
 void* flatten_root_pointer_seq(CFlatten flatten, size_t idx) {
 	try {
 		return ((Unflatten*)flatten)->get_seq_root(idx);
+	} catch(std::exception& ex) { 
+		fprintf(stderr, "[UnflattenLib] Failed to get seq root pointer - `%s`\n", ex.what());
+		return NULL;
 	} catch(...) {
+		fprintf(stderr, "[UnflattenLib] Failed to get seq root pointer - exception occurred\n");
 		return NULL;
 	}
 }
@@ -754,7 +770,11 @@ void* flatten_root_pointer_seq(CFlatten flatten, size_t idx) {
 void* flatten_root_pointer_named(CFlatten flatten, const char* name, size_t* idx) {
 	try {
 		return ((Unflatten*)flatten)->get_named_root(name, idx);
+	}  catch(std::exception& ex) { 
+		fprintf(stderr, "[UnflattenLib] Failed to get named root pointer - `%s`\n", ex.what());
+		return NULL;
 	} catch(...) {
+		fprintf(stderr, "[UnflattenLib] Failed to get named root pointer - exception occurred\n");
 		return NULL;
 	}
 }
