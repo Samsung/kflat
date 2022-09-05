@@ -506,9 +506,10 @@ public:
 			size_t name_size, index, size;
 			read_file(&name_size,sizeof(size_t),1,f);
 
-			char* name = new char[name_size];
+			char* name = new char[name_size + 1];
 			try {
 				read_file((void*)name, name_size, 1, f);
+				name[name_size] = '\0';
 				read_file(&index, sizeof(size_t), 1, f);
 				read_file(&size, sizeof(size_t), 1, f);
 				root_ptr_ext_map.insert({index, {std::string(name), size}});
