@@ -1460,8 +1460,7 @@ int flatten_write_internal(struct kflat* kflat, size_t* wcounter_p) {
 			struct flat_node *node = PTRNODE(p->root_addr);
 			if (!node) {
 				/* Actually nothing has been flattened under this root address */
-				p = p->next;
-				continue;
+				root_addr_offset = (size_t)-1;
 			}
 			root_addr_offset = node->storage->index + (p->root_addr-node->start);
 		}
