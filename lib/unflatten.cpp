@@ -116,7 +116,7 @@ private:
 	std::map<uintptr_t,std::string> fptrmap;
 	struct timeval timeS;
 
-	void* flatten_memory_start() {
+	inline void* flatten_memory_start() const {
 		return (char*) FLCTRL.mem + \
 				FLCTRL.HDR.ptr_count * sizeof(size_t) +  \
 				FLCTRL.HDR.fptr_count * sizeof(size_t) + \
@@ -137,7 +137,7 @@ private:
 	/***************************
 	 * LIMITED LOGGING
 	 **************************/
-	void debug(const char* fmt, ...) {
+	inline void debug(const char* fmt, ...) const {
 		va_list args;
 		if(loglevel < LOG_DEBUG)
 			return;
@@ -147,7 +147,7 @@ private:
 		va_end(args);
 	}
 
-	void info(const char* fmt, ...) {
+	inline void info(const char* fmt, ...) const {
 		va_list args;
 		if(loglevel < LOG_INFO)
 			return;
@@ -498,7 +498,6 @@ public:
 			size_t root_addr_offset;
 			read_file(&root_addr_offset, sizeof(size_t), 1, f);
 			root_ptr_vector.push_back(root_addr_offset);
-			debug(" * root_addr: %lx\n", root_addr_offset);
 		}
 
 		std::map<size_t,std::pair<std::string,size_t>> root_ptr_ext_map;
@@ -564,10 +563,6 @@ public:
 		size_t* minfoptr = (size_t*)((char*)FLCTRL.mem + FLCTRL.HDR.ptr_count * sizeof(size_t) + FLCTRL.HDR.fptr_count * sizeof(size_t));
 		void* memptr = flatten_memory_start();
 		info(" * memory size: %lu\n", FLCTRL.HDR.memory_size);
-	 	debug("[ ");
-	 	for (size_t i = 0; i < FLCTRL.HDR.memory_size; ++i)
-	 		debug("%02x ",*((unsigned char*)memptr + i));
-	 	debug("]\n");
 
 		for (size_t i = 0; i < FLCTRL.HDR.mcount; ++i) {
 			size_t index = *minfoptr++;
