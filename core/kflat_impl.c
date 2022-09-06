@@ -1461,8 +1461,8 @@ int flatten_write_internal(struct kflat* kflat, size_t* wcounter_p) {
 			if (!node) {
 				/* Actually nothing has been flattened under this root address */
 				root_addr_offset = (size_t)-1;
-			}
-			root_addr_offset = node->storage->index + (p->root_addr-node->start);
+			} else 
+				root_addr_offset = node->storage->index + (p->root_addr-node->start);
 		}
 		else {
 			root_addr_offset = (size_t)-1;
