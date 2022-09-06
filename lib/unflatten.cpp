@@ -522,7 +522,7 @@ public:
 
 		for (size_t i = 0; i < root_ptr_vector.size(); ++i) {
 			if (root_ptr_ext_map.find(i) != root_ptr_ext_map.end())
-				root_addr_append_extended(i, root_ptr_ext_map[i].first.c_str(), root_ptr_ext_map[i].second);
+				root_addr_append_extended(root_ptr_vector[i], root_ptr_ext_map[i].first.c_str(), root_ptr_ext_map[i].second);
 			else
 				root_addr_append(root_ptr_vector[i]);
 		}
