@@ -16,6 +16,7 @@
 #include <linux/slab.h>
 #include <linux/spinlock.h>
 #include <linux/stop_machine.h>
+#include <linux/uaccess.h>
 #include <linux/vmalloc.h>
 
 
@@ -250,12 +251,12 @@ struct stopm_args {
 };
 
 static int _stop_machine_func(void* arg) {
-	pr_info("--- Stop machine started ---");
-
 	struct stopm_args* stopm = (struct stopm_args*) arg;
-	stopm->handler(stopm->kflat, stopm->regs);
 
+	pr_info("--- Stop machine started ---");
+	stopm->handler(stopm->kflat, stopm->regs);
 	pr_info("-- Stop machine finishing ---");
+	
 	return 0;
 }
 

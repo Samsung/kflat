@@ -14,6 +14,7 @@
 #include <linux/mm.h>
 #include <linux/slab.h>
 #include <linux/uaccess.h>
+#include <linux/version.h>
 #include <linux/vmalloc.h>
 
 #ifdef CONFIG_X86_64
@@ -250,7 +251,7 @@ static pgd_t* kdump_get_kernel_pgd(void) {
 }
 
 #else 
-#error "Kflat module support only x86 and ARM64 architectures
+#error "Kflat module support only x86 and ARM64 architectures"
 #endif
 
 /*
@@ -286,6 +287,10 @@ static inline int pmd_sect(pmd_t pmd) {
  *  register (TCR_EL1) to see if TBI is enabled or not and handle
  *  top-byte clearing accordingly.
  */
+#if LINUX_VERSION_CODE <= KERNEL_VERSION(5, 0, 0)
+static void* kasan_reset_tag(void* addr) { return addr; }
+#endif
+
 #ifdef CONFIG_ARM64
 static int tbi_is_enabled = 0;
 
@@ -401,6 +406,10 @@ static size_t walk_addr(pgd_t* swapper_pgd, uint64_t addr, struct page** pagep) 
     pmd_t* pmdp, pmd;
     pte_t* ptep, pte;
 
+#ifdef CONFIG_X86_64
+    uint64_t top_bits;
+#endif
+
     *pagep = NULL;
 
 #ifdef CONFIG_ARM64
@@ -412,7 +421,7 @@ static size_t walk_addr(pgd_t* swapper_pgd, uint64_t addr, struct page** pagep) 
 #elif CONFIG_X86_64
 
     // Check whether provided address is canonical
-    uint64_t top_bits = (int64_t)addr >> __VIRTUAL_MASK_SHIFT;
+    top_bits = (int64_t)addr >> __VIRTUAL_MASK_SHIFT;
     if(top_bits != -1ULL && top_bits != 0)
         return SIZE_TO_NEXT_PAGE(addr, PGDIR);
 
@@ -461,7 +470,7 @@ static size_t walk_addr(pgd_t* swapper_pgd, uint64_t addr, struct page** pagep) 
     return SIZE_TO_NEXT_PAGE(addr, PAGE);
 }
 
-static void walk_page_range(struct kdump_memory_map* kdump, pgd_t* swapper_pgd, uint64_t start, uint64_t end) {
+static void kdump_walk_page_range(struct kdump_memory_map* kdump, pgd_t* swapper_pgd, uint64_t start, uint64_t end) {
     int ret;
     struct page* page;
     size_t size;
@@ -485,9 +494,9 @@ void kdump_dump_vma(struct kdump_memory_map* kdump) {
     printk(KERN_INFO "Kflat: Start kernel memory dump...");
 
 #ifdef CONFIG_ARM64
-    walk_page_range(kdump, kernel_pgd, (~0ULL) << VA_BITS, VMALLOC_END);
+    kdump_walk_page_range(kdump, kernel_pgd, (~0ULL) << VA_BITS, VMALLOC_END);
 #elif CONFIG_X86_64
-    walk_page_range(kdump, kernel_pgd, VMALLOC_START, MODULES_END);
+    kdump_walk_page_range(kdump, kernel_pgd, VMALLOC_START, MODULES_END);
 #endif
 
     printk(KERN_INFO "Kflat: Finished kernel memory dump");
@@ -496,6 +505,7 @@ void kdump_dump_vma(struct kdump_memory_map* kdump) {
 size_t kdump_test_address(void* addr, size_t size) {
     size_t walked_size = 0;
     struct page* page;
+    pgd_t* kernel_pgd;
     size_t page_offset = (uint64_t)addr & (~PAGE_MASK);
 
     addr = ptr_reset_tag(addr);
@@ -505,7 +515,7 @@ size_t kdump_test_address(void* addr, size_t size) {
 	if (addr == NULL)
 		return 0;
     
-    pgd_t* kernel_pgd = kdump_get_kernel_pgd();
+    kernel_pgd = kdump_get_kernel_pgd();
     for(walked_size = 0; walked_size < size;) {
         size_t ret_size = walk_addr(kernel_pgd, (uint64_t) addr + walked_size, &page);
         if(page == NULL || !kdump_is_phys_in_ram(page_to_phys(page)))

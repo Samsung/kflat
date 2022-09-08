@@ -1,5 +1,6 @@
 #include <linux/linkage.h>
 #include <linux/init.h>
+#include <linux/version.h>
 #include <asm/nospec-branch.h>
 
 /* Setup stack frame, dump current context and
@@ -7,7 +8,11 @@
  * execution, restore context and jump back to the
  * original code
  */
+#if LINUX_VERSION_CODE < KERNEL_VERSION(5, 4, 76)
+ENTRY(raw_probing_delegate)
+#else
 SYM_CODE_START(raw_probing_delegate)
+#endif
     /* Mark this code as a valid location for jump.
        Otherwise Control Flow Integrity (CFI)
        would crash the kernel  */
@@ -58,4 +63,9 @@ SYM_CODE_START(raw_probing_delegate)
 
     ANNOTATE_RETPOLINE_SAFE;
     jmp    *%rax;            /* Jump back to saved_ip */
+
+#if LINUX_VERSION_CODE < KERNEL_VERSION(5, 4, 76)
+END(raw_probing_delegate)
+#else
 SYM_CODE_END(raw_probing_delegate)
+#endif

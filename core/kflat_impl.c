@@ -13,9 +13,11 @@
 #include <linux/vmalloc.h>
 
 
+#ifdef KFLAT_GET_OBJ_SUPPORT
 /* Nasty include, but we need some of the macros that for whatever
  *  reasons are stored in header files located outside of include/ dir */
 #include "../../mm/slab.h"
+#endif /* KFLAT_GET_OBJ_SUPPORT */
 
 
 #define START(node) ((node)->start)
@@ -1555,6 +1557,13 @@ EXPORT_SYMBOL_GPL(flatten_global_address_by_name);
 /*******************************************************
  * DYNAMIC OBJECTS RESOLUTION
  *******************************************************/
+#ifdef KFLAT_GET_OBJ_SUPPORT
+#if LINUX_VERSION_CODE <= KERNEL_VERSION(5, 0, 0)
+static void* kasan_reset_tag(void* addr) { 
+	return addr;
+}
+#endif
+
 /*
  * Original implementation of kmem_cache_debug_flags can be 
  * 	found in mm/slab.h
@@ -1697,6 +1706,12 @@ bool flatten_get_object(void* ptr, void** start, void** end) {
 		return true;
 	}
 }
+#else /* KFLAT_GET_OBJ_SUPPORT */
+bool flatten_get_object(void* ptr, void** start, void** end) {
+	return false;
+}
+#endif /* KFLAT_GET_OBJ_SUPPORT */
+
 EXPORT_SYMBOL_GPL(flatten_get_object);
 
 /*******************************************************
