@@ -295,7 +295,7 @@ static void handler_{0}(struct kflat* kflat, struct probe_regs* regs) {{
 %s_recipes-objs := \\
 %s
 
-ccflags-y := -Wno-undefined-internal -Wno-visibility -ferror-limit=0 -Wno-gcc-compat -Wno-unused-variable -I${PWD}/include/
+ccflags-y := -Wno-undefined-internal -Wno-visibility -Wno-gcc-compat -Wno-unused-variable -I${PWD}/include/
 
 obj-m = %s_recipes.o
 LINUXINCLUDE := ${LINUXINCLUDE}
