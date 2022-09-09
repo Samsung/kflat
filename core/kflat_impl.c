@@ -219,10 +219,11 @@ static int binary_stream_element_write(struct kflat* kflat, struct blstream* p, 
 }
 
 void binary_stream_print(struct kflat* kflat) {
+	struct blstream* cp;
+	size_t total_size = 0;
 
 	kflat_dbg_printf("# Binary stream\n");
-	struct blstream* cp = kflat->FLCTRL.bhead;
-	size_t total_size = 0;
+	cp = kflat->FLCTRL.bhead;
     while(cp) {
     	struct blstream* p = cp;
     	cp = cp->next;
@@ -258,8 +259,11 @@ size_t binary_stream_size(struct kflat* kflat) {
 }
 
 void binary_stream_update_pointers(struct kflat* kflat) {
+	int count = 0;
+	size_t size_to_cpy, __ptr_offset;
+	struct blstream* __storage;
 	struct rb_node * p = rb_first(&kflat->FLCTRL.fixup_set_root.rb_root);
-	int count=0;
+
 	kflat_dbg_printf("# Pointer update\n");
 	while(p) {
     	struct fixup_set_node* node = (struct fixup_set_node*)p;
@@ -267,9 +271,9 @@ void binary_stream_update_pointers(struct kflat* kflat) {
 			void* newptr = (unsigned char*)node->ptr->node->storage->index+node->ptr->offset;
 			kflat_dbg_printf("@ ptr update at ((%lx)%lx:%zu) : %lx => %lx\n",(unsigned long)node->inode,(unsigned long)node->inode->start,node->offset,
 					(unsigned long)newptr,(unsigned long)(((unsigned char*)node->inode->storage->data)+node->offset));
-			size_t size_to_cpy = sizeof(void*);
-			struct blstream* __storage = node->inode->storage;
-			size_t __ptr_offset = node->offset;
+			size_to_cpy = sizeof(void*);
+			__storage = node->inode->storage;
+			__ptr_offset = node->offset;
 			while(size_to_cpy>0) {
 				size_t cpy_size = (size_to_cpy>(__storage->size-__ptr_offset))?(__storage->size-__ptr_offset):(size_to_cpy);
 				memcpy(&((unsigned char*)__storage->data)[__ptr_offset],(unsigned char*)&newptr+(sizeof(void*)-size_to_cpy),cpy_size);
@@ -1187,9 +1191,11 @@ EXPORT_SYMBOL_GPL(root_addr_set_count);
 
 void interval_tree_print(struct rb_root *root) {
 
+	struct rb_node * p;
+	size_t total_size = 0;
+
 	kflat_dbg_printf("# Interval tree\n");
-	struct rb_node * p = rb_first(root);
-	size_t total_size=0;
+	p = rb_first(root);
 	while(p) {
 		struct flat_node* node = (struct flat_node*)p;
 		kflat_dbg_printf("(%lx)[%lx:%lx](%zu){%lx}\n",(unsigned long)node,(unsigned long)node->start,(unsigned long)node->last,
@@ -1537,7 +1543,7 @@ EXPORT_SYMBOL_GPL(flatten_clear_option);
  *******************************************************/
 unsigned long (*kflat_lookup_kallsyms_name)(const char* name);
 
-void* flatten_global_address_by_name(const char* name) {
+__nocfi void* flatten_global_address_by_name(const char* name) {
 	void* addr;
 
 	if(kflat_lookup_kallsyms_name == NULL) {

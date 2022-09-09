@@ -797,7 +797,6 @@ struct flatten_pointer* flatten_struct_##FLTYPE(struct kflat* kflat, const struc
 	size_t _node_offset;	\
 			\
 	struct flat_node *__node = interval_tree_iter_first(&kflat->FLCTRL.imap_root, (uint64_t)_ptr, (uint64_t)_ptr+sizeof(struct FLTYPE)-1);	\
-	(_container_type*)_ptr;	\
 	DBGS("flatten_struct_" #FLTYPE "(%lx): [%zu]\n",(uintptr_t)_ptr,sizeof(struct FLTYPE));	\
 	if (__node) {	\
 		uintptr_t p = (uintptr_t)_ptr;	\
@@ -917,7 +916,6 @@ struct flatten_pointer* flatten_struct_##FLTYPE(struct kflat* kflat, const struc
 	size_t _node_offset;	\
 			\
 	struct flat_node *__node = interval_tree_iter_first(&kflat->FLCTRL.imap_root, (uint64_t)_ptr, (uint64_t)_ptr+FLSIZE-1);	\
-	(void*)_ptr;	\
 	DBGS("flatten_struct_" #FLTYPE "(%lx): [%zu]\n",(uintptr_t)_ptr,FLSIZE);	\
 	if (__node) {	\
 		uintptr_t p = (uintptr_t)_ptr;	\
@@ -1034,7 +1032,6 @@ struct flatten_pointer* flatten_struct_type_##FLTYPE(struct kflat* kflat, const 
 	size_t _node_offset;	\
 			\
 	struct flat_node *__node = interval_tree_iter_first(&kflat->FLCTRL.imap_root, (uint64_t)_ptr, (uint64_t)_ptr+sizeof(FLTYPE)-1);	\
-	(_container_type*)_ptr;	\
 	DBGS("flatten_struct_type_" #FLTYPE "(%lx): [%zu]\n",(uintptr_t)_ptr,sizeof(FLTYPE));	\
 	if (__node) {	\
 		uintptr_t p = (uintptr_t)_ptr;	\
@@ -1154,7 +1151,6 @@ struct flatten_pointer* flatten_struct_type_##FLTYPE(struct kflat* kflat, const 
 	size_t _node_offset;	\
 			\
 	struct flat_node *__node = interval_tree_iter_first(&kflat->FLCTRL.imap_root, (uint64_t)_ptr, (uint64_t)_ptr+FLSIZE-1);	\
-	(void*)_ptr;	\
 	DBGS("flatten_struct_type_" #FLTYPE "(%lx): [%zu]\n",(uintptr_t)_ptr,FLSIZE);	\
 	if (__node) {	\
 		uintptr_t p = (uintptr_t)_ptr;	\
@@ -1272,7 +1268,6 @@ struct flatten_pointer* flatten_struct_iter_##FLTYPE(struct kflat* kflat, const 
 	const struct FLTYPE* _ptr = (const struct FLTYPE*) ptr;	\
             \
     struct flat_node *__node = interval_tree_iter_first(&kflat->FLCTRL.imap_root, (uint64_t)_ptr, (uint64_t)_ptr+sizeof(struct FLTYPE)-1);    \
-    (_container_type*)_ptr;	\
     DBGS("flatten_struct_" #FLTYPE "_iter(%lx): [%zu]\n",(uintptr_t)_ptr,sizeof(struct FLTYPE));	\
 	if (__node) {	\
 		uintptr_t p = (uintptr_t)_ptr;	\
@@ -1394,7 +1389,6 @@ struct flatten_pointer* flatten_union_iter_##FLTYPE(struct kflat* kflat, const v
 	const union FLTYPE* _ptr = (const union FLTYPE*) ptr; \
             \
     struct flat_node *__node = interval_tree_iter_first(&kflat->FLCTRL.imap_root, (uint64_t)_ptr, (uint64_t)_ptr+sizeof(union FLTYPE)-1);    \
-    (_container_type*)_ptr;	\
     DBGS("flatten_union_" #FLTYPE "_iter(%lx): [%zu]\n",(uintptr_t)_ptr,sizeof(union FLTYPE));	\
 	if (__node) {	\
 		uintptr_t p = (uintptr_t)_ptr;	\
@@ -1515,7 +1509,6 @@ struct flatten_pointer* flatten_struct_iter_##FLTYPE(struct kflat* kflat, const 
 	const struct FLTYPE* _ptr = (const struct FLTYPE*) ptr;	\
             \
     struct flat_node *__node = interval_tree_iter_first(&kflat->FLCTRL.imap_root, (uint64_t)_ptr, (uint64_t)_ptr+FLSIZE-1);    \
-    (void*)_ptr;	\
     DBGS("flatten_struct_" #FLTYPE "_iter(%lx): [%zu]\n",(uintptr_t)_ptr,FLSIZE);	\
 	if (__node) {	\
 		uintptr_t p = (uintptr_t)_ptr;	\
@@ -1631,8 +1624,6 @@ struct flatten_pointer* flatten_struct_iter_##FLTYPE##_##TAG(struct kflat* kflat
     size_t _node_offset;	\
             \
     struct flat_node *__node = interval_tree_iter_first(&kflat->FLCTRL.imap_root, (uint64_t)_ptr, (uint64_t)_ptr+FLSIZE-1);    \
-    (void*)_ptr;	\
-    (void)interval_tree_remove;	\
     DBGS("flatten_struct_" #FLTYPE "_iter(%lx): [%zu]\n",(uintptr_t)_ptr,FLSIZE);	\
 	if (__node) {	\
 		uintptr_t p = (uintptr_t)_ptr;	\
@@ -1749,7 +1740,6 @@ struct flatten_pointer* flatten_union_iter_##FLTYPE(struct kflat* kflat, const v
 	const union FLTYPE* _ptr = (const union FLTYPE*) ptr;	\
             \
     struct flat_node *__node = interval_tree_iter_first(&kflat->FLCTRL.imap_root, (uint64_t)_ptr, (uint64_t)_ptr+FLSIZE-1);    \
-    (void*)_ptr;	\
     DBGS("flatten_union_" #FLTYPE "_iter(%lx): [%zu]\n",(uintptr_t)_ptr,FLSIZE);	\
 	if (__node) {	\
 		uintptr_t p = (uintptr_t)_ptr;	\
@@ -1867,7 +1857,6 @@ struct flatten_pointer* flatten_struct_type_iter_##FLTYPE(struct kflat* kflat, c
 	const FLTYPE* _ptr = (const FLTYPE*) ptr; \
 			\
 	struct flat_node *__node = interval_tree_iter_first(&kflat->FLCTRL.imap_root, (uint64_t)_ptr, (uint64_t)_ptr+sizeof(FLTYPE)-1);    \
-	(_container_type*)_ptr;	\
 	DBGS("flatten_struct_type_" #FLTYPE "_iter(%lx): [%zu]\n",(uintptr_t)_ptr,sizeof(FLTYPE));	\
 	if (__node) {	\
 		uintptr_t p = (uintptr_t)_ptr;	\
@@ -1988,7 +1977,6 @@ struct flatten_pointer* flatten_struct_type_iter_##FLTYPE(struct kflat* kflat, c
 	const FLTYPE* _ptr = (const FLTYPE*) ptr;	\
 			\
 	struct flat_node *__node = interval_tree_iter_first(&kflat->FLCTRL.imap_root, (uint64_t)_ptr, (uint64_t)_ptr+FLSIZE-1);    \
-	(void*)_ptr;	\
 	DBGS("flatten_struct_type_" #FLTYPE "_iter(%lx): [%zu]\n",(uintptr_t)_ptr,FLSIZE);	\
 	if (__node) {	\
 		uintptr_t p = (uintptr_t)_ptr;	\
