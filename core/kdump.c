@@ -173,7 +173,7 @@ int kdump_tree_remap(struct kdump_memory_map* kdump, struct vm_area_struct* vma)
                             vma->vm_page_prot);
         if(ret && warned < 10) {
             // Warn and keep going!
-            printk(KERN_NOTICE "Kflat: failed to remap physical page to userspace mapping (%zu), err=%d", offset, ret);
+            pr_warn("failed to remap physical page to userspace mapping (%zu), err=%d", offset, ret);
             warned++;
         }
         
@@ -306,7 +306,7 @@ static inline void tbi_check(void) {
     
 #ifdef CONFIG_KASAN_HW_TAGS
     if(!tbi_is_enabled)
-        printk(KERN_NOTICE "kflat: Top-bytes-ignore feature is disabled even"
+        pr_notice("Top-bytes-ignore feature is disabled even"
             " though CONFIG_KASAN_HW_TAGS is enabled");
 #endif
 }
@@ -374,7 +374,7 @@ static int kdump_collect_iomem_ram(void) {
         }
     }
 
-    printk(KERN_NOTICE "Kflat: discovered %d regions of System Ram", cnt);
+    pr_info("discovered %d regions of System Ram", cnt);
     return 0;
 
 err:
@@ -491,7 +491,7 @@ static void kdump_walk_page_range(struct kdump_memory_map* kdump, pgd_t* swapper
 
 void kdump_dump_vma(struct kdump_memory_map* kdump) {
     pgd_t* kernel_pgd = kdump_get_kernel_pgd();
-    printk(KERN_INFO "Kflat: Start kernel memory dump...");
+    pr_info("Start kernel memory dump...");
 
 #ifdef CONFIG_ARM64
     kdump_walk_page_range(kdump, kernel_pgd, (~0ULL) << VA_BITS, VMALLOC_END);
@@ -499,7 +499,7 @@ void kdump_dump_vma(struct kdump_memory_map* kdump) {
     kdump_walk_page_range(kdump, kernel_pgd, VMALLOC_START, MODULES_END);
 #endif
 
-    printk(KERN_INFO "Kflat: Finished kernel memory dump");
+    pr_info("Finished kernel memory dump");
 }
 
 size_t kdump_test_address(void* addr, size_t size) {

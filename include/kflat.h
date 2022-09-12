@@ -13,6 +13,9 @@
 
 extern int flatten_base_global_address;
 
+#undef pr_fmt
+#define pr_fmt(fmt) "kflat: " fmt
+
 #define kflat_fmt(fmt) 			"kflat: " fmt
 #define flat_errs(fmt,...) 		printk(KERN_ERR kflat_fmt(fmt), ##__VA_ARGS__);
 #define flat_infos(fmt,...) 	printk(KERN_INFO kflat_fmt(fmt), ##__VA_ARGS__);
