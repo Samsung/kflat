@@ -900,6 +900,47 @@ int fixup_set_fptr_write(struct kflat* kflat, size_t* wcounter_p) {
     return 0;
 }
 
+size_t fixup_fptr_info_count(struct kflat* kflat) {
+	char func_symbol[128];
+	size_t symbol_len, func_ptr, count = sizeof(size_t);
+
+	struct rb_node * p = rb_first(&kflat->FLCTRL.fixup_set_root.rb_root);
+	while(p) {
+		struct fixup_set_node* node = (struct fixup_set_node*)p;
+		if (((unsigned long)node->ptr) & 1) {
+			func_ptr = ((unsigned long)node->ptr) & ~(1ULL);
+			symbol_len = scnprintf(func_symbol, sizeof(func_symbol), "%ps", func_ptr);
+
+			count += 2 * sizeof(size_t) + symbol_len;
+		}
+		p = rb_next(p);
+	}
+	return count;
+}
+
+int fixup_set_fptr_info_write(struct kflat* kflat, size_t* wcounter_p) {
+	char func_symbol[128];
+	size_t symbol_len, func_ptr, orig_ptr;
+
+	FLATTEN_WRITE_ONCE(&kflat->FLCTRL.HDR.fptr_count, sizeof(size_t), wcounter_p);
+
+	struct rb_node * p = rb_first(&kflat->FLCTRL.fixup_set_root.rb_root);
+	while(p) {
+		struct fixup_set_node* node = (struct fixup_set_node*)p;
+		if (((unsigned long)node->ptr) & 1) {
+			func_ptr = ((unsigned long)node->ptr) & ~(1ULL);
+			orig_ptr = node->inode->storage->index+node->offset;
+			symbol_len = scnprintf(func_symbol, sizeof(func_symbol), "%ps", func_ptr);
+
+			FLATTEN_WRITE_ONCE(&orig_ptr, sizeof(size_t), wcounter_p);
+			FLATTEN_WRITE_ONCE(&symbol_len, sizeof(size_t), wcounter_p);
+			FLATTEN_WRITE_ONCE(func_symbol, symbol_len, wcounter_p);
+		}
+		p = rb_next(p);
+	}
+	return 0;
+}
+
 size_t mem_fragment_index_count(struct kflat* kflat) {
 
 	struct rb_node * p = rb_first(&kflat->FLCTRL.imap_root.rb_root);
@@ -1460,6 +1501,7 @@ int flatten_write_internal(struct kflat* kflat, size_t* wcounter_p) {
     kflat->FLCTRL.HDR.this_addr = (uintptr_t)&flatten_base_function_address;
     kflat->FLCTRL.HDR.mcount = mem_fragment_index_count(kflat);
     kflat->FLCTRL.HDR.magic = FLATTEN_MAGIC;
+	kflat->FLCTRL.HDR.fptrmapsz = fixup_fptr_info_count(kflat);
     FLATTEN_WRITE_ONCE(&kflat->FLCTRL.HDR,sizeof(struct flatten_header),wcounter_p);
     p = kflat->FLCTRL.rhead;
 	while(p) {
@@ -1499,6 +1541,9 @@ int flatten_write_internal(struct kflat* kflat, size_t* wcounter_p) {
 		return err;
 	}
 	if ((err = binary_stream_write(kflat,wcounter_p))!=0) {
+		return err;
+	}
+	if ((err = fixup_set_fptr_info_write(kflat, wcounter_p)) != 0) {
 		return err;
 	}
     return 0;
