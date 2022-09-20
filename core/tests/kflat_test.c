@@ -1858,6 +1858,7 @@ int kflat_ioctl_test(struct kflat *kflat, unsigned int cmd, unsigned long arg) {
 			break;
 
 		case GETOBJECTCHECK: {
+#ifdef KFLAT_GET_OBJ_SUPPORT
 				bool ret;
 				void* start = NULL; void* end = NULL;
 				void* buffer = kmalloc(256, GFP_KERNEL);
@@ -1872,6 +1873,10 @@ int kflat_ioctl_test(struct kflat *kflat, unsigned int cmd, unsigned long arg) {
 								 __func__, (uint64_t)start, (uint64_t)end, (uint64_t)buffer, (uint64_t)buffer + 256);
 					err = -EFAULT;
 				}
+#else
+				pr_warn("%s: KFLAT hasn't been compiled with KFLAT_GET_OBJ_SUPPORT option enabled", __func__);
+				pr_warn("%s: Ignoring test GETOBJECTCHECK...", __func__);
+#endif
 
 			}
 			break;
@@ -1909,5 +1914,8 @@ int kflat_ioctl_test(struct kflat *kflat, unsigned int cmd, unsigned long arg) {
 	if(err < 0)
 		return err;
 	
-	return *(size_t*)kflat->area + sizeof(size_t);
+	if(kflat->area != NULL)
+		return *(size_t*)kflat->area + sizeof(size_t);
+	
+	return 0;
 }
