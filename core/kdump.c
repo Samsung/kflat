@@ -516,7 +516,7 @@ size_t kdump_test_address(void* addr, size_t size) {
 		return 0;
     
     kernel_pgd = kdump_get_kernel_pgd();
-    for(walked_size = 0; walked_size < size;) {
+    for(walked_size = 0; walked_size < size + page_offset;) {
         size_t ret_size = walk_addr(kernel_pgd, (uint64_t) addr + walked_size, &page);
         if(page == NULL || !kdump_is_phys_in_ram(page_to_phys(page)))
             break;
