@@ -251,7 +251,7 @@ static pgd_t* kdump_get_kernel_pgd(void) {
 }
 
 #else 
-#error "Kflat module support only x86 and ARM64 architectures"
+#error "Kflat module supports only x86 and ARM64 architectures
 #endif
 
 /*

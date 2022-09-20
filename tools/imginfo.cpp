@@ -180,23 +180,29 @@ struct fptr_test_struct {
 	int i;
 	long l;
 	char* s;
-	int (*sf)(struct kflat *kflat, size_t num_strings, int debug_flag);
+	int (*df)(const char *name, char **option);
+	int (*sf)(struct kflat* kflat, uintptr_t addr);
 	struct blstream* (*ef)(struct kflat* kflat, const void* data, size_t size);
 	int (*gf)(struct kflat* kflat);
 };
 
-int kflat_stringset_module_test(struct kflat *kflat, size_t num_strings, int debug_flag) {
-	printf("HOST::kflat_stringset_module_test()\n");
+int fixup_set_reserve_address(struct kflat* kflat, uintptr_t addr) {
+	printf("HOST::fixup_set_reserve_address() [kflat_core]\n");
 	return 0;
 }
 
 int binary_stream_append(struct kflat* kflat, const void* data, size_t size) {
-	printf("HOST::binary_stream_append()\n");
+	printf("HOST::binary_stream_append() [kflat_core]\n");
 	return 0;
 }
 
 int binary_stream_calculate_index(struct kflat* kflat) {
-	printf("HOST::binary_stream_calculate_index()\n");
+	printf("HOST::binary_stream_calculate_index() [kflat_core]\n");
+	return 0;
+}
+
+int fb_get_options(const char *name, char **option) {
+	printf("HOST::fb_get_options()\n");
 	return 0;
 }
 
@@ -210,14 +216,17 @@ bool endswith (std::string const &s, std::string const &what) {
 
 uintptr_t get_fpointer_test_function_address(const char* fsym) {
 	std::string sf(fsym);
-	if (endswith(sf,"kflat_stringset_module_test")) {
-		return (uintptr_t)&kflat_stringset_module_test;
+	if (endswith(sf,"fixup_set_reserve_address [kflat_core]")) {
+		return (uintptr_t)&fixup_set_reserve_address;
 	}
-	else if (endswith(sf,"binary_stream_append")) {
+	else if (endswith(sf,"binary_stream_append [kflat_core]")) {
 		return (uintptr_t)&binary_stream_append;
 	}
-	else if (endswith(sf,"binary_stream_calculate_index")) {
+	else if (endswith(sf,"binary_stream_calculate_index [kflat_core]")) {
 		return (uintptr_t)&binary_stream_calculate_index;
+	}
+	else if (endswith(sf,"fb_get_options")) {
+		return (uintptr_t)&fb_get_options;
 	}
 
 	return 0;
@@ -447,7 +456,7 @@ int main(int argc, char* argv[]) {
 		printf("Half of the circumference: %.17f\n", circumference / 2);
 		return 0;
 	}
-	else if ((!strcmp(argv[2],"CURRENTTASK")) || (!strcmp(argv[2],"CURRENTTASKM"))) {
+	else if (!strcmp(argv[2],"CURRENTTASK")) {
 		struct task_struct *T = (struct task_struct *) flatten.get_next_root();
 		print_struct_task_offsets(T);
 		printf("\n");
@@ -477,7 +486,7 @@ int main(int argc, char* argv[]) {
 		printf("%s\n", pA->p);
 		return 0;
 	}
-	else if ((!strcmp(argv[2],"STRINGSET"))||(!strcmp(argv[2],"STRINGSETM"))) {
+	else if (!strcmp(argv[2],"STRINGSET")) {
 		const struct rb_root* root = (struct rb_root*)flatten.get_next_root();
 		printf("stringset size: %zu\n",stringset_count(root));
 		stringset_nprint(root,10);
@@ -504,7 +513,8 @@ int main(int argc, char* argv[]) {
 		printf("%d\n", p->i);
 		printf("%ld\n", p->l);
 		printf("%s\n", p->s);
-		p->sf(0,0,0);
+		p->df(0,0);
+		p->sf(0,0);
 		p->ef(0,0,0);
 		p->gf(0);
 		return 0;

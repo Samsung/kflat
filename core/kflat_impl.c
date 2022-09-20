@@ -1501,7 +1501,7 @@ int flatten_write_internal(struct kflat* kflat, size_t* wcounter_p) {
     kflat->FLCTRL.HDR.this_addr = (uintptr_t)&flatten_base_function_address;
     kflat->FLCTRL.HDR.mcount = mem_fragment_index_count(kflat);
     kflat->FLCTRL.HDR.magic = FLATTEN_MAGIC;
-	kflat->FLCTRL.HDR.fptrmapsz = fixup_fptr_info_count(kflat);
+    kflat->FLCTRL.HDR.fptrmapsz = fixup_fptr_info_count(kflat);
     FLATTEN_WRITE_ONCE(&kflat->FLCTRL.HDR,sizeof(struct flatten_header),wcounter_p);
     p = kflat->FLCTRL.rhead;
 	while(p) {

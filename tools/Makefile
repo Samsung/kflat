@@ -1,13 +1,13 @@
 export INCLUDE_PATH=$(PWD)/include/
 
 common.o: common.c
-	$(CC) $(CFLAGS) -isystem /usr/aarch64-linux-gnu/include -c -o $@ $^
+	$(CC) $(CFLAGS) -ggdb3 -isystem /usr/aarch64-linux-gnu/include -c -o $@ $^
 
 executor: executor.c common.o
-	$(CC) $(CFLAGS) -DENV_64 -I${INCLUDE_PATH} -isystem /usr/aarch64-linux-gnu/include --static -o $@ $^
+	$(CC) $(CFLAGS) -ggdb3 -DENV_64 -I${INCLUDE_PATH} -isystem /usr/aarch64-linux-gnu/include --static -o $@ $^
 
 kflattest: kflattest.c common.o
-	$(CC) $(CFLAGS) -I${INCLUDE_PATH} -isystem /usr/aarch64-linux-gnu/include --static -o $@ $^
+	$(CC) $(CFLAGS) -ggdb3 -I${INCLUDE_PATH} -isystem /usr/aarch64-linux-gnu/include --static -o $@ $^
 
 imginfo: imginfo.cpp
 	$(CXX) -Wall -I${INCLUDE_PATH} -I$(PWD)/lib/include_priv -isystem /usr/aarch64-linux-gnu/include -ggdb3 --static -o $@ imginfo.cpp ../lib/libunflatten_$(ARCH).a

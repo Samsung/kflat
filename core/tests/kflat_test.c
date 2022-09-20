@@ -452,6 +452,7 @@ FUNCTION_DEFINE_FLATTEN_STRUCT(paddingRoot,
 );
 
 static int kflat_padding_test(struct kflat *kflat) {
+
 	int err = 0;
 	struct paddingA a0 = {3};
 	struct paddingB b = {'3'};
@@ -475,6 +476,52 @@ static int kflat_padding_test(struct kflat *kflat) {
 	return err;
 }
 
+struct fptr_test_struct {
+	int i;
+	long l;
+	char* s;
+	int (*df)(const char *name, char **option);
+	int (*sf)(struct kflat* kflat, uintptr_t addr);
+	struct blstream* (*ef)(struct kflat* kflat, const void* data, size_t size);
+	int (*gf)(struct kflat* kflat);
+};
+
+int binary_stream_calculate_index(struct kflat* kflat);
+int fb_get_options(const char *name, char **option);
+
+FUNCTION_DEFINE_FLATTEN_STRUCT(fptr_test_struct,
+	AGGREGATE_FLATTEN_STRING(s);
+	AGGREGATE_FLATTEN_FUNCTION_POINTER(df);
+	AGGREGATE_FLATTEN_FUNCTION_POINTER(sf);
+	AGGREGATE_FLATTEN_FUNCTION_POINTER(ef);
+	AGGREGATE_FLATTEN_FUNCTION_POINTER(gf);
+);
+static int kflat_fpointer_test(struct kflat *kflat) {
+
+	struct fptr_test_struct F = {
+		0,1000,"this_string",
+		fb_get_options,
+		fixup_set_reserve_address,
+		binary_stream_append,
+		binary_stream_calculate_index
+	};
+
+	int err = 0;
+
+	flatten_init(kflat);
+
+	FOR_ROOT_POINTER(&F,
+		FLATTEN_STRUCT(fptr_test_struct,&F);
+	);
+
+	flat_infos("@Flatten done: %d\n",kflat->errno);
+	if (!kflat->errno) {
+		err = flatten_write(kflat);
+	}
+	flatten_fini(kflat);
+
+	return err;
+}
 
 /*******************************************************
  * TEST CASE #7
@@ -1806,14 +1853,8 @@ int kflat_ioctl_test(struct kflat *kflat, unsigned int cmd, unsigned long arg) {
 				err = kflat_structarray_test(kflat);
 			break;
 		
-		case GLOBALCHECK: {
-				// struct class *wakeup_class;
-				// static unsigned long stringset_root_base_address = 0xffffffff8330a668;
-				// static unsigned long wakeup_class_base_address = 0xffffffff833451c0;
-				// long global_offset = GLOBAL_ADDR_OFFSET(&stringset_root,stringset_root_base_address);
-				// wakeup_class = *((struct class**)(wakeup_class_base_address + global_offset));
-				// flat_infos("wakeup_class:name: %s\n",wakeup_class->name);
-			}
+		case FPOINTER:
+			err = kflat_fpointer_test(kflat);
 			break;
 
 		case GETOBJECTCHECK: {

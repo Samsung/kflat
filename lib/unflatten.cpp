@@ -608,10 +608,9 @@ public:
 				assert(node != NULL);
 
 				size_t node_offset = fptri-node->start;
-				uintptr_t fptrv = *((uintptr_t*)((char*)node->mptr + node_offset));
-				if (fptrmap.find(fptrv) != fptrmap.end()) {
+				if (fptrmap.find(fptri) != fptrmap.end()) {
 					// Fix function pointer
-					uintptr_t nfptr = (*gfa)(fptrmap[fptrv].c_str());
+					uintptr_t nfptr = (*gfa)(fptrmap[fptri].c_str());
 					*((void**)((char*)node->mptr + node_offset)) = (void*)nfptr;
 				}
 			}
