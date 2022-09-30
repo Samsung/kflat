@@ -921,10 +921,11 @@ size_t fixup_fptr_info_count(struct kflat* kflat) {
 int fixup_set_fptr_info_write(struct kflat* kflat, size_t* wcounter_p) {
 	char func_symbol[128];
 	size_t symbol_len, func_ptr, orig_ptr;
+	struct rb_node* p;
 
 	FLATTEN_WRITE_ONCE(&kflat->FLCTRL.HDR.fptr_count, sizeof(size_t), wcounter_p);
 
-	struct rb_node * p = rb_first(&kflat->FLCTRL.fixup_set_root.rb_root);
+	p = rb_first(&kflat->FLCTRL.fixup_set_root.rb_root);
 	while(p) {
 		struct fixup_set_node* node = (struct fixup_set_node*)p;
 		if (((unsigned long)node->ptr) & 1) {
