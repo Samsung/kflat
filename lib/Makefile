@@ -1,14 +1,15 @@
 CFLAGS = -Iinclude_priv/ -Wall -O3 -fPIC -ggdb3
 LDFLAGS = --shared -fPIC
+ALL_TARGET = 
 
 #
 # Generic targets
 #
 rbtree.o: rbtree.c
-	$(CXX) $(CFLAGS) -ggdb3 -c -o $@ $^
+	$(CXX) $(CFLAGS) -c -o $@ $^
 
 unflatten.o: unflatten.cpp unflatten.hpp
-	$(CXX) $(CFLAGS) -ggdb3 -c -o $@ $<
+	$(CXX) $(CFLAGS) -c -o $@ $<
 
 libunflatten_$(ARCH).so: unflatten.o rbtree.o
 	$(CXX) $(LDFLAGS) -o $@ $^
@@ -24,6 +25,18 @@ unflatten.bc: unflatten.cpp unflatten.hpp
 
 rbtree.bc: rbtree.c
 	clang++-9 -emit-llvm -o $@ -c -Iinclude_priv/ rbtree.c
+
+#
+# DFSAN targets
+#
+unflatten_dfsan.o: unflatten.cpp unflatten.hpp
+	clang-15 $(CFLAGS) -fsanitize=dataflow -mllvm -dfsan-event-callbacks -c -o $@ $<
+
+rbtree_dfsan.o: rbtree.c
+	clang-15 $(CFLAGS) -fsanitize=dataflow -mllvm -dfsan-event-callbacks -c -o $@ $^
+
+libunflatten_$(ARCH)_dfsan.a: unflatten_dfsan.o rbtree_dfsan.o
+	ar rcs $@ $^
 
 #
 # When building for ARM64, extra provide x86 version of
@@ -42,19 +55,26 @@ libunflatten_x86_64.so: unflatten_x86_64.o rbtree_x86_64.o
 libunflatten_x86_64.a: unflatten_x86_64.o rbtree_x86_64.o
 	ar rcs $@ $^
 
-all: libunflatten_arm64.a libunflatten_arm64.so libunflatten_x86_64.a libunflatten_x86_64.so
+ALL_TARGET += libunflatten_arm64.a libunflatten_arm64.so libunflatten_x86_64.a libunflatten_x86_64.so
 
 else
+
+ALL_TARGET += libunflatten_x86_64.a libunflatten_x86_64.so
+
+endif
 
 # Check if clang-9 is available. If so, built libraries for KLEE as well
-ifneq ($(shell which clang++-9),)
-all: libunflatten_x86_64.a libunflatten_x86_64.so unflatten.bc rbtree.bc
-else
-all: libunflatten_x86_64.a libunflatten_x86_64.so
+ifneq ($(shell command -v clang++-9),)
+ALL_TARGET += unflatten.bc rbtree.bc
 endif
 
+# Check if clang-15 is avaible. If so, built DFSAN libraries for AoT
+ifneq ($(shell command -v clang-15),)
+ALL_TARGET += libunflatten_$(ARCH)_dfsan.a
 endif
+
+all: $(ALL_TARGET)
 
 .PHONY: clean
 clean:
-	rm -f *.o *.so *.a
+	rm -f *.o *.so *.a *.bc
