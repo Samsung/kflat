@@ -5,6 +5,8 @@ KDIR ?= $(KERNEL_DIR)
 CCDIR ?= $(CLANG_DIR)
 OPTS ?= $(KFLAT_OPTS)
 
+.DEFAULT_GOAL := default
+
 ifeq ($(KDIR),)
   KDIR := /lib/modules/$(shell uname -r)/build
   $(info KDIR is not specified, defaulting to current kernel headers - $(KDIR))
@@ -32,8 +34,6 @@ else
   $(error Unsupported architecture "$(ARCH)")
 endif
 
-library:
-	$(MAKE) -C $(PWD)/lib all
 
 default:
 	$(MAKE) -C $(KDIR) M=$(PWD)/core CC=$(CC) LD=$(LD) CFLAGS=$(CFLAGS) OPTS=$(KFLAT_OPTS) modules
@@ -41,6 +41,11 @@ default:
 	$(MAKE) -C $(PWD)/lib all
 	$(MAKE) -C $(PWD)/tools all
 
+.PHONY: library
+library:
+	$(MAKE) -C $(PWD)/lib all
+
+.PHONY: clean
 clean:
 	$(MAKE) -C $(KDIR) M=$(PWD)/core clean
 	$(MAKE) -C $(KDIR) M=$(PWD)/recipes clean

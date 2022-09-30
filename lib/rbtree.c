@@ -24,9 +24,15 @@
 
 #include <stdlib.h>
 
+#ifdef __cplusplus
 extern "C" {
+#endif
+
 #include "rbtree_augmented.h"
+
+#ifdef __cplusplus
 }
+#endif
 
 /*
  * red-black trees properties:  https://en.wikipedia.org/wiki/Rbtree
