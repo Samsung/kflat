@@ -17,6 +17,15 @@ libunflatten_$(ARCH).a: unflatten.o rbtree.o
 	ar rcs $@ $^
 
 #
+# KLEE libraries
+#
+unflatten.bc: unflatten.cpp unflatten.hpp
+	clang++-9 -emit-llvm -o $@ -c -Iinclude_priv/ unflatten.cpp
+
+rbtree.bc: rbtree.c
+	clang++-9 -emit-llvm -o $@ -c -Iinclude_priv/ rbtree.c
+
+#
 # When building for ARM64, extra provide x86 version of
 #  library files for easier testing on host machine
 #
@@ -36,7 +45,13 @@ libunflatten_x86_64.a: unflatten_x86_64.o rbtree_x86_64.o
 all: libunflatten_arm64.a libunflatten_arm64.so libunflatten_x86_64.a libunflatten_x86_64.so
 
 else
+
+# Check if clang-9 is available. If so, built libraries for KLEE as well
+ifneq ($(shell which clang++-9),)
+all: libunflatten_x86_64.a libunflatten_x86_64.so unflatten.bc rbtree.bc
+else
 all: libunflatten_x86_64.a libunflatten_x86_64.so
+endif
 
 endif
 

@@ -32,6 +32,9 @@ else
   $(error Unsupported architecture "$(ARCH)")
 endif
 
+library:
+	$(MAKE) -C $(PWD)/lib all
+
 default:
 	$(MAKE) -C $(KDIR) M=$(PWD)/core CC=$(CC) LD=$(LD) CFLAGS=$(CFLAGS) OPTS=$(KFLAT_OPTS) modules
 	$(MAKE) -C $(KDIR) M=$(PWD)/recipes CC=$(CC) LD=$(LD) CFLAGS=$(CFLAGS) modules
