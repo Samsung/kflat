@@ -4,6 +4,7 @@ PWD := $(shell pwd)
 KDIR ?= $(KERNEL_DIR)
 CCDIR ?= $(CLANG_DIR)
 OPTS ?= $(KFLAT_OPTS)
+KLEE_LIBCXX_INSTALL ?= $(KLEE_LIBCXX_INSTALL)
 
 .DEFAULT_GOAL := default
 
@@ -38,7 +39,7 @@ endif
 default:
 	$(MAKE) -C $(KDIR) M=$(PWD)/core CC=$(CC) LD=$(LD) CFLAGS=$(CFLAGS) OPTS=$(KFLAT_OPTS) modules
 	$(MAKE) -C $(KDIR) M=$(PWD)/recipes CC=$(CC) LD=$(LD) CFLAGS=$(CFLAGS) modules
-	$(MAKE) -C $(PWD)/lib all
+	$(MAKE) -C $(PWD)/lib KLEE_LIBCXX_INSTALL=$(KLEE_LIBCXX_INSTALL) all
 	$(MAKE) -C $(PWD)/tools all
 
 .PHONY: library
