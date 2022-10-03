@@ -22,7 +22,7 @@
 #include "unflatten.hpp"
 
 #define container_of(ptr, type, member) ({			\
-  	const typeof( ((type *)0)->member ) *__mptr = (ptr);	\
+  	const decltype( ((type *)0)->member ) *__mptr = (ptr);	\
   	(type *)( (char *)__mptr - offsetof(type,member) );})
 
 extern "C" {
@@ -298,7 +298,7 @@ public:
 		FLCTRL.root_addr_count = 0;
 		FLCTRL.mem = 0;
 		need_unload = false;
-		loglevel = (typeof(loglevel))_level;
+		loglevel = (decltype(loglevel))_level;
 	}
 
 	int imginfo(FILE* f, const char* arg) {
