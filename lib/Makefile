@@ -64,12 +64,12 @@ ALL_TARGET += libunflatten_x86_64.a libunflatten_x86_64.so
 endif
 
 # Check if clang-9 is available. If so, built libraries for KLEE as well
-ifneq ($(shell command -v clang++-9),)
+ifneq ($(shell which clang++-9),)
 ALL_TARGET += unflatten.bc rbtree.bc
 endif
 
 # Check if clang-15 is avaible. If so, built DFSAN libraries for AoT
-ifneq ($(shell command -v clang-15),)
+ifneq ($(shell which clang-15),)
 ALL_TARGET += libunflatten_$(ARCH)_dfsan.a
 endif
 
