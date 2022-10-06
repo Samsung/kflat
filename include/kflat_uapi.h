@@ -11,27 +11,27 @@
 #endif
 
 struct kflat_ioctl_enable {
-    pid_t   pid;
-    char    target_name[128];
-	int		debug_flag;
-	int 	use_stop_machine;
-	int		skip_function_body;
+	pid_t	pid;
+	char	target_name[128];
+	int	debug_flag;
+	int	use_stop_machine;
+	int	skip_function_body;
 };
 
 struct kflat_ioctl_disable {
-	int		invoked;
+	int	invoked;
 	size_t	size;
-	int 	error;
+	int	error;
 };
 
 struct kflat_ioctl_mem_map {
-	void* buffer;
-	size_t size;
+	void*	buffer;
+	size_t	size;
 };
 
 enum kflat_test_flags {
-    KFLAT_DEBUG_FLAG = 1,
-    KFLAT_TEST_ITER,
+	KFLAT_DEBUG_FLAG = 1,
+	KFLAT_TEST_ITER,
 };
 
 enum kflat_test_codes {
@@ -56,17 +56,17 @@ enum kflat_test_codes {
 	INFO,
 };
 
-#define KFLAT_TEST_TO_ARG(CODE, FLAG)       ((uint64_t) CODE << 2 | FLAG)
-#define KFLAT_ARG_TO_FLAG(ARG)              (ARG & 0b11)
-#define KFLAT_ARG_TO_CODE(ARG)              (ARG >> 2)
+#define KFLAT_TEST_TO_ARG(CODE, FLAG)	((uint64_t) CODE << 2 | FLAG)
+#define KFLAT_ARG_TO_FLAG(ARG)		(ARG & 0b11)
+#define KFLAT_ARG_TO_CODE(ARG)		(ARG >> 2)
 
 
-#define KFLAT_PROC_ENABLE			_IOW('k', 2, struct kflat_ioctl_enable)
-#define KFLAT_PROC_DISABLE			_IOR('k', 3, struct kflat_ioctl_disable)
-#define KFLAT_TESTS     			_IOW('k', 4, uint64_t)
-#define KFLAT_MEMORY_MAP			_IOR('k', 5, struct kflat_ioctl_mem_map)
+#define KFLAT_PROC_ENABLE		_IOW('k', 2, struct kflat_ioctl_enable)
+#define KFLAT_PROC_DISABLE		_IOR('k', 3, struct kflat_ioctl_disable)
+#define KFLAT_TESTS			_IOW('k', 4, uint64_t)
+#define KFLAT_MEMORY_MAP		_IOR('k', 5, struct kflat_ioctl_mem_map)
 
-#define KFLAT_MMAP_FLATTEN			0
-#define KFLAT_MMAP_KDUMP			1
+#define KFLAT_MMAP_FLATTEN		0
+#define KFLAT_MMAP_KDUMP		1
 
 #endif /* _LINUX_KFLAT_IOCTLS_H */

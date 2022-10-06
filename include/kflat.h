@@ -233,7 +233,7 @@ struct kflat {
 	struct kdump_memory_map 	mem_map;
 	int 						debug_flag;
 	int 						use_stop_machine;
-	int							skip_function_body;
+	int 						skip_function_body;
 };
 
 int kflat_recipe_register(struct kflat_recipe* recipe);
