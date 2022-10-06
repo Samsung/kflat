@@ -15,6 +15,7 @@ struct kflat_ioctl_enable {
     char    target_name[128];
 	int		debug_flag;
 	int 	use_stop_machine;
+	int		skip_function_body;
 };
 
 struct kflat_ioctl_disable {

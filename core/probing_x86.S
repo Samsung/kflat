@@ -61,8 +61,18 @@ SYM_CODE_START(raw_probing_delegate)
     pop %r14;
     pop %r15;
 
+    /* If saved_ip is NULL, set return value (rax) to 0 
+     *  and return to parent function
+     */
+    cmpq $0, %rax;
+    jz  1f
+
     ANNOTATE_RETPOLINE_SAFE;
     jmp    *%rax;            /* Jump back to saved_ip */
+
+1:
+    mov $0, %rax;
+    ret
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(5, 4, 76)
 END(raw_probing_delegate)

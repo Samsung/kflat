@@ -325,7 +325,12 @@ asmlinkage __used uint64_t probing_delegate(struct probe_regs* regs) {
 	kflat_put_current(kflat);
 	probe_priv = NULL;
 
-	pr_info("flatten finished - returning to interrupted function");
+	if(kflat->skip_function_body) {
+		pr_info("flatten finished - returning to PARENT function");
+		return_addr = 0x0;
+	} else
+		pr_info("flatten finished - returning to INTERRUPTED function");
+
 	return return_addr;
 }
 
@@ -378,6 +383,7 @@ static int kflat_ioctl_locked(struct kflat *kflat, unsigned int cmd,
 		kflat->pid = args.enable.pid;
 		kflat->debug_flag = !!args.enable.debug_flag;
 		kflat->use_stop_machine = !!args.enable.use_stop_machine;
+		kflat->skip_function_body = !!args.enable.skip_function_body;
 		args.enable.target_name[sizeof(args.enable.target_name) - 1] = '\0';
 
 #if LINEAR_MEMORY_ALLOCATOR == 0

@@ -86,6 +86,7 @@ interface_handler get_interface_by_name(const char* name) {
 struct args {
     int debug;
     int stop_machine;
+    int skip_function_body;
     const char* output;
     const char* recipe;
     const char* node;
@@ -101,6 +102,7 @@ static struct argp_option options[] = {
     {"output", 'o', "FILE", 0, "Save kflat image to FILE"},
     {"debug", 'd', 0, 0, "Enable debug logs in kflat module"},
     {"stop_machine", 's', 0, 0, "Execute kflat recipe under kernel's stop_machine mode"},
+    {"skip_funcion_body", 'n', 0, 0, "Do not execute target function body after flattening memory"},
     { 0 }
 };
 
@@ -125,6 +127,11 @@ static error_t parse_opt(int key, char* arg, struct argp_state* state) {
         
         case 's':
             options->stop_machine = 1;
+            break;
+
+        case 'n':
+            options->skip_function_body = 1;
+            break;
         
         case ARGP_KEY_ARG:
             if(options->recipe == NULL)
@@ -191,6 +198,7 @@ void kflat_enable(int fd, struct args* opts) {
     enable.pid = getpid();
     enable.debug_flag = opts->debug;
     enable.use_stop_machine = opts->stop_machine;
+    enable.skip_function_body = opts->skip_function_body;
     strncpy(enable.target_name, opts->recipe, sizeof(enable.target_name));
 
     ret = ioctl(fd, KFLAT_PROC_ENABLE, &enable);
