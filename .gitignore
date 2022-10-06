@@ -15,3 +15,5 @@ __pycache__
 tools/executor
 tools/imginfo
 tools/kflattest
+
+recipes/output
