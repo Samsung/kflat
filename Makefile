@@ -4,7 +4,6 @@ PWD := $(shell pwd)
 KDIR ?= $(KERNEL_DIR)
 CCDIR ?= $(CLANG_DIR)
 OPTS ?= $(KFLAT_OPTS)
-KLEE_LIBCXX_INSTALL ?= $(KLEE_LIBCXX_INSTALL)
 
 .DEFAULT_GOAL := default
 
