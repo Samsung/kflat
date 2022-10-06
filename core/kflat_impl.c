@@ -19,6 +19,10 @@
 #include "../../mm/slab.h"
 #endif /* KFLAT_GET_OBJ_SUPPORT */
 
+#ifndef __nocfi
+#define __nocfi
+#endif
+
 
 #define START(node) ((node)->start)
 #define LAST(node)  ((node)->last)
@@ -909,7 +913,7 @@ size_t fixup_fptr_info_count(struct kflat* kflat) {
 		struct fixup_set_node* node = (struct fixup_set_node*)p;
 		if (((unsigned long)node->ptr) & 1) {
 			func_ptr = ((unsigned long)node->ptr) & ~(1ULL);
-			symbol_len = scnprintf(func_symbol, sizeof(func_symbol), "%ps", func_ptr);
+			symbol_len = scnprintf(func_symbol, sizeof(func_symbol), "%ps", (void*) func_ptr);
 
 			count += 2 * sizeof(size_t) + symbol_len;
 		}
@@ -931,7 +935,7 @@ int fixup_set_fptr_info_write(struct kflat* kflat, size_t* wcounter_p) {
 		if (((unsigned long)node->ptr) & 1) {
 			func_ptr = ((unsigned long)node->ptr) & ~(1ULL);
 			orig_ptr = node->inode->storage->index+node->offset;
-			symbol_len = scnprintf(func_symbol, sizeof(func_symbol), "%ps", func_ptr);
+			symbol_len = scnprintf(func_symbol, sizeof(func_symbol), "%ps", (void*) func_ptr);
 
 			FLATTEN_WRITE_ONCE(&orig_ptr, sizeof(size_t), wcounter_p);
 			FLATTEN_WRITE_ONCE(&symbol_len, sizeof(size_t), wcounter_p);
