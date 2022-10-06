@@ -464,7 +464,7 @@ static size_t walk_addr(pgd_t* swapper_pgd, uint64_t addr, struct page** pagep) 
     // Finally, check PTE table for page entry
     ptep = pte_offset_kernel(pmdp, addr);
     pte = READ_ONCE(*ptep);
-    if(!pte_none(pte) && pfn_valid(pte_pfn(pte)))    
+    if(!pte_none(pte) && pte_present(pte) && pfn_valid(pte_pfn(pte)))    
         *pagep = pte_page(pte);
 
     return SIZE_TO_NEXT_PAGE(addr, PAGE);
