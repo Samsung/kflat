@@ -598,7 +598,7 @@ public:
 			size_t ptr_node_offset = ptr-ptr_node->start;
 			*((void**)((char*)node->mptr + node_offset)) = (char*)ptr_node->mptr + ptr_node_offset;
 
-			debug("%lx <- %lx (%lx)\n", fix_loc, ptr, *(unsigned long*)((char*)ptr_node->mptr + ptr_node_offset));
+			debug("%lx <- %lx (%hhx)\n", fix_loc, ptr, *(unsigned char*)((char*)ptr_node->mptr + ptr_node_offset));
 			fix_count++;
 		}
 
