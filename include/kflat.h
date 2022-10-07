@@ -195,6 +195,7 @@ struct kflat_recipe {
 	struct module*      owner;
 	char* 				symbol;
 	void 				(*handler)(struct kflat*, struct probe_regs*);
+	void				(*pre_handler)(struct kflat*);
 };
 
 enum kflat_mode {

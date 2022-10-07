@@ -303,6 +303,9 @@ asmlinkage __used uint64_t probing_delegate(struct probe_regs* regs) {
 
 	flatten_init(kflat);
 
+	if(kflat->recipe->pre_handler)
+		kflat->recipe->pre_handler(kflat);
+
 	// Invoke recipe via stop_machine if user asked for that
 	if(kflat->use_stop_machine)
 		flatten_stop_machine(kflat, regs);

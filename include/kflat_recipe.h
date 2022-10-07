@@ -1,5 +1,6 @@
-#define KFLAT_RECIPE_LIST(...)            static struct kflat_recipe __kflat_recipes_list[] = { __VA_ARGS__ }
-#define KFLAT_RECIPE(SYM, FUNC)         {.owner = THIS_MODULE, .symbol = SYM, .handler= FUNC}
+#define KFLAT_RECIPE_LIST(...)                  static struct kflat_recipe __kflat_recipes_list[] = { __VA_ARGS__ }
+#define KFLAT_RECIPE(SYM, FUNC)                 {.owner = THIS_MODULE, .symbol = SYM, .handler= FUNC}
+#define KFLAT_RECIPE_EX(SYM, FUNC, PRE_FUNC)    {.owner = THIS_MODULE, .symbol = SYM, .handler = FUNC, .pre_handler = PRE_FUNC}
 
 #define KFLAT_RECIPE_MODULE(DESC)       \
     MODULE_DESCRIPTION(DESC);           \
