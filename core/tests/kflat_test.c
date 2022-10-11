@@ -1038,9 +1038,9 @@ static struct string_node* stringset_search(const char* s) {
 
 static int stringset_insert(const char* s) {
 
-	struct string_node* data = libflat_zalloc(1,sizeof(struct string_node));
+	struct string_node* data = kvzalloc(1,sizeof(struct string_node));
 	struct rb_node **new, *parent = 0;
-	data->s = libflat_zalloc(1,strlen(s)+1);
+	data->s = kvzalloc(1,strlen(s)+1);
 	strcpy(data->s,s);
 	new = &(stringset_root.rb_node);
 
@@ -1054,8 +1054,8 @@ static int stringset_insert(const char* s) {
 		else if (strcmp(data->s,this->s)>0)
 			new = &((*new)->rb_right);
 		else {
-		    libflat_free((void*)data->s);
-		    libflat_free(data);
+		    kvfree((void*)data->s);
+		    kvfree(data);
 		    return 0;
 		}
 	}
@@ -1076,8 +1076,8 @@ static void stringset_destroy(struct rb_root* root) {
         struct string_node* data = (struct string_node*)p;
         rb_erase(p, root);
         p = rb_next(p);
-        libflat_free((void*)data->s);
-        libflat_free(data);
+        kvfree((void*)data->s);
+        kvfree(data);
     }
 }
 
@@ -1263,7 +1263,7 @@ static void strset_destroy(struct rb_root* root) {
     	struct myTreeNode* data = container_of(p,struct myTreeNode,snode);
     	rb_erase(p, root);
         p = rb_next(p);
-        libflat_free(data->s);
+        kvfree(data->s);
     }
 }
 
@@ -1287,7 +1287,7 @@ static int kflat_rbnode_test_iter(struct kflat *kflat, int debug_flag) {
 	struct rb_root sroot = RB_ROOT;
 
 	struct myTreeNode tarr[15] = {};
-	for (i=0; i<10; ++i) tarr[i].s = libflat_zalloc(1,4);
+	for (i=0; i<10; ++i) tarr[i].s = kvzalloc(1,4);
 	strcpy(tarr[0].s,"AA0");
 	strcpy(tarr[1].s,"AA5");
 	strcpy(tarr[2].s,"AA9");
@@ -1553,14 +1553,14 @@ static int kflat_stringset_test(struct kflat *kflat, size_t num_strings) {
 	int err = 0;
 
 	for (j=0; j<num_strings; ++j) {
-		char* s = libflat_zalloc(1,sizeof chars);
+		char* s = kvzalloc(1,sizeof chars);
 		for (i=0; i<sizeof chars - 1; ++i) {
 			unsigned char u;
 			get_random_bytes(&u,1);
 			s[i] = chars[u%(sizeof chars - 1)];
 		}
 		stringset_insert(s);
-		libflat_free(s);
+		kvfree(s);
 	}
 
 	flat_infos("String set size: %zu\n",stringset_count(&stringset_root));
@@ -1592,14 +1592,14 @@ static int kflat_stringset_test_iter(struct kflat *kflat, size_t num_strings) {
 	int err = 0;
 
 	for (j=0; j<num_strings; ++j) {
-		char* s = libflat_zalloc(1,sizeof chars);
+		char* s = kvzalloc(1,sizeof chars);
 		for (i=0; i<sizeof chars - 1; ++i) {
 			unsigned char u;
 			get_random_bytes(&u,1);
 			s[i] = chars[u%(sizeof chars - 1)];
 		}
 		stringset_insert(s);
-		libflat_free(s);
+		kvfree(s);
 	}
 
 	flat_infos("String set size: %zu\n",stringset_count(&stringset_root));

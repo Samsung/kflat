@@ -1166,9 +1166,9 @@ EXPORT_SYMBOL_GPL(root_addr_set_search);
 
 int root_addr_set_insert(struct kflat* kflat, const char* name, uintptr_t v) {
 
-	struct root_addr_set_node* data = libflat_zalloc(1,sizeof(struct root_addr_set_node));
+	struct root_addr_set_node* data = kflat_zalloc(kflat, 1, sizeof(struct root_addr_set_node));
 	struct rb_node **new, *parent = 0;
-	data->name = libflat_zalloc(1,strlen(name)+1);
+	data->name = kflat_zalloc(kflat, 1, strlen(name)+1);
 	strcpy(data->name,name);
 	data->root_addr = v;
 	new = &(kflat->root_addr_set.rb_node);
@@ -1183,8 +1183,8 @@ int root_addr_set_insert(struct kflat* kflat, const char* name, uintptr_t v) {
 		else if (strcmp(data->name,this->name)>0)
 			new = &((*new)->rb_right);
 		else {
-			libflat_free((void*)data->name);
-		    libflat_free(data);
+			kflat_free((void*)data->name);
+		    kflat_free(data);
 		    return 0;
 		}
 	}
@@ -1216,8 +1216,8 @@ void root_addr_set_destroy(struct kflat* kflat) {
         struct root_addr_set_node* data = (struct root_addr_set_node*)p;
         rb_erase(p, root);
         p = rb_next(p);
-        libflat_free((void*)data->name);
-        libflat_free(data);
+        kflat_free((void*)data->name);
+        kflat_free(data);
     }
 }
 EXPORT_SYMBOL_GPL(root_addr_set_destroy);
@@ -1290,6 +1290,7 @@ struct flatten_pointer* flatten_plain_type(struct kflat* kflat, const void* _ptr
 	struct flat_node *node;
 	struct flatten_pointer* r = 0;
 	if (!_sz) {
+		flat_errs("flatten_plain_type - zero size memory");
 		return 0;
 	}
 	node = interval_tree_iter_first(&kflat->FLCTRL.imap_root, (uintptr_t)_ptr, (uintptr_t)_ptr+_sz-1);

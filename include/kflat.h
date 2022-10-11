@@ -10,42 +10,18 @@
 #include <linux/slab.h>
 #include <linux/timekeeping.h>
 #include <linux/stop_machine.h>
+#include <linux/time.h>
 
-extern int flatten_base_global_address;
 
-#undef pr_fmt
-#define pr_fmt(fmt) "kflat: " fmt
+/* KFLAT configuration */
+#define LINEAR_MEMORY_ALLOCATOR					1
+#define KFLAT_LINEAR_MEMORY_INITIAL_POOL_SIZE	(256ULL * 1024 * 1024)
+#define DEFAULT_ITER_QUEUE_SIZE					(1024 * 1024 * 8)
+#define KFLAT_PING_TIME_NS						(1 * NSEC_PER_SEC)
+#define KFLAT_MAX_TIME_NS						(8 * NSEC_PER_SEC)
 
-#define kflat_fmt(fmt) 			"kflat: " fmt
-#define flat_errs(fmt,...) 		printk(KERN_ERR kflat_fmt(fmt), ##__VA_ARGS__);
-#define flat_infos(fmt,...) 	printk(KERN_INFO kflat_fmt(fmt), ##__VA_ARGS__);
 
-#define LINEAR_MEMORY_ALLOCATOR	1
-#define KFLAT_LINEAR_MEMORY_INITIAL_POOL_SIZE	(256ULL*1024*1024)
-
-#define DEFAULT_ITER_QUEUE_SIZE (1024*1024*8)
-
-#define TIME_NS	1
-#define TIME_US	(1000*TIME_NS)
-#define TIME_MS	(1000*TIME_US)
-#define TIME_S	(1000*TIME_MS)
-#define KFLAT_PING_TIME_NS	(TIME_S)
-
-#define STR(s) #s
-
-#define GLOBAL_ADDR_OFFSET(addr0,addr1)	\
-	((((unsigned long)addr0>=(unsigned long)addr1)?(1):(-1))*(long)(	\
-		((unsigned long)addr0>=(unsigned long)addr1)?	\
-				((unsigned long)addr0-(unsigned long)addr1):((unsigned long)addr1-(unsigned long)addr0)))
-
-static inline void *libflat_zalloc(size_t size, size_t n) {
-	return kvzalloc(size*n,GFP_KERNEL);
-}
-
-static inline void libflat_free(const void* p) {
-	kvfree(p);
-}
-
+/* Exported structures */
 struct flat_node {
 	struct rb_node rb;
 	uintptr_t start;	/* Start of interval */
@@ -237,67 +213,6 @@ struct kflat {
 	int 						skip_function_body;
 };
 
-int kflat_recipe_register(struct kflat_recipe* recipe);
-int kflat_recipe_unregister(struct kflat_recipe* recipe);
-struct kflat_recipe* kflat_recipe_get(char* name);
-void kflat_recipe_put(struct kflat_recipe* recipe);
-
-static inline void *kflat_zalloc(struct kflat* kflat, size_t size, size_t n) {
-#if LINEAR_MEMORY_ALLOCATOR>0
-	size_t alloc_size = ALIGN(size*n,__alignof__(unsigned long long));
-	void* m = 0;
-	if (unlikely(kflat->mptrindex+alloc_size>kflat->msize)) {
-		static int diag_issued;
-		if (!diag_issued) {
-			flat_errs("Maximum capacity of kflat linear memory allocator (%zu) has been reached at %zu\n",
-					kflat->msize,kflat->mptrindex);
-			diag_issued = 1;
-		}
-		return 0;
-	}
-	m = (unsigned char*)kflat->mpool+kflat->mptrindex;
-	kflat->mptrindex+=alloc_size;
-	return m;
-#else
-	return kvzalloc(size*n,GFP_KERNEL);
-#endif
-}
-
-static inline void kflat_free(const void* p) {
-#if LINEAR_MEMORY_ALLOCATOR>0
-#else
-	kvfree(p);
-#endif
-}
-
-static inline void *kflat_bqueue_zalloc(struct kflat* kflat, size_t size, size_t n) {
-#if LINEAR_MEMORY_ALLOCATOR>0
-	size_t alloc_size = ALIGN(size*n,__alignof__(unsigned long long));
-	void* m = 0;
-	if (unlikely(kflat->bqueue_mptrindex+alloc_size>kflat->bqueue_msize)) {
-		static int diag_issued;
-		if (!diag_issued) {
-			flat_errs("Maximum capacity of kflat bqueue linear memory allocator (%zu) has been reached at %zu\n",
-					kflat->bqueue_msize,kflat->bqueue_mptrindex);
-			diag_issued = 1;
-		}
-		return 0;
-	}
-	m = (unsigned char*)kflat->bqueue_mpool+kflat->bqueue_mptrindex;
-	kflat->bqueue_mptrindex+=alloc_size;
-	return m;
-#else
-	return kvzalloc(size*n,GFP_KERNEL);
-#endif
-}
-
-static inline void kflat_bqueue_free(const void* p) {
-}
-
-static inline void bqueue_release_memory(struct kflat* kflat) {
-	kflat->bqueue_mptrindex = 0;
-}
-
 struct flatten_base {};
 
 typedef struct flatten_pointer* (*flatten_struct_t)(struct kflat* kflat, const void*, size_t n, struct bqueue*);
@@ -305,6 +220,8 @@ typedef struct flatten_pointer* (*flatten_struct_mixed_convert_t)(struct flatten
 
 typedef struct flatten_pointer* (*flatten_struct_iter_f)(struct kflat* kflat, const void* _ptr, struct bqueue* __q);
 typedef struct flatten_pointer* (*flatten_struct_f)(struct kflat* kflat, const void* _ptr);
+
+typedef void (*flatten_interface_arg_f)(struct kflat* kflat, const void* __arg);
 
 struct recipe_node {
 	struct rb_node node;
@@ -319,19 +236,11 @@ struct root_addr_set_node {
 	uintptr_t root_addr;
 };
 
-typedef void (*flatten_interface_arg_f)(struct kflat* kflat, const void* __arg);
-
 struct ifns_node {
 	struct rb_node node;
 	char* s;
 	flatten_interface_arg_f f;
 };
-
-struct root_addr_set_node* root_addr_set_search(struct kflat* kflat, const char* name);
-int root_addr_set_insert(struct kflat* kflat, const char* name, uintptr_t v);
-int root_addr_set_delete(struct kflat* kflat, const char* name);
-void root_addr_set_destroy(struct kflat* kflat);
-size_t root_addr_set_count(struct kflat* kflat);
 
 struct flatten_job {
     struct flat_node* node;
@@ -343,6 +252,25 @@ struct flatten_job {
     const struct flatten_base* fp;
     flatten_struct_mixed_convert_t convert;
 };
+
+enum flatten_option {
+	KFLAT_OPTION_SILENT = 0x01,
+	KFLAT_OPTION_IN_PROGRESS = 0x10,
+};
+
+/* Exported functions */
+int kflat_recipe_register(struct kflat_recipe* recipe);
+int kflat_recipe_unregister(struct kflat_recipe* recipe);
+struct kflat_recipe* kflat_recipe_get(char* name);
+void kflat_recipe_put(struct kflat_recipe* recipe);
+
+
+static inline void kflat_bqueue_free(const void* p) {
+}
+
+static inline void bqueue_release_memory(struct kflat* kflat) {
+	kflat->bqueue_mptrindex = 0;
+}
 
 /* Debug printing functions */
 
@@ -384,7 +312,13 @@ size_t fixup_set_fptr_count(struct kflat* kflat);
 void fixup_set_destroy(struct kflat* kflat);
 int fixup_set_write(struct kflat* kflat, size_t* wcounter_p);
 int fixup_set_fptr_write(struct kflat* kflat, size_t* wcounter_p);
+
 size_t root_addr_count(struct kflat* kflat);
+struct root_addr_set_node* root_addr_set_search(struct kflat* kflat, const char* name);
+int root_addr_set_insert(struct kflat* kflat, const char* name, uintptr_t v);
+int root_addr_set_delete(struct kflat* kflat, const char* name);
+void root_addr_set_destroy(struct kflat* kflat);
+size_t root_addr_set_count(struct kflat* kflat);
 
 int bqueue_init(struct kflat* kflat, struct bqueue* q, size_t block_size);
 void bqueue_destroy(struct bqueue* q);
@@ -393,13 +327,6 @@ size_t bqueue_size(struct bqueue* q);
 int bqueue_push_back(struct kflat* kflat, struct bqueue* q, const void* m, size_t s);
 int bqueue_pop_front(struct bqueue* q, void* m, size_t s);
 
-#define DBGC(b,...)		do { if (b!=0)	__VA_ARGS__; } while(0)
-
-enum flatten_option {
-	KFLAT_OPTION_SILENT = 0x01,
-	KFLAT_OPTION_IN_PROGRESS = 0x10,
-};
-
 void flatten_set_option(struct kflat* kflat, int option);
 void flatten_clear_option(struct kflat* kflat, int option);
 
@@ -407,6 +334,83 @@ extern unsigned long (*kflat_lookup_kallsyms_name)(const char* name);
 bool flatten_get_object(void* ptr, void** start, void** end);
 void* flatten_global_address_by_name(const char* name);
 void* flatten_global_address(const char* module, uint64_t offset);
+
+
+/* Logging */
+#undef pr_fmt
+#define pr_fmt(fmt) "kflat: " fmt
+
+#define kflat_fmt(fmt) 			"kflat: " fmt
+#define flat_errs(fmt,...) 		do { printk_ratelimited(KERN_ERR kflat_fmt(fmt), ##__VA_ARGS__); kflat_dbg_printf(fmt, ##__VA_ARGS__); } while(0)
+#define flat_infos(fmt,...) 	do { printk_ratelimited(KERN_INFO kflat_fmt(fmt), ##__VA_ARGS__); kflat_dbg_printf(fmt, ##__VA_ARGS__); } while(0)
+#define flat_dbg(fmt, ...)		do { if (KFLAT_ACCESSOR->FLCTRL.debug_flag & 1) kflat_dbg_printf(fmt, ##__VA_ARGS__); } while(0)
+
+#define DBGS(M, ...)						flat_dbg(M, ##__VA_ARGS__);
+#define DBGM1(name,a1)						flat_dbg(#name "(" #a1 ")\n")
+#define DBGF(name,F,FMT,P)					flat_dbg(#name "(" #F "[" FMT "])\n",P)
+#define DBGOF(name,F,FMT,P,Q)				flat_dbg(#name "(" #F "[" FMT "])\n",P,Q)
+#define DBGM2(name,a1,a2)					flat_dbg(#name "(" #a1 "," #a2 ")\n")
+#define DBGTF(name,T,F,FMT,P)				flat_dbg(#name "(" #T "," #F "[" FMT "])\n",P)
+#define DBGTNF(name,T,N,F,FMT,P)			flat_dbg(#name "(" #T "," #N "," #F "[" FMT "])\n",P)
+#define DBGTFMF(name,T,F,FMT,P,PF,FF)		flat_dbg(#name "(" #T "," #F "[" FMT "]," #PF "," #FF ")\n",P)
+#define DBGTFOMF(name,T,F,FMT,P,Q,PF,FF) 	flat_dbg(#name "(" #T "," #F "[" FMT "]," #PF "," #FF ")\n",P,Q)
+#define DBGTNFOMF(name,T,N,F,FMT,P,Q,PF,FF) flat_dbg(#name "(" #T "," #N "," #F "[" FMT "]," #PF "," #FF ")\n",P,Q)
+#define DBGTP(name,T,P)						flat_dbg(#name "(" #T "," #P "[%llx])\n", (uint64_t)P)
+#define DBGTNP(name,T,N,P)					flat_dbg(#name "(" #T "," #N "," #P "[%llx])\n", (uint64_t)P)
+#define DBGM3(name,a1,a2,a3)				flat_dbg(#name "(" #a1 "," #a2 "," #a3 ")\n")
+#define DBGM4(name,a1,a2,a3,a4)				flat_dbg(#name "(" #a1 "," #a2 "," #a3 "," #a4 ")\n")
+#define DBGM5(name,a1,a2,a3,a4,a5)			flat_dbg(#name "(" #a1 "," #a2 "," #a3 "," #a4 "," #a5 ")\n")
+#define DBGM6(name,a1,a2,a3,a4,a5, a6)		flat_dbg(#name "(" #a1 "," #a2 "," #a3 "," #a4 "," #a5 "," #a6 ")\n")
+
+/* Memory allocation */
+
+static inline void *kflat_zalloc(struct kflat* kflat, size_t size, size_t n) {
+#if LINEAR_MEMORY_ALLOCATOR > 0
+	size_t alloc_size = ALIGN(size*n,__alignof__(unsigned long long));
+	void* m = 0;
+	if (unlikely(kflat->mptrindex+alloc_size>kflat->msize)) {
+		static int diag_issued;
+		if (!diag_issued) {
+			flat_errs("Maximum capacity of kflat linear memory allocator (%zu) has been reached at %zu\n",
+					kflat->msize,kflat->mptrindex);
+			diag_issued = 1;
+		}
+		return 0;
+	}
+	m = (unsigned char*)kflat->mpool+kflat->mptrindex;
+	kflat->mptrindex+=alloc_size;
+	return m;
+#else
+	return kvzalloc(size*n,GFP_KERNEL);
+#endif
+}
+
+static inline void kflat_free(const void* p) {
+#if LINEAR_MEMORY_ALLOCATOR == 0
+	kvfree(p);
+#endif
+}
+
+static inline void *kflat_bqueue_zalloc(struct kflat* kflat, size_t size, size_t n) {
+#if LINEAR_MEMORY_ALLOCATOR>0
+	size_t alloc_size = ALIGN(size*n,__alignof__(unsigned long long));
+	void* m = 0;
+	if (unlikely(kflat->bqueue_mptrindex+alloc_size>kflat->bqueue_msize)) {
+		static int diag_issued;
+		if (!diag_issued) {
+			flat_errs("Maximum capacity of kflat bqueue linear memory allocator (%zu) has been reached at %zu\n",
+					kflat->bqueue_msize,kflat->bqueue_mptrindex);
+			diag_issued = 1;
+		}
+		return 0;
+	}
+	m = (unsigned char*)kflat->bqueue_mpool+kflat->bqueue_mptrindex;
+	kflat->bqueue_mptrindex+=alloc_size;
+	return m;
+#else
+	return kvzalloc(size*n,GFP_KERNEL);
+#endif
+}
 
 static inline struct flatten_pointer* make_flatten_pointer(struct kflat* kflat, struct flat_node* node, size_t offset) {
 	struct flatten_pointer* v = kflat_zalloc(kflat,sizeof(struct flatten_pointer),1);
@@ -446,22 +450,6 @@ static inline size_t ptrarrmemlen(const void* const* m) {
 		*wcounter_p+=wsize;	\
 } while(0);
 
-#define DBGS(M, ...)					do { if (KFLAT_ACCESSOR->FLCTRL.debug_flag&1) kflat_dbg_printf(M, ##__VA_ARGS__); } while(0)
-#define DBGM1(name,a1)					do { if (KFLAT_ACCESSOR->FLCTRL.debug_flag&1) kflat_dbg_printf(#name "(" #a1 ")\n"); } while(0)
-#define DBGF(name,F,FMT,P)				do { if (KFLAT_ACCESSOR->FLCTRL.debug_flag&1) kflat_dbg_printf(#name "(" #F "[" FMT "])\n",P); } while(0)
-#define DBGOF(name,F,FMT,P,Q)			do { if (KFLAT_ACCESSOR->FLCTRL.debug_flag&1) kflat_dbg_printf(#name "(" #F "[" FMT "])\n",P,Q); } while(0)
-#define DBGM2(name,a1,a2)				do { if (KFLAT_ACCESSOR->FLCTRL.debug_flag&1) kflat_dbg_printf(#name "(" #a1 "," #a2 ")\n"); } while(0)
-#define DBGTF(name,T,F,FMT,P)			do { if (KFLAT_ACCESSOR->FLCTRL.debug_flag&1) kflat_dbg_printf(#name "(" #T "," #F "[" FMT "])\n",P); } while(0)
-#define DBGTNF(name,T,N,F,FMT,P)		do { if (KFLAT_ACCESSOR->FLCTRL.debug_flag&1) kflat_dbg_printf(#name "(" #T "," #N "," #F "[" FMT "])\n",P); } while(0)
-#define DBGTFMF(name,T,F,FMT,P,PF,FF)	do { if (KFLAT_ACCESSOR->FLCTRL.debug_flag&1) kflat_dbg_printf(#name "(" #T "," #F "[" FMT "]," #PF "," #FF ")\n",P); } while(0)
-#define DBGTFOMF(name,T,F,FMT,P,Q,PF,FF) do { if (KFLAT_ACCESSOR->FLCTRL.debug_flag&1) kflat_dbg_printf(#name "(" #T "," #F "[" FMT "]," #PF "," #FF ")\n",P,Q); } while(0)
-#define DBGTNFOMF(name,T,N,F,FMT,P,Q,PF,FF) do { if (KFLAT_ACCESSOR->FLCTRL.debug_flag&1) kflat_dbg_printf(#name "(" #T "," #N "," #F "[" FMT "]," #PF "," #FF ")\n",P,Q); } while(0)
-#define DBGTP(name,T,P)					do { if (KFLAT_ACCESSOR->FLCTRL.debug_flag&1) kflat_dbg_printf(#name "(" #T "," #P "[%llx])\n", (uint64_t)P); } while(0)
-#define DBGTNP(name,T,N,P)				do { if (KFLAT_ACCESSOR->FLCTRL.debug_flag&1) kflat_dbg_printf(#name "(" #T "," #N "," #P "[%llx])\n", (uint64_t)P); } while(0)
-#define DBGM3(name,a1,a2,a3)			do { if (KFLAT_ACCESSOR->FLCTRL.debug_flag&1) kflat_dbg_printf(#name "(" #a1 "," #a2 "," #a3 ")\n"); } while(0)
-#define DBGM4(name,a1,a2,a3,a4)			do { if (KFLAT_ACCESSOR->FLCTRL.debug_flag&1) kflat_dbg_printf(#name "(" #a1 "," #a2 "," #a3 "," #a4 ")\n"); } while(0)
-#define DBGM5(name,a1,a2,a3,a4,a5)		do { if (KFLAT_ACCESSOR->FLCTRL.debug_flag&1) kflat_dbg_printf(#name "(" #a1 "," #a2 "," #a3 "," #a4 "," #a5 ")\n"); } while(0)
-#define DBGM6(name,a1,a2,a3,a4,a5, a6)	do { if (KFLAT_ACCESSOR->FLCTRL.debug_flag&1) kflat_dbg_printf(#name "(" #a1 "," #a2 "," #a3 "," #a4 "," #a5 "," #a6 ")\n"); } while(0)
 
 #define ATTR(f)	((_ptr)->f)
 #define OFFATTR(T,_off)	(*((T*)((unsigned char*)(_ptr)+_off)))
@@ -472,8 +460,6 @@ static inline size_t ptrarrmemlen(const void* const* m) {
 	q;	\
 }))
 #define OFFADDR(T,_off)	((T*)((unsigned char*)(_ptr)+_off))
-
-#define ADDR_VALID(PTR)				(kdump_test_address((void*) PTR, 1))
 
 static __used bool _addr_range_valid(void* ptr, size_t size) {
 	size_t avail_size;
@@ -489,9 +475,9 @@ static __used bool _addr_range_valid(void* ptr, size_t size) {
 	return false;
 }
 
+#define ADDR_VALID(PTR)				(kdump_test_address((void*) PTR, 1))
 #define ADDR_RANGE_VALID(PTR, SIZE) (_addr_range_valid((void*) PTR, SIZE))
-// TODO: Consider checking +x permission
-#define TEXT_ADDR_VALID(PTR)		ADDR_VALID(PTR)
+#define TEXT_ADDR_VALID(PTR)		ADDR_VALID(PTR)		// TODO: Consider checking +x permission
 
 #define STRUCT_ALIGN(n)		do { _alignment=n; } while(0)
 
@@ -4726,15 +4712,20 @@ FUNCTION_DEFINE_FLATTEN_STRUCT_TYPE_ARRAY_ITER_SELF_CONTAINED(FLTYPE,FLSIZE)
 				DBGS("UNDER_ITER_HARNESS: recipes done: %lu, elapsed: %lld\n",__n,__now-__inittime);	\
 				if (__now-__inittime>KFLAT_PING_TIME_NS) {	\
 					__total_time+=__now-__inittime;	\
+					if (__total_time > KFLAT_MAX_TIME_NS) {	\
+						flat_errs("Timeout! Total time %lld [ms] exceeds maximum allowed %lld [ms]", __total_time, KFLAT_MAX_TIME_NS);	\
+						KFLAT_ACCESSOR->errno = EAGAIN;	\
+						break;	\
+					}	\
 					flat_infos("Still working! done %lu recipes in total time %lld [ms], memory used: %zu, memory avail: %zu \n",	\
-						__n,__total_time/TIME_MS,KFLAT_ACCESSOR->mptrindex,KFLAT_ACCESSOR->msize);	\
+						__n,__total_time/NSEC_PER_MSEC,KFLAT_ACCESSOR->mptrindex,KFLAT_ACCESSOR->msize);	\
 					__inittime = ktime_get();	\
 				}	\
 			}	\
 			__end = ktime_get();	\
 			__total_time+=__end-__inittime;	\
 			flat_infos("Done working with %lu recipes in total time %lld [ms], memory used: %zu, memory avail: %zu \n",	\
-				__n,__total_time/TIME_MS,KFLAT_ACCESSOR->mptrindex,KFLAT_ACCESSOR->msize);	\
+				__n,__total_time/NSEC_PER_MSEC,KFLAT_ACCESSOR->mptrindex,KFLAT_ACCESSOR->msize);	\
 			bqueue_destroy(&bq);	\
 			bqueue_release_memory(KFLAT_ACCESSOR);	\
 		} while(0)
