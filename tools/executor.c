@@ -168,6 +168,54 @@ void setup_sigalarm(void) {
         log_abort("Failed to set SIGALRM handler with sigaction - %s", strerror(errno));
 }
 
+/*******************************************************
+ * PERFORMANCE IMPROVEMENTS
+ *******************************************************/
+static char active_governor[128];
+
+int governor_save_current(void) {
+    int fd = open("/sys/devices/system/cpu/cpu0/cpufreq/scaling_governor", O_RDONLY);
+    if(fd < 0)
+        goto error;
+
+    int ret = read(fd, active_governor, sizeof(active_governor) - 1);
+    if(ret < 0) 
+        goto error;
+    return 0;
+
+error:
+    log_error("Failed to read current active CPU governor - %s", strerror(errno));
+    return -1;
+}
+
+void governor_restore(void) {
+    int fd = open("/sys/devices/system/cpu/cpu0/cpufreq/scaling_governor", O_RDWR);
+    if(fd < 0)
+        goto error;
+
+    int ret = write(fd, active_governor, sizeof(active_governor) - 1);
+    if(ret < 0) 
+        goto error;
+    return;
+
+error:
+    log_error("Failed to restore original CPU governor - %s", strerror(errno));
+}
+
+int governor_set(const char* name) {
+    int fd = open("/sys/devices/system/cpu/cpu0/cpufreq/scaling_governor", O_RDWR);
+    if(fd < 0)
+        goto error;
+
+    int ret = write(fd, name, strlen(name));
+    if(ret < 0) 
+        goto error;
+    return 0;
+
+error:
+    log_error("Failed to set CPU governor to '%s' - %s", name, strerror(errno));
+    return -1;
+}
 
 /*******************************************************
  * MAIN ROUTINE
@@ -317,6 +365,12 @@ int main(int argc, char** argv, char** envp) {
         log_abort("Failed to mmap area memory - %s", strerror(errno));
     log_info("Maped Kflat area memory @ %p", area);
 
+    /*
+     * Setup CPU frequency scalling for optimal results
+     */
+    governor_save_current();
+    governor_set("performance");
+    atexit(governor_restore);
 
     kflat_enable(fd, &opts);
     setup_sigalarm();
