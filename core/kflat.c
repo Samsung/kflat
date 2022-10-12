@@ -9,6 +9,7 @@
 #include "probing.h"
 
 #include <linux/atomic.h>
+#include <linux/cpumask.h>
 #include <linux/debugfs.h>
 #include <linux/fs.h>
 #include <linux/module.h>
@@ -262,13 +263,17 @@ static int _stop_machine_func(void* arg) {
 
 static int flatten_stop_machine(struct kflat* kflat, struct probe_regs* regs) {
 	int err;
+	cpumask_t cpumask;
 	struct stopm_args arg = {
 			.kflat = kflat,
 			.regs = regs,
 			.handler = kflat->recipe->handler
 	};
 
-	err = stop_machine(_stop_machine_func, (void*) &arg, NULL);
+	cpumask_clear(&cpumask);
+	cpumask_set_cpu(0, &cpumask);
+
+	err = stop_machine(_stop_machine_func, (void*) &arg, &cpumask);
 	if(err)
 		pr_err("@Flatten stop_machine failed: %d", err);
 	return err;
