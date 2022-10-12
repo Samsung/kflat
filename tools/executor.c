@@ -253,6 +253,14 @@ size_t kflat_disable(int fd, size_t dump_size) {
         log_abort("Failed to IOCTL KFLAT_PROC_DISABLE - %d:%s", errno, strerror(errno));
     log_info("Disabled kflat capture mode (IOCTL KFLAT_PROC_DISABLE)");
 
+    if(disable.error) {
+        log_error("");
+        log_error("[KFLAT internal error]");
+        log_error(" KFLAT flattening engine reported an error while processing selected recipe");
+        log_error("");
+        log_abort("KFLAT failed with an error: %d [%s]", disable.error, strerror(disable.error));
+    }
+
     if(!disable.invoked) {
         log_error("");
         log_error("[Recipe was not invoked]");
@@ -260,14 +268,6 @@ size_t kflat_disable(int fd, size_t dump_size) {
         log_error(" correct operation and device are selected");
         log_error("");
         log_abort("Recipe was not invoked");
-    }
-
-    if(disable.error) {
-        log_error("");
-        log_error("[KFLAT internal error]");
-        log_error(" KFLAT flattening engine reported an error while processing selected recipe");
-        log_error("");
-        log_abort("KFLAT failed with an error: %d", disable.error);
     }
 
     log_info("Recipe produced %zu bytes of flattened memory", disable.size);
