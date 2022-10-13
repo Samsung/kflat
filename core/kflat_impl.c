@@ -1565,6 +1565,7 @@ int flatten_fini(struct kflat* kflat) {
     	kflat_free(p);
     }
     interval_tree_destroy(kflat,&kflat->FLCTRL.imap_root.rb_root);
+	root_addr_set_destroy(kflat);
 #if LINEAR_MEMORY_ALLOCATOR
     kvfree(kflat->mpool);
     kflat->mptrindex = 0;
@@ -1573,7 +1574,6 @@ int flatten_fini(struct kflat* kflat) {
     kflat->bqueue_mptrindex = 0;
     kflat->bqueue_msize = 0;
 #endif
-    root_addr_set_destroy(kflat);
     return 0;
 }
 EXPORT_SYMBOL_GPL(flatten_fini);
