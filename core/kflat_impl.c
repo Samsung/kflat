@@ -273,7 +273,7 @@ void binary_stream_update_pointers(struct kflat* kflat) {
     	struct fixup_set_node* node = (struct fixup_set_node*)p;
     	if ((node->ptr)&&(!(((unsigned long)node->ptr)&1))) {
 			void* newptr = (unsigned char*)node->ptr->node->storage->index+node->ptr->offset;
-			kflat_dbg_printf("@ ptr update at ((%lx)%lx:%zu) : %lx => %lx\n",(unsigned long)node->inode,(unsigned long)node->inode->start,node->offset,
+			DBGS("@ ptr update at ((%lx)%lx:%zu) : %lx => %lx\n",(unsigned long)node->inode,(unsigned long)node->inode->start,node->offset,
 					(unsigned long)newptr,(unsigned long)(((unsigned char*)node->inode->storage->data)+node->offset));
 			size_to_cpy = sizeof(void*);
 			__storage = node->inode->storage;
