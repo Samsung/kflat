@@ -46,21 +46,11 @@ Once `kflat` module has been successfully loaded into kernel, you might test it 
 # List all available tests
 ./kflattest -l
 
-# Run test CIRCLE and save its output to directory `output`
-./kflattest -o output CIRCLE
+# Run test SIMPLE and save its output to directory `output`
+./kflattest -o output SIMPLE
 ```
 
-
-
-
-
-// TODO: Reqrite it
-Let's start with the tests. `kflat` test suite can be found [here](https://github.com/Samsung/kflat/blob/912e4baa243ee505aaac8e83a5eaa52c4a515929/core/tests/kflat_test.c#L1733). There's also a handy tool to setup and run `kflat` tests for us on the device:
-```bash
-adb push tools/kflattest /data/local/tmp
-```
-
-Let's start with a simple [test](https://github.com/Samsung/kflat/blob/912e4baa243ee505aaac8e83a5eaa52c4a515929/core/tests/kflat_test.c#L44):
+Let's take a look at a `SIMPLE` test [test](https://github.com/Samsung/kflat/blob/912e4baa243ee505aaac8e83a5eaa52c4a515929/core/tests/kflat_test.c#L44):
 ```c
 struct B {
 	unsigned char T[4];
@@ -105,22 +95,22 @@ static int kflat_simple_test(struct kflat *kflat) {
 Here we have a `struct A` member which points to another `struct B` object. In order to be able to flatten a structure we have to use `FUNCTION_DEFINE_FLATTEN_STRUCT` macro. This actually creates a function responsible for saving memory image for a given structure object (in case of `struct A` the created function is called `flatten_struct_A`). If structure contains any pointers and we want to include the memory it points to in the final memory image we have to add additional recipe which tells the engine what kind of pointer it is. In our case we have a pointer to another structure therefore we use `AGGREGATE_FLATTEN_STRUCT` recipe. Later we have to point out where the flattening process should start, i.e. we have to use some existing pointer as a root (`FOR_ROOT_POINTER macro`) of the memory image (after the memory is de-serialized we will access the memory image using the same pointer).
 
 Execute the test:
-```bash
-adb shell /data/local/tmp/kflattest -o /data/local/tmp SIMPLE
+```sh
+./tools/kflattest -o out SIMPLE
 ```
 
 You should see something like:
 ```
-[+][  0.000] main      | will be using /data/local/tmp as output directory
+[+][  0.000] main      | will be using out as output directory
 [+][  0.000] run_test  | starting test SIMPLE...
 [+][  0.084] run_test  | recipe produced 156 bytes of flattened memory
-[+][  0.084] run_test  |          saved flatten image to file /data/local/tmp/flat_SIMPLE.img
+[+][  0.084] run_test  |          saved flatten image to file out/flat_SIMPLE.img
 [+][  0.084] run_test  |         Test #5 - SUCCESS
 ```
 
 Now get back to your `kflat` source directory and check the `kflat` verification suite available [here](https://github.com/Samsung/kflat/blob/912e4baa243ee505aaac8e83a5eaa52c4a515929/tools/imginfo.cpp#L379). It reads the image retrieved from the kernel, establishes the image in the process memory and verifies its correctness. It accepts a test name as a parameter. For our simple test this would be:
 ```bash
-adb pull /data/local/tmp/flat_SIMPLE.img && ./tools/imginfo flat_SIMPLE.img SIMPLE
+./tools/imginfo out/flat_SIMPLE.img SIMPLE
 ```
 
 The verification code for our simple case is as follows:
@@ -135,7 +125,7 @@ printf("sizeof(struct A): %zu\n", sizeof(struct A));
 					pA->pB->T[2], pA->pB->T[3]);
 ```
 
-After executing it:
+After executing it we end up with the below output:
 ```
 sizeof(struct A): 16
 sizeof(struct B): 4
@@ -143,11 +133,78 @@ pA->X: 000000000000404f
 pA->pB->T: [41424300]
 ```
 
-Now stop and ponder for a while what actually happened here. We've had around 20 bytes of memory in the running Linux kernel (additionally part of this memory was a pointer to other place in this memory). We were able to save the memory contents to a file and read it back on different machine, different running Linux version and different process, fix the memory so the embedded pointer points to proper location and verify the memory contents as appropriate.
+Now stop and ponder for a while what actually happened here. We've had around 20 bytes of memory in the running Linux kernel (additionally part of this memory was a pointer to other place in this memory). We were able to save the memory contents to a file and read it back on different machine, different running Linux version and different process, fix the memory so the embedded pointer points to proper location and verify the memory contents as appropriate. Isn't it awesome?
 
+You can check out the rest of the tests embedded into Kflat to find out about different other features supported by Kflat.
 
 ## Creating custom recipe
+Testing is good, but our ultimate goal is to dump some useful data from running kernel. To do this we're gonna need to write a special module telling Kflat what and when to dump and what's the layout of flattened memory - so called Kflat recipe. Let's start by creating a new directory `TODO` in `recipes/` directory.
+
+```c
+#include <linux/module.h>
+#include <linux/interval_tree_generic.h>
+
+#include "kflat.h"
+#include "kflat_recipe.h"
+
+
+// Declare recipes for required data_types
+FUNCTION_DEFINE_FLATTEN_STRUCT(priv_data,
+	// ...
+);
+
+// Recipe entry point
+static void handler(struct kflat* kflat, struct probe_regs* regs) {
+    struct priv_data* priv = (void*) regs->arg1;
+
+    // Dump structure
+    FOR_ROOT_POINTER(priv,
+        FLATTEN_STRUCT(priv_data, priv);
+    );
+}
+
+// Declaration of instrumented functions
+KFLAT_RECIPE_LIST(
+    KFLAT_RECIPE("<function_name, ex. random_read>", handler)
+);
+KFLAT_RECIPE_MODULE("First custom Kflat recipe");
+```
+
+Create Kbuild file describing how to build recipe:
+
+```make
+obj-m += your-c-file-1.o your-c-file-2.o
+EXTRA_CFLAGS := -I${PWD}/include/
+```
+
+and add module to top-level Kbuild config:
+
+```diff
+  obj-m += random_read/
++ obj-m += TODO/
+```
+
+Finally, run `make` command in the root directory of this project to generate file `todo_recipe.ko`.
 
 ## Executing recipe
+Once our custom recipe has been built successfully, we can load it into the running kernel with insmod command:
+
+```sh
+insmod recipes/TODO/TODO.ko
+```
+
+Finally, to dump kernel memory we need to arm Kflat module and execute targeted syscall. This can be easily achived with `./tools/executor` app. Simply invoke:
+```sh
+./tools/executor -n -s -o memory.kflat -i READ TODO path_todo
+```
+
+The meaning of program arguments is:
+- `-n` instructs Kflat to not invoke targetted function (therefore making it safe to do things like `write` on `/dev/sda`),
+- `-s` invokes flattening under stop_machine kernel function to avoid data-races
+- `-o memory.kflat` specifies the output file
+- `-i READ` selects syscall to invoke (ex. `READ`, `WRITE`, `IOCTL`)
+- `TODO` is the ID of recipe compiled in previous step
+- `path_todo` is a path to the device on which syscall will be invoked
 
 ## What's next?
+Since we already knew how to write custom recipes and execute them on target OS, next step would be to use Unflatten library (in `lib/` dir) to load generated memory dumps and use them for whatever you might need!
