@@ -19,6 +19,15 @@ FUNCTION_DEFINE_FLATTEN_STRUCT(priv_data,
 	// ...
 );
 
+// Declare pointers for global variables
+void* some_global_var;
+
+// Create optional pre_handler responsible for extracting pointers to
+//  global variables from kallsyms
+static void pre_handler(struct kflat* kflat) {
+    some_global_var = flatten_global_address_by_name("global_variable_name");
+}
+
 // Create base handler that will be invoked in instrumented function
 //  flatten_init, flatten_write and flatten_fini were/will be invoked by
 //  kflat core module, so they shouldn't be added here.
@@ -30,12 +39,19 @@ static void handler(struct kflat* kflat, struct probe_regs* regs) {
     FOR_ROOT_POINTER(priv,
         FLATTEN_STRUCT(priv_data, priv);
     );
+
+    // Dump global variable
+    if(some_global_var != NULL) {
+        FOR_EXTENDED_ROOT_POINTER(some_global_var, "global_variable_name", 32,
+			FLATTEN_STRUCT(global_type, some_global_var);
+		);
+    }
 }
 
 // Declaration of instrumented functions
 //  For each func assign handler. Function name is also the ID of recipe
 KFLAT_RECIPE_LIST(
-    KFLAT_RECIPE("<function_name, ex. random_read>", handler),
+    KFLAT_RECIPE_EX("<function_name, ex. random_read>", handler, pre_handler),
     // ... More if needed
 );
 KFLAT_RECIPE_MODULE("<Description of your module>");
