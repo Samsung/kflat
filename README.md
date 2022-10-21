@@ -26,6 +26,10 @@ export CLANG_DIR="<path to clang directory>"
 make KDIR=$KERNEL_DIR CCDIR=$CLANG_DIR ARCH=x86_64
 ```
 
+There are some extra build parameters than can be set to additional options:
+- `KFLAT_OPTS` - enable extra/testing features in kflat_core module, like `KFLAT_GET_OBJ_SUPPORT`,
+- `KLEE_LIBCXX_INSTALL` - if you wish to build kflat library with support for KLEE symbolic execution engine, specify here the path to libc++ library built for KLEE.
+
 ## Project layout
 
 Project directory presents as follow:
@@ -33,6 +37,7 @@ Project directory presents as follow:
 .
 ├── core            // Main implementation of kflat module
 │   └── tests       // Unit-tests
+├── doc             // Project documentation
 ├── include         // Shared include files
 ├── lib             // Userspace library for unflattening images
 │   └── include
@@ -43,6 +48,8 @@ Project directory presents as follow:
 ```
 
 ## How to use it?
+
+Below you can find general instruction for using kflat kernel module. For more detailed information head out to markdown files in `doc/` directory.
 
 ### Load kernel modules
 The first step is to upload compiled kernel modules to your target machine. Built modules are located in: `core/kflat_core.ko` and `recipes/*/*.ko` files. To load copied files into the kernel, use `insmod` command:
@@ -128,59 +135,3 @@ int main(int argc, char** argv) {
 
 Refer to README file in `lib/` directory for details regarding API reference and C bindings usage.
 
-## Kernel API
-
-Upon loading, kflat creates a new file on debugfs `/sys/kernel/debug/kflat`, which enables user to interact with loaded module. Allowed file operations on that node are `mmap` and `ioctl`.
-
-### IOCTL commands
-
-Kflat ioctl handlers supports the following commands:
-
-| Command | Details |
-| -- | -- |
-| KFLAT_PROC_ENABLE | Enables selected recipe for process with provided PID |
-| KFLAT_PROC_DISABLE | Disables recipe for process with provided PID |
-| KFLAT_TESTS | Runs selected kflat unit test |
-| KFLAT_MEMORY_MAP | Dumps current kernel memory layout |
-
-Currently, only one recipe can be enabled per one process at the same time. Also, recipes works in single fire mode only - after dumping kflat image, you need to reenable recipe to use it again in the same process.
-
-Example usage of the above commands can be found in `tools/` directory.
-
-### Mmap commands
-
-Kflat mmap handler supports two modes selectable by the value of `offset` argument.
-| Offset | Details |
-| -- | -- |
-| KFLAT_MMAP_FLATTEN _(0)_ | Mmaped memory will contain flattened image of selected structure |
-| KFLAT_MMAP_KDUMP _(1)_ | Mmaped memory will be exposing whole kernel-space memory stored in RAM. This feature can be used to conveniently dump kernel memory on devices with `/dev/kmem` disabled. |
-| _Other_ | Device will return `-EINVAL` | 
-
-### Example use of kernel API
-
-The simplified flow of dumping kernel memory with kflat looks as follow:
-
-```c
-sizet_t mem_size = 1_MB;        // Max. size of dumped image
-fd = open("/sys/kernel/debug/kflat", O_RDONLY);
-
-mem = mmap(NULL, mem_size, PROT_READ, MAP_PRIVATE, fd, KFLAT_MMAP_FLATTEN);
-
-struct kflat_ioctl_enable enable = {
-    .pid = getpid(),
-    .debug_flag = 1,    // Whether to output debug logs to dmesg
-};
-strcpy(enable.target_name, "target_recipe");
-ioctl(fd, KFLAT_PROC_ENABLE, &enable);
-
-// Invoke target function
-// for instance: fd = open(TARGET_NODE, O_RDONLY); read(fd, buf, sizeof buf);
-//  [...]
-
-ioctl(fd, KFLAT_PROC_DISABLE, 0);
-
-// The flattened image is in `mem` array
-// [...]
-
-munmap(area, init.size);
-```
