@@ -1,6 +1,11 @@
-# kflat
+# Startup guide (Android)
 
-is a Linux kernel implementation of the library for fast serialization of C structures. It works by making a copy of the process memory for indicated variables and structures. First `kflat` implementation was prepared for the Android kernel emulator and tested thereof. To show examples of `kflat` operation first thing to do is to setup the proper Linux development environment. We would need full AOSP source code together with the Linux kernel to compile and test the `kflat` module on the emulator. Start with defining your source directories:
+First `kflat` implementation was prepared for the Android kernel emulator and tested thereof. To show examples of `kflat` operation first thing to do is to setup the proper Linux development environment. We would need full AOSP source code together with the Linux kernel to compile and test the `kflat` module on the emulator. 
+
+
+## Prerequisites
+### Downloading Android and setting up emulator
+Start with defining your source directories:
 
 ```bash
 export ROOT_DIR=<your_source_root_directory>
@@ -17,7 +22,7 @@ repo init -u https://android.googlesource.com/platform/manifest -b android-12.0.
 repo sync -j32
 ```
 
-If you don't have `repo` you might want to download the lanucher from [here](https://source.android.com/setup/develop#installing-repo).
+If you don't have `repo` you might want to download the launcher from [here](https://source.android.com/setup/develop#installing-repo).
 
 Next download Linux kernel sources for the emulator:
 ```bash
@@ -72,16 +77,28 @@ m
 And run the emulator with the images we've just built:
 ```bash
 export LD_LIBRARY_PATH=${SDK_DIR}/emulator/lib64:${SDK_DIR}/emulator/lib64/gles_swiftshader:${SDK_DIR}/emulator/lib64/gles_angle:${SDK_DIR}/emulator/lib64/gles_angle9:${SDK_DIR}/emulator/lib64/gles_angle11:${SDK_DIR}/emulator/lib64/libstdc++:${SDK_DIR}/emulator/lib64/qt/lib
-${SDK_DIR}/emulator/qemu/linux-x86_64/qemu-system-x86_64-headless -netdelay none -netspeed full -verbose -show-kernel -no-snapshot -kernel ${KERNEL_DIR}/kernel/arch/x86/boot/bzImage -data ${ANDROID_DIR}/out/target/product/emulator64_x86_64/userdata.img -ramdisk ${ANDROID_DIR}/out/target/product/emulator64_x86_64/ramdisk-qemu.img -system ${ANDROID_DIR}/out/target/product/emulator64_x86_64/system-qemu.img -vendor ${ANDROID_DIR}/out/target/product/emulator64_x86_64/vendor-qemu.img -sysdir ${ANDROID_DIR}/out/target/product/emulator64_x86_64 -memory 16384
+${SDK_DIR}/emulator/qemu/linux-x86_64/qemu-system-x86_64-headless \
+        -netdelay none -netspeed full \
+        -verbose \
+        -show-kernel \
+        -no-snapshot \
+        -kernel ${KERNEL_DIR}/kernel/arch/x86/boot/bzImage \
+        -data ${ANDROID_DIR}/out/target/product/emulator64_x86_64/userdata.img \
+        -ramdisk ${ANDROID_DIR}/out/target/product/emulator64_x86_64/ramdisk-qemu.img \
+        -system ${ANDROID_DIR}/out/target/product/emulator64_x86_64/system-qemu.img \
+        -vendor ${ANDROID_DIR}/out/target/product/emulator64_x86_64/vendor-qemu.img \
+        -sysdir ${ANDROID_DIR}/out/target/product/emulator64_x86_64 \
+        -memory 16384
 ```
 The above command will run the emulator without the GUI support (we don't need that for testing purposes, just having working adb will suffice). To run the kernel latest emulator is needed (it was tested on the 30.9.5.0 version of the emulator). On older emulator releases it tends to restart init services without properly setup adb connection.
 
+### Building KFLAT
 Now open new window and clone the `kflat` sources:
 ```bash
-git clone https://github.com/Samsung/kflat.git && cd kflat
+git clone https://github.com/samsung/kflat.git && cd kflat
 ```
 
-and build for the `x86_64` architecture:
+and build it for the `x86_64` architecture:
 ```bash
 export CLANG_DIR=${ANDROID_DIR}/prebuilts/clang/host/linux-x86/clang-r416183b
 make KDIR=${KERNEL_DIR}/kernel ARCH=x86_64 CCDIR=$CLANG_DIR
@@ -89,15 +106,18 @@ make KDIR=${KERNEL_DIR}/kernel ARCH=x86_64 CCDIR=$CLANG_DIR
 
 Now you're ready to rock'n'roll. 
 
+## Running KFLAT tests
 `kflat` exposes `/sys/kernel/debug/kflat` node in the debugfs to control flattening operation. First make sure `debugfs` is properly mounted (starting from Android 11 it is not enabled by default even in engineering builds):
 ```bash
 export PATH=$SDK_DIR/platform-tools:$PATH
-if [ -z "$(adb shell ls -A /sys/kernel/debug)" ]; then adb shell mount -t debugfs none /sys/kernel/debug; else :; fi
-````
+adb shell mount -t debugfs none /sys/kernel/debug
+```
 
 The `kflat` module needs to be loaded on to the device where we operate:
 ```bash
-adb shell mkdir -p /data/local/tmp && adb push core/kflat_core.ko /data/local/tmp && adb shell insmod /data/local/tmp/kflat_core.ko
+adb shell mkdir -p /data/local/tmp
+adb push core/kflat_core.ko /data/local/tmp 
+adb shell insmod /data/local/tmp/kflat_core.ko
 ```
 
 When this operation succeeds you should see the `kflat` node in the `sysfs`:
