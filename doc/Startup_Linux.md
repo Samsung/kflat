@@ -138,7 +138,7 @@ Now stop and ponder for a while what actually happened here. We've had around 20
 You can check out the rest of the tests embedded into Kflat to find out about different other features supported by Kflat.
 
 ## Creating custom recipe
-Testing is good, but our ultimate goal is to dump some useful data from running kernel. To do this we're gonna need to write a special module telling Kflat what and when to dump and what's the layout of flattened memory - so called Kflat recipe. Let's start by creating a new directory `TODO` in `recipes/` directory.
+Testing is good, but our ultimate goal is to dump some useful data from running kernel. To do this we're gonna need to write a special module telling Kflat what and when to dump and what's the layout of flattened memory - so called Kflat recipe. For the purpose of this manual, let's create a flattening recipe for for function `rfkill_fop_write`. The first step is to create directory `rfkill_write` in `recipes/` and file `rfkill_write.c` in there:
 
 ```c
 #include <linux/module.h>
@@ -147,33 +147,33 @@ Testing is good, but our ultimate goal is to dump some useful data from running 
 #include "kflat.h"
 #include "kflat_recipe.h"
 
+// TODO: Copy here the definition of structure rfkill_data
 
 // Declare recipes for required data_types
-FUNCTION_DEFINE_FLATTEN_STRUCT(priv_data,
-	// ...
+FUNCTION_DEFINE_FLATTEN_STRUCT(rfkill_data,
 );
 
 // Recipe entry point
 static void handler(struct kflat* kflat, struct probe_regs* regs) {
-    struct priv_data* priv = (void*) regs->arg1;
+    struct rfkill_data* priv = (void*) regs->arg1;
 
     // Dump structure
-    FOR_ROOT_POINTER(priv,
-        FLATTEN_STRUCT(priv_data, priv);
+    FOR_ROOT_POINTER(rfkill_data,
+        FLATTEN_STRUCT(rfkill_data, priv);
     );
 }
 
 // Declaration of instrumented functions
 KFLAT_RECIPE_LIST(
-    KFLAT_RECIPE("<function_name, ex. random_read>", handler)
+    KFLAT_RECIPE("rfkill_fop_write", handler)
 );
-KFLAT_RECIPE_MODULE("First custom Kflat recipe");
+KFLAT_RECIPE_MODULE("KFlat recipe for func rfkill_fop_write");
 ```
 
-Create Kbuild file describing how to build recipe:
+Next, create Kbuild file describing how to build recipe:
 
 ```make
-obj-m += your-c-file-1.o your-c-file-2.o
+obj-m += rfkill_write.o
 EXTRA_CFLAGS := -I${PWD}/include/
 ```
 
@@ -181,30 +181,30 @@ and add module to top-level Kbuild config:
 
 ```diff
   obj-m += random_read/
-+ obj-m += TODO/
++ obj-m += rfkill_write/
 ```
 
-Finally, run `make` command in the root directory of this project to generate file `todo_recipe.ko`.
+Finally, run `make` command in the root directory of this project to generate file `rfkill_write.ko`.
 
 ## Executing recipe
 Once our custom recipe has been built successfully, we can load it into the running kernel with insmod command:
 
 ```sh
-insmod recipes/TODO/TODO.ko
+insmod recipes/rfkill_write/rfkill_write.ko
 ```
 
 Finally, to dump kernel memory we need to arm Kflat module and execute targeted syscall. This can be easily achived with `./tools/executor` app. Simply invoke:
 ```sh
-./tools/executor -n -s -o memory.kflat -i READ TODO path_todo
+./tools/executor -n -s -o memory.kflat -i WRITE rfkill_write /dev/rfkill
 ```
 
 The meaning of program arguments is:
 - `-n` instructs Kflat to not invoke targetted function (therefore making it safe to do things like `write` on `/dev/sda`),
 - `-s` invokes flattening under stop_machine kernel function to avoid data-races
 - `-o memory.kflat` specifies the output file
-- `-i READ` selects syscall to invoke (ex. `READ`, `WRITE`, `IOCTL`)
-- `TODO` is the ID of recipe compiled in previous step
-- `path_todo` is a path to the device on which syscall will be invoked
+- `-i WRITE` selects syscall to invoke (ex. `READ`, `WRITE`, `IOCTL`)
+- `rfkill_write` is the ID of recipe compiled in previous step
+- `/dev/rfkill` is a path to the device on which syscall will be invoked
 
 ## What's next?
 Since we already knew how to write custom recipes and execute them on target OS, next step would be to use Unflatten library (in `lib/` dir) to load generated memory dumps and use them for whatever you might need!

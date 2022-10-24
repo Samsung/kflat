@@ -26,7 +26,7 @@ export CLANG_DIR="<path to clang directory>"
 make KDIR=$KERNEL_DIR CCDIR=$CLANG_DIR ARCH=x86_64
 ```
 
-There are some extra build parameters than can be set to additional options:
+There are some extra build parameters than can be set:
 - `KFLAT_OPTS` - enable extra/testing features in kflat_core module, like `KFLAT_GET_OBJ_SUPPORT`,
 - `KLEE_LIBCXX_INSTALL` - if you wish to build kflat library with support for KLEE symbolic execution engine, specify here the path to libc++ library built for KLEE.
 

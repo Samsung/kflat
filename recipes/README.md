@@ -20,7 +20,7 @@ FUNCTION_DEFINE_FLATTEN_STRUCT(priv_data,
 );
 
 // Declare pointers for global variables
-void* some_global_var;
+static void* some_global_var;
 
 // Create optional pre_handler responsible for extracting pointers to
 //  global variables from kallsyms
