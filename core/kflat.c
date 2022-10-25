@@ -419,7 +419,14 @@ static int kflat_ioctl_locked(struct kflat *kflat, unsigned int cmd,
 			return ret;
 		}
 
-		kflat_register(kflat);	//tODO: ERROR handling
+		ret = kflat_register(kflat);
+		if(ret) {
+			probing_disarm(&kflat->probing);
+			kflat_recipe_put(kflat->recipe);
+			kflat->recipe = NULL;
+			return ret;
+		}
+
 		kflat->mode = KFLAT_MODE_ENABLED;
 		return 0;
 
