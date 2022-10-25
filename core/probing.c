@@ -83,18 +83,27 @@ static void probing_post_handler(struct kprobe* p, struct pt_regs* regs, unsigne
     return;
 }
 
+void probing_init(struct probe* probing) {
+    memset(probing, 0, sizeof(*probing));
+    mutex_init(&probing->lock);
+}
+
 int probing_arm(struct probe* probing, const char* symbol, pid_t callee) {
-    int ret;
+    int ret = 0;
     struct kprobe* kprobe;
 
-    if(probing->is_armed) {
+    mutex_lock(&probing->lock);
+    if(probing->kprobe != NULL) {
         pr_err("failed to arm new kprobe - already armed");
-        return -EFAULT;
+        ret = -EAGAIN;
+        goto exit;
     }
 
     kprobe = kmalloc(sizeof(*kprobe), GFP_KERNEL);
-    if(kprobe == NULL)
-        return -ENOMEM;
+    if(kprobe == NULL) {
+        ret = -ENOMEM;
+        goto exit;
+    }
 
     memset(kprobe, 0, sizeof(*kprobe));
     kprobe->symbol_name = symbol;
@@ -105,26 +114,34 @@ int probing_arm(struct probe* probing, const char* symbol, pid_t callee) {
     if(ret) {
         pr_err("failed to arm new kprobe - ret(%d)", ret);
         kfree(kprobe);
-        return ret;
+        goto exit;
     }
 
     probing->kprobe = kprobe;
     probing->triggered = 0;
-    probing->is_armed = 1;
-    return 0;
+    
+exit:
+    mutex_unlock(&probing->lock);
+    return ret;
 }
+NOKPROBE_SYMBOL(probing_arm);
 
 void probing_disarm(struct probe* probing) {
-    if(!probing->is_armed)
-        return;
+    mutex_lock(&probing->lock);
+
+    if(probing->kprobe == NULL)
+        goto exit;
     
     probing->triggered = 0;
     unregister_kprobe(probing->kprobe);
     kfree(probing->kprobe);
-
-    probing->is_armed = 0;
     probing->kprobe = NULL;
+
+exit:
+    mutex_unlock(&probing->lock);
+    return;
 }
+NOKPROBE_SYMBOL(probing_disarm);
 
 
 /*******************************************************

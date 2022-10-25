@@ -303,6 +303,7 @@ asmlinkage __used uint64_t probing_delegate(struct probe_regs* regs) {
 	kflat = _kflat_access_current();
 	if(kflat == NULL)
 		BUG();
+	
 	probe_priv = &kflat->probing;
 	probe_priv->triggered = 1;
 
@@ -327,7 +328,6 @@ asmlinkage __used uint64_t probing_delegate(struct probe_regs* regs) {
 
 	// Prepare for return
 	probing_disarm(probe_priv);
-	probe_priv->is_armed = 0;
 	return_addr = READ_ONCE(probe_priv->return_ip);
 
 	kflat_put_current(kflat);
@@ -341,6 +341,7 @@ asmlinkage __used uint64_t probing_delegate(struct probe_regs* regs) {
 
 	return return_addr;
 }
+NOKPROBE_SYMBOL(probing_delegate);
 
 
 /*******************************************************
@@ -359,6 +360,7 @@ static int kflat_open(struct inode *inode, struct file *filep) {
 	atomic_set(&kflat->refcount, 1);
 
 	mutex_init(&kflat->lock);
+	probing_init(&kflat->probing);
 	kflat->FLCTRL.fixup_set_root = RB_ROOT_CACHED;
 	kflat->FLCTRL.imap_root = RB_ROOT_CACHED;
 	filep->private_data = kflat;

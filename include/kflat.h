@@ -162,8 +162,8 @@ struct probe_regs {
 #endif
 
 struct probe {
+	struct mutex		lock;
 	int 				triggered;
-	int 				is_armed;
 	uint64_t 			return_ip;
 	struct kprobe* 		kprobe;
 };

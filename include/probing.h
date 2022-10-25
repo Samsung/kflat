@@ -18,6 +18,7 @@
 /*
  * Exported functions
  */
+void probing_init(struct probe* probing);
 int probing_arm(struct probe* probing, const char* symbol, pid_t callee);
 void probing_disarm(struct probe* probing);
 void* probing_get_kallsyms(void);
