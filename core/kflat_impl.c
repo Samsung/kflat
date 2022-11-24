@@ -1741,7 +1741,7 @@ void* flatten_find_heap_object(void* ptr) {
  *  For instance, if there's an array `char tab[32]` allocated on heap,
  *   invoking this func with &tab[10] will set `start` to &tab[0] and
  *   `end` to &tab[31].
- *  Returns false, when pointer does not point to valid memory location
+ *  Returns false, when pointer does not point to valid heap memory location
  */
 bool flatten_get_object(void* ptr, void** start, void** end) {
 
@@ -1752,15 +1752,17 @@ bool flatten_get_object(void* ptr, void** start, void** end) {
 	if(obj != NULL) {
 		return _flatten_get_heap_obj(obj, ptr, start, end);
 	} else {
-		size_t size = kdump_test_address(ptr, INT_MAX);
-		if(size == 0)
-			return false;
+		// xxx TODO: Find whether the pointer points to vmalloc area
+		// size_t size = kdump_test_address(ptr, INT_MAX);
+		// if(size == 0)
+		//	    return false;
 		
-		if(start)
-			*start = ptr;	// xxx TODO: Find the start of vmalloc area
-		if(end)
-			*end = ptr + size;
-		return true;
+		// if(start)
+		//	   *start = ptr;
+		// if(end)
+		//	   *end = ptr + size;
+		// return true;
+		return false;
 	}
 }
 #else /* KFLAT_GET_OBJ_SUPPORT */
