@@ -4855,6 +4855,17 @@ FUNCTION_DEFINE_FLATTEN_STRUCT_TYPE_ARRAY_ITER_SELF_CONTAINED(FLTYPE,FLSIZE)
 			bqueue_release_memory(KFLAT_ACCESSOR);	\
 		} while(0)
 
+/* Try to detect the size of the heap object pointed to by '__ptr'
+ * When successfully detected it returns the size of the object starting from '__ptr' to the end of the object
+ * When detection fails returns the value passed in '__default_size'
+ */
+#define FLATTEN_DETECT_OBJECT_SIZE(__ptr,__default_size) \
+		({			\
+			void *__start, *__end;	\
+			bool rv = flatten_get_object(__ptr, &__start, &__end);	\
+			(rv)?(__end-__ptr+1):(__default_size);	\
+		})
+
 #define GLOBAL_VARIABLE(MODULE_NAME, OFFSET)		flatten_global_address(MODULE_NAME, OFFSET)
 
 #define PTRNODE(PTRV)	(interval_tree_iter_first(&kflat->FLCTRL.imap_root, (uintptr_t)(PTRV), (uintptr_t)(PTRV)))
