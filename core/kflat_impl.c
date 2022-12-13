@@ -1671,7 +1671,7 @@ static bool _flatten_get_heap_obj(struct page* page, void* ptr, void** start, vo
 	return true;
 }
 
-void* flatten_find_heap_object(void* ptr) {
+static void* flatten_find_heap_object(void* ptr) {
 	struct page* page;
 
 	page = compound_head(kmap_to_page(ptr));
@@ -1722,7 +1722,7 @@ static bool _flatten_get_heap_obj(struct slab* slab, void* ptr,
 	return true;
 }
 
-void* flatten_find_heap_object(void* ptr) {
+static void* flatten_find_heap_object(void* ptr) {
 	struct folio* folio;
 	
 	if(folio == NULL)
@@ -1736,34 +1736,46 @@ void* flatten_find_heap_object(void* ptr) {
 #endif
 
 /*
- * flatten_get_object - check whether `ptr` points to the heap object and
- *		if so retrieve its start and end address
+ * flatten_get_object - check whether `ptr` points to the heap or vmalloc
+ *		object and if so retrieve its start and end address
  *  For instance, if there's an array `char tab[32]` allocated on heap,
  *   invoking this func with &tab[10] will set `start` to &tab[0] and
  *   `end` to &tab[31].
  *  Returns false, when pointer does not point to valid heap memory location
  */
 bool flatten_get_object(void* ptr, void** start, void** end) {
+	void* obj;
 
-	if(!virt_addr_valid(ptr))
-		return false;
-
-	void* obj = flatten_find_heap_object(ptr);
-	if(obj != NULL) {
-		return _flatten_get_heap_obj(obj, ptr, start, end);
-	} else {
-		// xxx TODO: Find whether the pointer points to vmalloc area
-		// size_t size = kdump_test_address(ptr, INT_MAX);
-		// if(size == 0)
-		//	    return false;
+	if(virt_addr_valid(ptr)) {
+		obj = flatten_find_heap_object(ptr);
+		if(obj != NULL)
+			return _flatten_get_heap_obj(obj, ptr, start, end);
+	} 
+	/* xxx this could be an extension of this function that supports 
+	       vmalloc as well. However, the problem is that kernel allocates
+		   stack with vmalloc, so we cannot distinguish between stack memory
+		   and intentionally allocated additional data 
+	else if (is_vmalloc_addr(ptr)) {
+		size_t size = kdump_test_address(ptr, INT_MAX);
+		if(size == 0)
+			    return false;
+		if(end)
+			   *end = ptr + size;
 		
-		// if(start)
-		//	   *start = ptr;
-		// if(end)
-		//	   *end = ptr + size;
-		// return true;
-		return false;
-	}
+		// Search for the start of memory
+		if(start) {
+			unsigned long long p = (unsigned long long) ptr;
+			p &= PAGE_MASK;
+			do {
+				p -= PAGE_SIZE;
+				size = kdump_test_address((void*)p, PAGE_SIZE);
+			} while(size);
+			*start = (void*)p + PAGE_SIZE;
+		}
+		return true;
+	}*/
+	
+	return false;
 }
 #else /* KFLAT_GET_OBJ_SUPPORT */
 bool flatten_get_object(void* ptr, void** start, void** end) {

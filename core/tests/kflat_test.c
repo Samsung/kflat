@@ -1867,10 +1867,28 @@ int kflat_ioctl_test(struct kflat *kflat, unsigned int cmd, unsigned long arg) {
 				if(!ret) {
 					flat_errs("%s: flatten_get_object failed to locate heap object", __func__);
 					err = -EFAULT;
-				}
-				if(start != buffer || end != buffer + 256) {
+				} else if(start != buffer || end != buffer + 256) {
 					flat_errs("%s: flatten_get_object incorrectly located object 0x%llx:0x%llx (should be: 0x%llx:0x%llx)",
 								 __func__, (uint64_t)start, (uint64_t)end, (uint64_t)buffer, (uint64_t)buffer + 256);
+					err = -EFAULT;
+				}
+				kfree(buffer);
+
+				ret = flatten_get_object(&ret, NULL, NULL);
+				if(ret) {
+					flat_errs("%s: flatten_get_object accepted object from stack", __func__);
+					err = -EFAULT;
+				}
+
+				ret = flatten_get_object(iarr, NULL, NULL);
+				if(ret) {
+					flat_errs("%s: flatten_get_object accepted global object", __func__);
+					err = -EFAULT;
+				}
+
+				ret = flatten_get_object(kflat_ioctl_test, NULL, NULL);
+				if(ret) {
+					flat_errs("%s: flatten_get_object accepted pointer to code section", __func__);
 					err = -EFAULT;
 				}
 #else
