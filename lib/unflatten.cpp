@@ -23,7 +23,7 @@
 #include "unflatten.hpp"
 
 #define container_of(ptr, type, member) ({			\
-  	const decltype( ((type *)0)->member ) *__mptr = (ptr);	\
+  	const __typeof__( ((type *)0)->member ) *__mptr = (ptr);	\
   	(type *)( (char *)__mptr - offsetof(type,member) );})
 
 extern "C" {
@@ -66,22 +66,19 @@ struct flatten_header {
 };
 
 struct root_addrnode {
-	struct root_addrnode* next;
 	uintptr_t root_addr;
 	const char* name;
-	size_t index;
 	size_t size;
 };
 
 struct FLCONTROL {
-	struct rb_root_cached fixup_set_root;
-	struct rb_root_cached imap_root;
 	struct flatten_header HDR;
-	struct root_addrnode* rhead;
-	struct root_addrnode* rtail;
-	struct root_addrnode* last_accessed_root;
-	size_t root_addr_count;
+
+	struct rb_root_cached imap_root;
 	void* mem;
+
+	ssize_t last_accessed_root;
+	std::vector<struct root_addrnode> root_addr;
 	std::map<std::string, std::pair<size_t, size_t>> root_addr_map;
 };
 
@@ -104,6 +101,8 @@ typedef uintptr_t (*get_function_address_t)(const char* fsym);
  *******************************/
 class Unflatten {
 private:
+	friend class Flatten;
+
 	constexpr static uint64_t FLATTEN_MAGIC = 0x464c415454454e00ULL;
 
 	bool need_unload;
@@ -161,62 +160,38 @@ private:
 	/***************************
 	 * ROOT POINTERS
 	 **************************/
-	void* root_pointer_next() {
-		assert(FLCTRL.rhead != NULL);
-		
-		if (FLCTRL.last_accessed_root == NULL)
-			FLCTRL.last_accessed_root = FLCTRL.rhead;
-		else if (FLCTRL.last_accessed_root->next)
-			FLCTRL.last_accessed_root = FLCTRL.last_accessed_root->next;
-		else
-			assert(0);
-
-		struct root_addrnode* last_root = FLCTRL.last_accessed_root;
-		if (last_root->root_addr == (size_t) -1)
+	inline void* get_root_addr_mem(uintptr_t root_addr) {
+		if (root_addr == (size_t) -1)
 			return 0;
 
 		if (interval_tree_iter_first(&FLCTRL.imap_root, 0, ULONG_MAX)) {	
 			/* We have allocated each memory fragment individually */
 			struct interval_tree_node *node = interval_tree_iter_first(
 					&FLCTRL.imap_root,
-					last_root->root_addr,
-					last_root->root_addr + 8);
+					root_addr, root_addr + 8);
 			assert(node != NULL);
 
-			size_t node_offset = last_root->root_addr - node->start;
+			size_t node_offset = root_addr - node->start;
 			return (char*)node->mptr + node_offset;
 		}
 		
-		return (char*)flatten_memory_start() + last_root->root_addr;
+		return (char*)flatten_memory_start() + root_addr;
+	}
+
+	void* root_pointer_next() {
+		assert(FLCTRL.last_accessed_root < (ssize_t)FLCTRL.root_addr.size() - 1);
+		FLCTRL.last_accessed_root++;
+		
+		struct root_addrnode* last_root = &FLCTRL.root_addr[FLCTRL.last_accessed_root];
+		return get_root_addr_mem(last_root->root_addr);
 	}
 
 	void* root_pointer_seq(size_t index) {
-		assert(FLCTRL.rhead != NULL);
+		assert(index < FLCTRL.root_addr.size());
+		FLCTRL.last_accessed_root = index;
 
-		FLCTRL.last_accessed_root = FLCTRL.rhead;
-		for (size_t i = 0; i < index; ++i) {
-			if (FLCTRL.last_accessed_root->next)
-				FLCTRL.last_accessed_root = FLCTRL.last_accessed_root->next;
-			else
-				assert(0);
-		}
-
-		if (FLCTRL.last_accessed_root->root_addr == (size_t) -1)
-			return 0;
-
-		if (interval_tree_iter_first(&FLCTRL.imap_root, 0, ULONG_MAX)) {	
-			/* We have allocated each memory fragment individually */
-			struct interval_tree_node *node = interval_tree_iter_first(
-					&FLCTRL.imap_root,
-					FLCTRL.last_accessed_root->root_addr,
-					FLCTRL.last_accessed_root->root_addr + 8);
-			assert(node != NULL);
-
-			size_t node_offset = FLCTRL.last_accessed_root->root_addr - node->start;
-			return (char*)node->mptr + node_offset;
-		}
-
-		return (char*)flatten_memory_start() + FLCTRL.last_accessed_root->root_addr;
+		struct root_addrnode* last_root = &FLCTRL.root_addr[FLCTRL.last_accessed_root];
+		return get_root_addr_mem(last_root->root_addr);
 	}
 
 	void* root_pointer_named(const char* name, size_t* size) {
@@ -232,38 +207,16 @@ private:
 			return NULL;
 		}
 
-		// TODO: Remove this copy&paste
-		if (root_addr == (size_t) -1)
-			return NULL;
-
-		if (interval_tree_iter_first(&FLCTRL.imap_root, 0, ULONG_MAX)) {
-			struct interval_tree_node *node = interval_tree_iter_first(
-					&FLCTRL.imap_root, root_addr, root_addr + 8);
-			assert(node != NULL);
-
-			size_t node_offset = root_addr - node->start;
-			return (char*)node->mptr + node_offset;
-		}
-		
-		return (char*)flatten_memory_start() + root_addr;
+		return get_root_addr_mem(root_addr);
 	}
 
 	void root_addr_append(uintptr_t root_addr, const char* name = nullptr, size_t size = 0) {
-		struct root_addrnode* v = (struct root_addrnode*)calloc(1, sizeof(struct root_addrnode));
-		assert(v != NULL);
-		v->root_addr = root_addr;
-		v->name = name;
-		v->size = size;
-		v->index = FLCTRL.root_addr_count;
-		if (!FLCTRL.rhead) {
-			FLCTRL.rhead = v;
-			FLCTRL.rtail = v;
-		}
-		else {
-			FLCTRL.rtail->next = v;
-			FLCTRL.rtail = FLCTRL.rtail->next;
-		}
-		FLCTRL.root_addr_count++;
+		struct root_addrnode v {
+			.root_addr = root_addr,
+			.name = name,
+			.size = size
+		};
+		FLCTRL.root_addr.push_back(v);
 	}
 
 	int root_addr_append_extended(size_t root_addr, const char* name, size_t size) {
@@ -284,19 +237,15 @@ private:
 		rd = fread(dst, size, n, f);
 		if(rd != n)
 			throw std::invalid_argument("Truncated file");
-		readin += sizeof(struct flatten_header);
+		readin += size * n;
 	}
 	
 
 public:
 	Unflatten(int _level = LOG_NONE) {
-		memset(&FLCTRL.fixup_set_root, 0, sizeof(struct rb_root_cached));
 		memset(&FLCTRL.imap_root, 0, sizeof(struct rb_root_cached));
 		memset(&FLCTRL.HDR, 0, sizeof(struct flatten_header));
-		FLCTRL.rhead = 0;
-		FLCTRL.rtail = 0;
-		FLCTRL.last_accessed_root = 0;
-		FLCTRL.root_addr_count = 0;
+		FLCTRL.last_accessed_root = -1;
 		FLCTRL.mem = 0;
 		need_unload = false;
 		loglevel = (decltype(loglevel))_level;
@@ -626,17 +575,19 @@ public:
 	}
 
 	void unload(void) {
-		FLCTRL.rtail = FLCTRL.rhead;
-		while(FLCTRL.rtail) {
-			struct root_addrnode* p = FLCTRL.rtail;
-			FLCTRL.rtail = FLCTRL.rtail->next;
-			free(p);
-		}
+		struct interval_tree_node* node, *tmp;
 		free(FLCTRL.mem);
 		fptrmap.clear();
 
-		// TODO: clear interval tree nodes and memory fragments
+		rbtree_postorder_for_each_entry_safe(node, tmp, &FLCTRL.imap_root.rb_root, rb) {
+			interval_tree_remove(node, &FLCTRL.imap_root);
+			free(node->mptr);
+			free(node);
+		}
 
+		FLCTRL.root_addr.clear();
+		FLCTRL.root_addr_map.clear();
+		FLCTRL.last_accessed_root = -1;
 		need_unload = false;
 	}
 
@@ -682,15 +633,15 @@ void Flatten::unload() {
 }
 
 void* Flatten::get_next_root() {
-	return engine->get_next_root();
+	return engine->root_pointer_next();
 }
 
 void* Flatten::get_seq_root(size_t idx) {
-	return engine->get_seq_root(idx);
+	return engine->root_pointer_seq(idx);
 }
 
 void* Flatten::get_named_root(const char* name, size_t* size) {
-	return engine->get_named_root(name, size);
+	return engine->root_pointer_named(name, size);
 }
 
 /********************************
