@@ -7,6 +7,7 @@
  */
 #include "kflat.h"
 #include "probing.h"
+#include "tests/tests_list.h"
 
 #include <linux/atomic.h>
 #include <linux/cpumask.h>
@@ -345,6 +346,43 @@ NOKPROBE_SYMBOL(probing_delegate);
 
 
 /*******************************************************
+ * KFLAT tests runner
+ *******************************************************/
+int kflat_run_test(struct kflat* kflat, struct kflat_ioctl_tests* test) {
+	int err;
+	size_t tests_count = sizeof(test_cases) / sizeof(test_cases[0]);
+
+	if(tests_count == 0) {
+		pr_err("KFLAT hasn't been compiled with embedded test cases");
+		return -EFAULT;
+	}
+	
+	for(size_t i = 0; i < tests_count; i++) {
+		if(!strcmp(test->test_name, test_cases[i]->name)) {
+			flatten_init(kflat);
+			kflat->FLCTRL.debug_flag = test->debug_flag;
+
+			err = test_cases[i]->handler(kflat);
+			
+			flat_infos("@Flatten done: %d\n",kflat->errno);
+			if (!kflat->errno && !err)
+				err = flatten_write(kflat);
+			flatten_fini(kflat);
+			
+			// On success, return the size of flattened memory
+			if(!err)
+				err = kflat->errno;
+			if(err)
+				return (err <= 0) ? err : -err;
+			return *(size_t*)kflat->area + sizeof(size_t);
+		}
+	}
+
+	pr_err("No such test named '%s' (avail %d tests)", test->test_name, tests_count);
+	return -ENOENT;
+}
+
+/*******************************************************
  * FILE OPERATIONS
  *******************************************************/
 static int kflat_open(struct inode *inode, struct file *filep) {
@@ -375,6 +413,7 @@ static int kflat_ioctl_locked(struct kflat *kflat, unsigned int cmd,
 		struct kflat_ioctl_enable enable;
 		struct kflat_ioctl_disable disable;
 		struct kflat_ioctl_mem_map map;
+		struct kflat_ioctl_tests tests;
 	} args;
 	struct kflat_recipe* recipe;
 
@@ -446,8 +485,19 @@ static int kflat_ioctl_locked(struct kflat *kflat, unsigned int cmd,
 		return 0;
 
 	case KFLAT_TESTS:
-		ret =  kflat_ioctl_test(kflat, cmd, arg);
-		return ret;
+		if(kflat->mode != KFLAT_MODE_DISABLED) {
+			pr_err("Cannot run embedded tests when KFLAT is armed");
+			return -EBUSY;
+		} else if(kflat->area == NULL) {
+			pr_err("MMap KFLAT shared buffer before running tests");
+			return -EINVAL;
+		}
+
+		if(copy_from_user(&args.tests, (void*) arg, sizeof(args.tests)))
+			return -EFAULT;
+		args.tests.test_name[sizeof(args.tests.test_name) - 1] = '\0';
+
+		return kflat_run_test(kflat, &args.tests);
 
 	case KFLAT_MEMORY_MAP:
 		if(copy_from_user(&args.map, (void*) arg, sizeof(args.map)))

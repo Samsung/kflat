@@ -5,9 +5,23 @@ ccflags-y := -std=gnu99 -Wno-unused-local-typedef -I${TOPDIR}/include/ $(patsubs
 
 LINUX_INCLUDES := ${LINUX_INCLUDES} ${TOPDIR}/include/
 
+# Generate list of available kflat tests
+quiet_cmd_kflat_tests_gen = GEN     $@
+cmd_kflat_tests_gen = $< $@
+
+$(obj)/tests/tests_list.h: $(obj)/tests/tests_list_gen.sh
+	$(call cmd,kflat_tests_gen)
+
+# Build kflat core module
 kflat_core-y = kflat.o kflat_impl.o probing.o kdump.o
 kflat_core-$(CONFIG_ARM64) += probing_arm.o
 kflat_core-$(CONFIG_X86_64) += probing_x86.o
-kflat_core-y += tests/kflat_test.o
 
+# Build kflat tests
+test_files = $(wildcard $(src)/tests/*.c)
+filenames = $(notdir $(test_files))
+out_files = $(addprefix tests/, $(filenames:.c=.o))
+kflat_core-y += $(out_files)
+
+# Create .ko file
 obj-m := kflat_core.o

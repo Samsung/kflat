@@ -1,0 +1,116 @@
+/**
+ * @file example_my_list_head.c
+ * @author Samsung R&D Poland - Mobile Security Group
+ * 
+ */
+
+#include "common.h"
+
+
+struct my_list_head {
+	struct my_list_head* prev;
+	struct my_list_head* next;
+};
+
+struct intermediate {
+	struct my_list_head* plh;
+};
+
+struct my_task_struct {
+	int pid;
+	struct intermediate* im;
+	struct my_list_head u;
+	float w;
+};
+
+#ifdef __KERNEL__
+
+/* RECURSIVE version */
+FUNCTION_DEFINE_FLATTEN_STRUCT(my_list_head,
+	AGGREGATE_FLATTEN_STRUCT(my_list_head,prev);
+	AGGREGATE_FLATTEN_STRUCT(my_list_head,next);
+);
+
+FUNCTION_DEFINE_FLATTEN_STRUCT(intermediate,
+	AGGREGATE_FLATTEN_STRUCT(my_list_head,plh);
+);
+
+FUNCTION_DEFINE_FLATTEN_STRUCT(my_task_struct,
+	AGGREGATE_FLATTEN_STRUCT(intermediate,im);
+	AGGREGATE_FLATTEN_STRUCT(my_list_head,u.prev);
+	AGGREGATE_FLATTEN_STRUCT(my_list_head,u.next);
+);
+
+/* ITER version */
+FUNCTION_DECLARE_FLATTEN_STRUCT_ITER(my_list_head);
+FUNCTION_DECLARE_FLATTEN_STRUCT_ITER(intermediate);
+FUNCTION_DECLARE_FLATTEN_STRUCT_ITER(my_task_struct);
+
+FUNCTION_DEFINE_FLATTEN_STRUCT_ITER(my_list_head,
+	AGGREGATE_FLATTEN_STRUCT_ITER(my_list_head,prev);
+	AGGREGATE_FLATTEN_STRUCT_ITER(my_list_head,next);
+);
+
+FUNCTION_DEFINE_FLATTEN_STRUCT_ITER(intermediate,
+	AGGREGATE_FLATTEN_STRUCT_ITER(my_list_head,plh);
+);
+
+FUNCTION_DEFINE_FLATTEN_STRUCT_ITER(my_task_struct,
+	AGGREGATE_FLATTEN_STRUCT_ITER(intermediate,im);
+	AGGREGATE_FLATTEN_STRUCT_ITER(my_list_head,u.prev);
+	AGGREGATE_FLATTEN_STRUCT_ITER(my_list_head,u.next);
+);
+
+static int kflat_overlaplist_test(struct kflat *kflat) {
+	int err = 0;
+	struct my_task_struct T;
+	struct intermediate IM = {&T.u};
+
+	T.pid = 123;
+	T.im = &IM;
+	T.u.prev = T.u.next = &T.u;
+	T.w = 1.0;
+
+	FOR_ROOT_POINTER(&T,
+		FLATTEN_STRUCT(my_task_struct,&T);
+	);
+
+	return err;
+}
+
+static int kflat_overlaplist_test_iter(struct kflat *kflat) {
+	int err = 0;
+	struct my_task_struct T;
+	struct intermediate IM = {&T.u};
+
+	T.pid = 123;
+	T.im = &IM;
+	T.u.prev = T.u.next = &T.u;
+	T.w = 1.0;
+	
+	FOR_ROOT_POINTER(&T,
+		UNDER_ITER_HARNESS(
+			FLATTEN_STRUCT_ITER(my_task_struct,&T);
+		);
+	);
+
+	return err;
+}
+
+#else
+
+static int kflat_overlaplist_validate(void* memory, size_t size, CFlatten flatten) {
+	struct my_task_struct* task = (struct my_task_struct*) memory;
+    ASSERT(task->pid == 123);
+	ASSERT(task->w == 1.0);
+	ASSERT(task->u.next == task->u.prev);
+	ASSERT(task->u.next == &task->u);
+	ASSERT(task->im->plh == &task->u);
+	return 0;
+}
+
+#endif
+
+
+KFLAT_REGISTER_TEST("OVERLAP_LIST", kflat_overlaplist_test, kflat_overlaplist_validate);
+KFLAT_REGISTER_TEST("OVERLAP_LIST_ITER", kflat_overlaplist_test_iter, kflat_overlaplist_validate);

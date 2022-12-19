@@ -32,7 +32,7 @@ static double log_time(void) {
 }
 
 static void _log_generic(FILE* stream, const char* color, const char* prefix, 
-                        const char* func, const char* fmt, va_list args) {
+                        const char* func, bool new_line, const char* fmt, va_list args) {
     if(supports_colors)
         fprintf(stdout, "[%s%s" LOG_DEFAULT_COLOR "][" 
                         LOG_TIME_COLOR "%7.3lf" LOG_DEFAULT_COLOR "] "
@@ -42,13 +42,16 @@ static void _log_generic(FILE* stream, const char* color, const char* prefix,
         fprintf(stdout, "[%s][%7.3lf] %-10s| ", prefix, log_time(), func);
 
     vfprintf(stdout, fmt, args);
-    fputs("\n", stdout);
+    if(new_line)
+        fputs("\n", stdout);
+    else
+        fflush(stdout);
 }
 
-void log_generic(const char* color, const char* prefix, const char* func, const char* fmt, ...) {
+void log_generic(const char* color, const char* prefix, const char* func, bool new_line, const char* fmt, ...) {
     va_list args;
     va_start(args, fmt);
-    _log_generic(stdout, color, prefix, func, fmt, args);
+    _log_generic(stdout, color, prefix, func, new_line, fmt, args);
     va_end(args);
 }
 
@@ -57,7 +60,7 @@ void _log_abort(const char* func, const char* fmt, ...) {
     char* err_msg;
 
     va_start(args, fmt);
-    _log_generic(stdout, LOG_ERR_COLOR, "X", func, fmt, args);
+    _log_generic(stdout, LOG_ERR_COLOR, "X", func, true, fmt, args);
     va_end(args);
 
     if(supports_colors)

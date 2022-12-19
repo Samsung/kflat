@@ -1,4 +1,4 @@
-CFLAGS = -Iinclude_priv/ -Wall -O3 -fPIC -ggdb3
+CFLAGS = -Iinclude_priv/ -Wall -O3 -fPIC
 LDFLAGS = --shared -fPIC
 ALL_TARGET = 
 
