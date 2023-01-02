@@ -308,6 +308,17 @@ struct myLongHeadList {
 	struct list_head v;
 };
 
+struct myList {
+	long q;
+	struct list_head v;
+};
+
+struct myListOwner {
+	const char* name;
+	long count;
+	struct list_head list;
+};
+
 struct hlist_node {
 	struct hlist_node *next, **pprev;
 };
@@ -562,6 +573,19 @@ int main(int argc, char* argv[]) {
 		}
 		printf("]\n");
 		printf("List size: %zu\n",list_size);
+		return 0;
+	}
+	else if (!strcmp(argv[2],"LISTMEMBER")) {
+		struct myListOwner* list = (struct myListOwner*)flatten.get_next_root();
+		struct list_head *p;
+		printf("List name: %s\n",list->name);
+		printf("List count: %ld\n",list->count);
+		printf("[ ");
+		for (p = list->list.next; p != &list->list; p = p->next) {
+			struct myList *entry = container_of(p, struct myList, v);
+			printf("%ld ",entry->q);
+		}
+		printf("]\n");
 		return 0;
 	}
 	else if (!strcmp(argv[2],"HLIST")) {

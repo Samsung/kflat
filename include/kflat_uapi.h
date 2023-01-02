@@ -49,6 +49,7 @@ enum kflat_test_codes {
 	GETOBJECTCHECK,
 	LIST,
 	LISTHEAD,
+	LISTMEMBER,
 	HLIST,
 	LLIST,
 	HNULLSLIST,

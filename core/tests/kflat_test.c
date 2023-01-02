@@ -288,6 +288,11 @@ FUNCTION_DEFINE_FLATTEN_STRUCT_ITER_SELF_CONTAINED(myLongList,24,
 	AGGREGATE_FLATTEN_STRUCT_ARRAY_ITER_SELF_CONTAINED_SHIFTED(myLongList,24,v.prev,16,1,-8);
 );
 
+/*
+ *    (head)
+ * [myLongList]--|-> [myLongList] --> [myLongList] --> [myLongList] ...
+ * 			   <-|-- [myLongList] <-- [myLongList] <-- [myLongList] ...
+ */
 static int kflat_list_test_iter(struct kflat *kflat, int debug_flag) {
 	int i, err = 0;
 	struct myLongList myhead = {-1};
@@ -413,9 +418,95 @@ static int kflat_listhead_test_iter(struct kflat *kflat, int debug_flag) {
 	return err;
 }
 
-
 /*******************************************************
  * TEST CASE #6
+ *******************************************************/
+struct myList {
+	long q;
+	struct list_head v;
+};
+
+FUNCTION_DECLARE_FLATTEN_STRUCT_ARRAY_ITER_SELF_CONTAINED(myList,sizeof(struct myList));
+
+FUNCTION_DEFINE_FLATTEN_STRUCT_ITER_SELF_CONTAINED(myList,sizeof(struct myList),
+	AGGREGATE_FLATTEN_STRUCT_ARRAY_ITER_SELF_CONTAINED(list_head,sizeof(struct list_head),v.next,sizeof(long)+offsetof(struct list_head,next),1);
+	AGGREGATE_FLATTEN_STRUCT_ARRAY_ITER_SELF_CONTAINED(list_head,sizeof(struct list_head),v.prev,sizeof(long)+offsetof(struct list_head,prev),1);
+);
+
+struct myListOwner {
+	const char* name;
+	long count;
+	struct list_head list;
+};
+
+FUNCTION_DECLARE_FLATTEN_STRUCT_ARRAY_ITER_SELF_CONTAINED(myListOwner,sizeof(struct myListOwner));
+
+FUNCTION_DEFINE_FLATTEN_STRUCT_ITER_SELF_CONTAINED(myListOwner,sizeof(struct myListOwner),
+	AGGREGATE_FLATTEN_STRING_SELF_CONTAINED(name,offsetof(struct myListOwner,name));
+	AGGREGATE_FLATTEN_STRUCT_ARRAY_ITER_SELF_CONTAINED(list_head,sizeof(struct list_head),v.next,
+			offsetof(struct myListOwner,list)+offsetof(struct list_head,next),1);
+	AGGREGATE_FLATTEN_STRUCT_ARRAY_ITER_SELF_CONTAINED(list_head,sizeof(struct list_head),v.prev,
+			offsetof(struct myListOwner,list)+offsetof(struct list_head,prev),1);
+	{
+		struct myList* __entry;
+		list_for_each_entry(__entry, &OFFATTR(struct list_head,offsetof(struct myListOwner,list)), v ) {
+			FOR_POINTER(struct myList*,____entry,__entry,
+					FLATTEN_STRUCT_ARRAY_ITER_SELF_CONTAINED(myList,sizeof(struct myList),____entry,1);
+			);
+		}
+	}
+);
+
+/*
+ *  (head)
+ * [myList]--|-> [myList] --> [myList] --> [myList] ...
+ * 		   <-|-- [myList] <-- [myList] <-- [myList] ...
+ */
+static int kflat_listmember_test_iter(struct kflat *kflat, int debug_flag) {
+	int i, err = 0;
+	struct myListOwner list = { "MyList",0 };
+	INIT_LIST_HEAD(&list.list);
+	unsigned long count = 0;
+	struct list_head *p;
+
+	for (i = 0; i < 10; ++i) {
+		struct myList* item = kvzalloc(sizeof(struct myList),GFP_KERNEL);
+		item->q = i+1;
+		list_add_tail(&item->v, &list.list);
+		list.count++;
+	}
+
+	list_for_each(p, &list.list) {
+		count++;
+	}
+	flat_infos("List size: %zu\n",count);
+
+	flatten_init(kflat);
+	kflat->FLCTRL.debug_flag = debug_flag;
+
+	UNDER_ITER_HARNESS(
+		FOR_ROOT_POINTER(&list,
+			FLATTEN_STRUCT_ARRAY_ITER(myListOwner,&list,1);
+		);
+	);
+
+	while(!list_empty(&list.list)) {
+		struct myList *entry = list_first_entry(&list.list, struct myList, v);
+		list_del(&entry->v);
+		kvfree(entry);
+	}
+
+	flat_infos("@Flatten done: %d\n",kflat->errno);
+	if (!kflat->errno) {
+		err = flatten_write(kflat);
+	}
+	flatten_fini(kflat);
+
+	return err;
+}
+
+/*******************************************************
+ * TEST CASE #7
  *******************************************************/
 struct paddingA {
 	int i;
@@ -524,7 +615,7 @@ static int kflat_fpointer_test(struct kflat *kflat) {
 }
 
 /*******************************************************
- * TEST CASE #7
+ * TEST CASE #8
  *******************************************************/
 static int kflat_pointer_test(struct kflat *kflat) {
 	int err = 0;
@@ -556,7 +647,7 @@ static int kflat_pointer_test(struct kflat *kflat) {
 
 
 /*******************************************************
- * TEST CASE #8
+ * TEST CASE #9
  *******************************************************/
 struct myLongHList {
 	int k;
@@ -663,7 +754,7 @@ static int kflat_hlist_test_iter(struct kflat *kflat, int debug_flag) {
 
 
 /*******************************************************
- * TEST CASE #9
+ * TEST CASE #10
  *******************************************************/
 struct myLongHnullsList {
 	int k;
@@ -765,7 +856,7 @@ static int kflat_hlist_nulls_test_iter(struct kflat *kflat, int debug_flag) {
 
 
 /*******************************************************
- * TEST CASE #10
+ * TEST CASE #11
  *******************************************************/
 struct llist_node *__llist_del_first(struct llist_head *head)
 {
@@ -864,7 +955,7 @@ static int kflat_llist_test_iter(struct kflat *kflat, int debug_flag) {
 }
 
 /*******************************************************
- * TEST CASE #11
+ * TEST CASE #12
  *******************************************************/
 struct point {
     double x;
@@ -1038,9 +1129,9 @@ static struct string_node* stringset_search(const char* s) {
 
 static int stringset_insert(const char* s) {
 
-	struct string_node* data = kvzalloc(1,sizeof(struct string_node));
+	struct string_node* data = kvzalloc(sizeof(struct string_node),GFP_KERNEL);
 	struct rb_node **new, *parent = 0;
-	data->s = kvzalloc(1,strlen(s)+1);
+	data->s = kvzalloc(strlen(s)+1,GFP_KERNEL);
 	strcpy(data->s,s);
 	new = &(stringset_root.rb_node);
 
@@ -1287,7 +1378,7 @@ static int kflat_rbnode_test_iter(struct kflat *kflat, int debug_flag) {
 	struct rb_root sroot = RB_ROOT;
 
 	struct myTreeNode tarr[15] = {};
-	for (i=0; i<10; ++i) tarr[i].s = kvzalloc(1,4);
+	for (i=0; i<10; ++i) tarr[i].s = kvzalloc(4,GFP_KERNEL);
 	strcpy(tarr[0].s,"AA0");
 	strcpy(tarr[1].s,"AA5");
 	strcpy(tarr[2].s,"AA9");
@@ -1553,7 +1644,7 @@ static int kflat_stringset_test(struct kflat *kflat, size_t num_strings) {
 	int err = 0;
 
 	for (j=0; j<num_strings; ++j) {
-		char* s = kvzalloc(1,sizeof chars);
+		char* s = kvzalloc(sizeof chars,GFP_KERNEL);
 		for (i=0; i<sizeof chars - 1; ++i) {
 			unsigned char u;
 			get_random_bytes(&u,1);
@@ -1592,7 +1683,7 @@ static int kflat_stringset_test_iter(struct kflat *kflat, size_t num_strings) {
 	int err = 0;
 
 	for (j=0; j<num_strings; ++j) {
-		char* s = kvzalloc(1,sizeof chars);
+		char* s = kvzalloc(sizeof chars,GFP_KERNEL);
 		for (i=0; i<sizeof chars - 1; ++i) {
 			unsigned char u;
 			get_random_bytes(&u,1);
@@ -1907,6 +1998,10 @@ int kflat_ioctl_test(struct kflat *kflat, unsigned int cmd, unsigned long arg) {
 			err = kflat_listhead_test_iter(kflat, debug_flag);
 			break;
 		
+		case LISTMEMBER:
+			err = kflat_listmember_test_iter(kflat, debug_flag);
+			break;
+
 		case HLIST:
 			err = kflat_hlist_test_iter(kflat, debug_flag);
 			break;
