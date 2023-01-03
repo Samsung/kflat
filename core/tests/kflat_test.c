@@ -479,9 +479,9 @@ FUNCTION_DEFINE_FLATTEN_STRUCT_ITER_SELF_CONTAINED(myListOwner,sizeof(struct myL
 static int kflat_listmember_test_iter(struct kflat *kflat, int debug_flag) {
 	int i, err = 0;
 	struct myListOwner list = { "MyList",0 };
-	INIT_LIST_HEAD(&list.list);
 	unsigned long count = 0;
 	struct list_head *p;
+	INIT_LIST_HEAD(&list.list);
 
 	for (i = 0; i < 10; ++i) {
 		struct myList* item = kvzalloc(sizeof(struct myList),GFP_KERNEL);
