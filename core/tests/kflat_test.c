@@ -439,17 +439,31 @@ struct myListOwner {
 	struct list_head list;
 };
 
+#define container_of_from_offset(ptr, type, offset) ({ 	\
+	void *__mptr = (void *)(ptr);						\
+	((type *)(__mptr - offset));						\
+})
+
+#define list_for_each_entry_from_offset(pos, head, offset)							\
+	for (pos = container_of_from_offset((head)->next, typeof(*pos), offset);		\
+	     	!(&(*((struct list_head*)((unsigned char*)(pos)+offset))) == (head));	\
+	     	pos = container_of_from_offset(											\
+	     		(*((struct list_head*)((unsigned char*)(pos)+offset))).next,		\
+	     		typeof(*(pos)), offset												\
+	     	)																		\
+	    )
+
 FUNCTION_DECLARE_FLATTEN_STRUCT_ARRAY_ITER_SELF_CONTAINED(myListOwner,sizeof(struct myListOwner));
 
 FUNCTION_DEFINE_FLATTEN_STRUCT_ITER_SELF_CONTAINED(myListOwner,sizeof(struct myListOwner),
 	AGGREGATE_FLATTEN_STRING_SELF_CONTAINED(name,offsetof(struct myListOwner,name));
-	AGGREGATE_FLATTEN_STRUCT_ARRAY_ITER_SELF_CONTAINED(list_head,sizeof(struct list_head),v.next,
+	AGGREGATE_FLATTEN_STRUCT_ARRAY_ITER_SELF_CONTAINED(list_head,sizeof(struct list_head),list.next,
 			offsetof(struct myListOwner,list)+offsetof(struct list_head,next),1);
-	AGGREGATE_FLATTEN_STRUCT_ARRAY_ITER_SELF_CONTAINED(list_head,sizeof(struct list_head),v.prev,
+	AGGREGATE_FLATTEN_STRUCT_ARRAY_ITER_SELF_CONTAINED(list_head,sizeof(struct list_head),list.prev,
 			offsetof(struct myListOwner,list)+offsetof(struct list_head,prev),1);
 	{
 		struct myList* __entry;
-		list_for_each_entry(__entry, &OFFATTR(struct list_head,offsetof(struct myListOwner,list)), v ) {
+		list_for_each_entry_from_offset(__entry, &OFFATTR(struct list_head,offsetof(struct myListOwner,list)), offsetof(struct myList,v) ) {
 			FOR_POINTER(struct myList*,____entry,__entry,
 					FLATTEN_STRUCT_ARRAY_ITER_SELF_CONTAINED(myList,sizeof(struct myList),____entry,1);
 			);
