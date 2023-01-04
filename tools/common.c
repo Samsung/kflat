@@ -2,6 +2,8 @@
  * Samsung R&D Poland - Mobile Security Group
  */
 
+#include "common.h"
+
 #include <stdarg.h>
 #include <stdbool.h>
 #include <stdio.h>
@@ -14,12 +16,6 @@
 /*******************************************************
  * LOGGING FUNCTIONS
  *******************************************************/
-#define LOG_DEFAULT_COLOR       "\x1b[0m"
-#define LOG_ERR_COLOR           "\x1b[31m"
-#define LOG_INFO_COLOR          "\x1b[32m"
-#define LOG_TIME_COLOR          "\x1b[36m"
-#define LOG_FUNC_COLOR          "\x1b[33m"
-
 static bool supports_colors = false;
 static double start_time = 0;
 
@@ -72,6 +68,9 @@ void _log_abort(const char* func, const char* fmt, ...) {
     exit(1);
 }
 
+bool is_color_capable(void) {
+    return supports_colors;
+}
 
 void init_logging(void) {
     // Check whether we're attached to tty terminal

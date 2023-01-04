@@ -51,11 +51,16 @@ struct kflat_test_case {
   	const typeof( ((type *)0)->member ) *__mptr = (ptr);	\
   	(type *)( (char *)__mptr - offsetof(type,member) );})
 
-#define ASSERT(EXPR)    do {                                                \
-                            if(!(EXPR)) {                                   \
-                                printf("\r=> %s:%d %s: Test failed `%s`\n", __FILE__, __LINE__, __func__, #EXPR); \
-                                return 1;                                   \
-                            }                                               \
+#define MAX_LAST_ASSERT 4096
+extern char _last_assert_tested[MAX_LAST_ASSERT];
+
+#define ASSERT(EXPR)    do {                                                    \
+                            snprintf(_last_assert_tested, MAX_LAST_ASSERT,      \
+                                "=> %s:%d %s: Test failed `%s`", __FILE__, __LINE__, __func__, #EXPR); \
+                            if(!(EXPR)) {                                       \
+                                fprintf(stderr, "%s\n", _last_assert_tested);     \
+                                return 1;                                       \
+                            }                                                   \
                         } while(0)
 
 #endif

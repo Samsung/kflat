@@ -8,6 +8,7 @@
 #include <assert.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <signal.h>
 #include <stdarg.h>
 #include <stdbool.h>
 #include <stdio.h>
@@ -17,6 +18,8 @@
 #include <sys/ioctl.h>
 #include <sys/mman.h>
 #include <sys/stat.h>
+#include <sys/wait.h>
+#include <ucontext.h>
 #include <unistd.h>
 
 #include "common.h"
@@ -34,6 +37,37 @@ struct args {
     bool verbose;
     const char* output_dir;
 };
+
+
+/*******************************************************
+ * SIGNAL HANDLER
+ *  Print neat and readable information for user when
+ *  an error occurs
+ *******************************************************/
+char _last_assert_tested[MAX_LAST_ASSERT];
+
+static void signal_handler(int signo, siginfo_t* si, void* raw_ucontext) {
+    ucontext_t* ucontext = (ucontext_t*) raw_ucontext;
+
+    printf("\n=======================\n");
+    log_error("SIGNAL %s", strsignal(signo)); 
+    // log_error(" * PC = %lx", ucontext->uc_mcontext.gregs[REG_RIP]);
+
+    switch(signo) {
+        case SIGSEGV:
+        case SIGILL:
+        case SIGBUS:
+        case SIGFPE:
+            log_error(" * Problematic address = %llx", si->si_addr);
+            break;
+    }
+
+    log_error(" * Last assertion tested: `%s`", _last_assert_tested);
+    log_error("Terminating test...\n");
+    fflush(stdout);
+
+    exit(signo);
+}
 
 /*******************************************************
  * TESTS VECTOR
@@ -126,17 +160,17 @@ int run_test(struct args* args, const char* name) {
         .debug_flag = args->debug
     };
 
-    log_info_continue("Test %s", name);
+    log_info("=> Testing %s...", name);
 
     int fd = open(KFLAT_NODE, O_RDONLY);
     if(fd < 0) {
-        log_error("\rfailed to open %s - %s", KFLAT_NODE, strerror(errno));
+        log_error("failed to open %s - %s", KFLAT_NODE, strerror(errno));
         goto exit;
     }
 
     area = mmap(NULL, flat_size, PROT_READ, MAP_PRIVATE, fd, 0);
     if(area == MAP_FAILED) {
-        log_error("\rfailed to mmap kflat memory - %s", strerror(errno));
+        log_error("failed to mmap kflat memory - %s", strerror(errno));
         goto close_fd;
     }
 
@@ -144,15 +178,15 @@ int run_test(struct args* args, const char* name) {
 
     output_size = ioctl(fd, KFLAT_TESTS, &tests);
     if(output_size < 0) {
-        log_error("\rfailed to execute KFLAT_TEST ioctl - %s", strerror(errno));
+        log_error("failed to execute KFLAT_TEST ioctl - %s", strerror(errno));
         goto munmap_area;
     }
 
     if(output_size > flat_size)
-        log_abort("\rtest somehow produced image larger than mmaped buffer (kernel bug?)"
+        log_abort("test somehow produced image larger than mmaped buffer (kernel bug?)"
                     " - size: %zu; mmap size: %zu", output_size, flat_size);
     if(args->verbose)
-        log_info("\n\t test produced %zu bytes of flattened memory", output_size);
+        log_info("\t test produced %zu bytes of flattened memory", output_size);
 
     // Save kflat image
     if(args->output_dir) {
@@ -179,7 +213,7 @@ int run_test(struct args* args, const char* name) {
 
         close(save_fd);
         if(!args->validate || args->verbose)
-            log_info("\n\t saved flatten image to file %s", out_name);
+            log_info("\t saved flatten image to file %s", out_name);
     }
 
     if(args->validate) {
@@ -195,22 +229,38 @@ int run_test(struct args* args, const char* name) {
         CFlatten flatten = flatten_init(0);
         ret = flatten_load(flatten, file, NULL);
         if(ret != 0) {
-            log_error("\rfailed to parse flattened image - %d", ret);
+            log_error("failed to parse flattened image - %d", ret);
             flatten_deinit(flatten);
             goto munmap_area;
         }
 
         void* memory = flatten_root_pointer_seq(flatten, 0);
         if(memory == NULL) {
-            log_error("\rfailed to acquire first root pointer from image");
+            log_error("failed to acquire first root pointer from image");
             flatten_deinit(flatten);
             goto munmap_area;
         }
 
-        ret = validator(memory, 0, flatten);
+        pid_t pid = fork();
+        if(pid == 0) {
+            ret = validator(memory, 0, flatten);
+            exit(0);
+        } else if(pid > 0) {
+            int status = 0;
+            waitpid(pid, &status, 0);
+
+            if(WEXITSTATUS(status) != 0) {
+                flatten_deinit(flatten);
+                goto munmap_area;
+            }
+        } else {
+            log_error("failed to fork subprocess");
+            ret = -1;
+        }
+        
         flatten_deinit(flatten);
         if(ret != 0) {
-            log_error("\rvalidator returned an error - %d", ret);
+            log_error("validator returned an error - %d", ret);
             goto munmap_area;
         }
 
@@ -226,11 +276,11 @@ munmap_area:
 close_fd:
     close(fd);
 exit:
-    printf("\r");
     if(success)
-        log_info("Test %-30s - SUCCESS", name);
+        log_info("Test %-50s - SUCCESS", name);
     else
-        log_error("Test %-30s - FAILED", name);
+        log_error("Test %-50s - %sFAILED%s", name, 
+                OUTPUT_COLOR(LOG_ERR_COLOR), OUTPUT_COLOR(LOG_DEFAULT_COLOR));
     return success;
 }
 
@@ -245,7 +295,7 @@ static struct argp_option options[] = {
     {"list", 'l', 0, 0, "List available tests"},
     {"output", 'o', "DIR", 0, "Save images to DIR"},
     {"debug", 'd', 0, 0, "Enable kflat debug flag"},
-    {"check", 'c', 0, 0, "Parse and validate saved image"},
+    {"skip-check", 's', 0, 0, "Skip saved image validation"},
     {"verbose", 'v', 0, 0, "More verbose logs"},
     { 0 }
 };
@@ -264,8 +314,8 @@ static error_t parse_opt(int key, char* arg, struct argp_state* state) {
         case 'd':
             options->debug = true;
             break;
-        case 'c':
-            options->validate = true;
+        case 's':
+            options->validate = false;
             break;
         case 'v':
             options->verbose = true;
@@ -297,6 +347,7 @@ int main(int argc, char** argv) {
     int ret;
     int count = 0, success = 0;
     struct args opts = {0};
+    opts.validate = true;
 
     init_logging();
     ret = argp_parse(&argp, argc, argv, 0, 0, &opts);
@@ -305,10 +356,8 @@ int main(int argc, char** argv) {
         return 1;
     }
 
-    if(opts.validate && !opts.output_dir) {
-        log_error("--check flag requires also --output to be set");
-        return 1;
-    }
+    if(opts.validate && !opts.output_dir)
+        opts.output_dir = ".out_tmp";
 
     if(opts.list) {
         list_tests();
@@ -325,6 +374,15 @@ int main(int argc, char** argv) {
         log_info("Will use `%s` as output directory", opts.output_dir);
     }
 
+    // Setup signal handler
+    struct sigaction sig_intercept = {
+        .sa_sigaction = signal_handler,
+        .sa_flags = SA_SIGINFO
+    };
+    
+    sigaction(SIGSEGV, &sig_intercept, NULL);
+    sigaction(SIGBUS, &sig_intercept, NULL);
+
     // Execute all tests requested by user
     struct tests_list* el = tests_list_tail;
     while(el) {
@@ -336,7 +394,11 @@ int main(int argc, char** argv) {
     if(count > 1) {
         log_info("Summary: %d/%d tests succeeded", success, count);
         if(success < count)
-            log_error("%d tests FAILED", count - success);
+            log_error("%d tests %sFAILED%s", count - success, 
+                    OUTPUT_COLOR(LOG_ERR_COLOR), OUTPUT_COLOR(LOG_DEFAULT_COLOR));
+        else
+            log_info("All tests %spassed%s", 
+                    OUTPUT_COLOR(LOG_INFO_COLOR), OUTPUT_COLOR(LOG_DEFAULT_COLOR));
     }
 
     return 0;
