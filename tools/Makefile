@@ -40,4 +40,4 @@ endif
 
 
 clean:
-	rm -f *.o executor executor_32 kflattest $(PWD)/tests/*.o
+	rm -f *.o executor executor_32 kflattest $(PWD)/tests/*.o $(PWD)/tests/tests_list.h

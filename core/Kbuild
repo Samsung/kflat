@@ -12,6 +12,8 @@ cmd_kflat_tests_gen = $< $@
 $(obj)/tests/tests_list.h: $(obj)/tests/tests_list_gen.sh
 	$(call cmd,kflat_tests_gen)
 
+$(obj)/kflat.o: $(obj)/tests/tests_list.h
+
 # Build kflat core module
 kflat_core-y = kflat.o kflat_impl.o probing.o kdump.o
 kflat_core-$(CONFIG_ARM64) += probing_arm.o
