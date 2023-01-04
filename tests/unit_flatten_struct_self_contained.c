@@ -17,7 +17,7 @@ struct unit_sc_B {
 };
 
 struct unit_sc_Large {
-    char data[4097];
+	char data[4097];
 };
 
 #ifdef __KERNEL__
@@ -30,9 +30,9 @@ FUNCTION_DECLARE_FLATTEN_STRUCT(unit_sc_Large);
 
 FUNCTION_DEFINE_FLATTEN_STRUCT_SELF_CONTAINED(unit_sc_B, sizeof(struct unit_sc_B));
 FUNCTION_DEFINE_FLATTEN_STRUCT_SELF_CONTAINED(unit_sc_A, sizeof(struct unit_sc_A),
-    AGGREGATE_FLATTEN_STRUCT_SELF_CONTAINED(
-        unit_sc_B, sizeof(struct unit_sc_B), 0, offsetof(struct unit_sc_A, pB)
-    );
+	AGGREGATE_FLATTEN_STRUCT_SELF_CONTAINED(
+		unit_sc_B, sizeof(struct unit_sc_B), 0, offsetof(struct unit_sc_A, pB)
+	);
 );
 FUNCTION_DEFINE_FLATTEN_STRUCT_SELF_CONTAINED(unit_sc_Large, sizeof(struct unit_sc_Large));
 
@@ -40,19 +40,19 @@ static int kflat_flatten_struct_self_contained_unit_test(struct kflat *kflat) {
 	struct unit_sc_B str = { "CDF" };
 	struct unit_sc_A obj = { 0xCAFECAFE, &str };
 	struct unit_sc_A* pA = &obj;
-    struct unit_sc_Large* large = (struct unit_sc_Large*) vmalloc(4096);
+	struct unit_sc_Large* large = (struct unit_sc_Large*) vmalloc(4096);
 
 	FOR_ROOT_POINTER(pA,
 		FLATTEN_STRUCT_SELF_CONTAINED(unit_sc_A, sizeof(struct unit_sc_A), pA);
 	);
 
-    FOR_ROOT_POINTER(&str,
-        FLATTEN_STRUCT_SELF_CONTAINED(unit_sc_B, sizeof(struct unit_sc_B), &str);
-    );
+	FOR_ROOT_POINTER(&str,
+		FLATTEN_STRUCT_SELF_CONTAINED(unit_sc_B, sizeof(struct unit_sc_B), &str);
+	);
 
-    FOR_ROOT_POINTER(large,
-        FLATTEN_STRUCT_SELF_CONTAINED(unit_sc_Large, sizeof(struct unit_sc_Large), large);
-    );
+	FOR_ROOT_POINTER(large,
+		FLATTEN_STRUCT_SELF_CONTAINED(unit_sc_Large, sizeof(struct unit_sc_Large), large);
+	);
 
 	return 0;
 }
@@ -60,12 +60,12 @@ static int kflat_flatten_struct_self_contained_unit_test(struct kflat *kflat) {
 #else
 
 static int kflat_flatten_struct_self_contained_unit_validate(void* memory, size_t size, CFlatten flatten) {
-    struct unit_sc_A* pA = (struct unit_sc_A*) flatten_root_pointer_seq(flatten, 0);
-    struct unit_sc_B* str = (struct unit_sc_B*) flatten_root_pointer_seq(flatten, 1);
+	struct unit_sc_A* pA = (struct unit_sc_A*) flatten_root_pointer_seq(flatten, 0);
+	struct unit_sc_B* str = (struct unit_sc_B*) flatten_root_pointer_seq(flatten, 1);
 
 	ASSERT(pA->X == 0xCAFECAFE);
 	ASSERT(pA->pB == str);
-    ASSERT(!strcmp((const char*) str->T, "CDF"));
+	ASSERT(!strcmp((const char*) str->T, "CDF"));
 	return 0;
 }
 
