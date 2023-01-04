@@ -335,7 +335,6 @@ void flatten_clear_option(struct kflat* kflat, int option);
 extern unsigned long (*kflat_lookup_kallsyms_name)(const char* name);
 bool flatten_get_object(void* ptr, void** start, void** end);
 void* flatten_global_address_by_name(const char* name);
-void* flatten_global_address(const char* module, uint64_t offset);
 
 
 /* Logging */
@@ -349,11 +348,11 @@ void* flatten_global_address(const char* module, uint64_t offset);
 
 #define DBGS(M, ...)						flat_dbg(M, ##__VA_ARGS__)
 #define DBGM1(name,a1)						flat_dbg(#name "(" #a1 ")\n")
-#define DBGF(name,F,FMT,P)					flat_dbg(#name "(" #F "[" FMT "])\n",P)
+#define DBGF(name,F,FMT,...)				flat_dbg(#name "(" #F "[" FMT "])\n", ##__VA_ARGS__)
 #define DBGOF(name,F,FMT,P,Q)				flat_dbg(#name "(" #F "[" FMT "])\n",P,Q)
 #define DBGM2(name,a1,a2)					flat_dbg(#name "(" #a1 "," #a2 ")\n")
-#define DBGTF(name,T,F,FMT,P)				flat_dbg(#name "(" #T "," #F "[" FMT "])\n",P)
-#define DBGTNF(name,T,N,F,FMT,P)			flat_dbg(#name "(" #T "," #N "," #F "[" FMT "])\n",P)
+#define DBGTF(name,T,F,FMT,...)				flat_dbg(#name "(" #T "," #F "[" FMT "])\n", ##__VA_ARGS__)
+#define DBGTNF(name,T,N,F,FMT,...)			flat_dbg(#name "(" #T "," #N "," #F "[" FMT "])\n", ##__VA_ARGS__)
 #define DBGTFMF(name,T,F,FMT,P,PF,FF)		flat_dbg(#name "(" #T "," #F "[" FMT "]," #PF "," #FF ")\n",P)
 #define DBGTFOMF(name,T,F,FMT,P,Q,PF,FF) 	flat_dbg(#name "(" #T "," #F "[" FMT "]," #PF "," #FF ")\n",P,Q)
 #define DBGTNFOMF(name,T,N,F,FMT,P,Q,PF,FF) flat_dbg(#name "(" #T "," #N "," #F "[" FMT "]," #PF "," #FF ")\n",P,Q)
@@ -698,9 +697,10 @@ struct flatten_pointer* flatten_struct_array_iter_##FLTYPE(struct kflat* kflat, 
 	extern struct flatten_pointer* flatten_struct_array_iter_##FLTYPE(struct kflat* kflat, const void* ptr, size_t n, struct bqueue* __q);
 
 #define FUNCTION_DEFINE_FLATTEN_STRUCT_ARRAY_ITER_SELF_CONTAINED_SPECIALIZE(TAG,FLTYPE,FLSIZE) \
-struct flatten_pointer* flatten_struct_array_iter_##FLTYPE##_##TAG(struct kflat* kflat, const struct FLTYPE* _ptr, size_t n, struct bqueue* __q) {    \
+struct flatten_pointer* flatten_struct_array_iter_##FLTYPE##_##TAG(struct kflat* kflat, const void* ptr, size_t n, struct bqueue* __q) {    \
     size_t _i;  \
     void* _fp_first=0;  \
+	const struct FLTYPE* _ptr = (const struct FLTYPE*) ptr;	\
     DBGS("flatten_struct_" #FLTYPE "_array_iter(%lx,%zu)\n",(uintptr_t)_ptr,n);	\
 	for (_i=0; _i<n; ++_i) {    \
 		void* _fp = (void*)flatten_struct_iter_##FLTYPE##_##TAG(kflat,(struct FLTYPE*)((unsigned char*)_ptr+_i*FLSIZE),__q);    \
@@ -722,7 +722,7 @@ struct flatten_pointer* flatten_struct_array_iter_##FLTYPE##_##TAG(struct kflat*
 }
 
 #define FUNCTION_DECLARE_FLATTEN_STRUCT_ARRAY_ITER_SELF_CONTAINED_SPECIALIZE(TAG,FLTYPE,FLSIZE) \
-extern struct flatten_pointer* flatten_struct_array_iter_##FLTYPE##_##TAG(struct kflat* kflat, const struct FLTYPE* _ptr, size_t n, struct bqueue* __q);
+extern struct flatten_pointer* flatten_struct_array_iter_##FLTYPE##_##TAG(struct kflat* kflat, const void* _ptr, size_t n, struct bqueue* __q);
 
 #define FUNCTION_DEFINE_FLATTEN_UNION_ARRAY_ITER_SELF_CONTAINED(FLTYPE,FLSIZE) \
 struct flatten_pointer* flatten_union_array_iter_##FLTYPE(struct kflat* kflat, const void* ptr, size_t n, struct bqueue* __q) {    \
@@ -1610,11 +1610,12 @@ FUNCTION_DEFINE_FLATTEN_STRUCT_ARRAY_ITER_SELF_CONTAINED(FLTYPE,FLSIZE)
 
 #define FUNCTION_DEFINE_FLATTEN_STRUCT_ITER_SELF_CONTAINED_SPECIALIZE(TAG,FLTYPE,FLSIZE,...)  \
 			\
-struct flatten_pointer* flatten_struct_iter_##FLTYPE##_##TAG(struct kflat* kflat, const struct FLTYPE* _ptr, struct bqueue* __q) {    \
+struct flatten_pointer* flatten_struct_iter_##FLTYPE##_##TAG(struct kflat* kflat, const void* ptr, struct bqueue* __q) {    \
             \
     size_t _alignment = 0;  \
     struct flatten_pointer* r = 0;	\
     size_t _node_offset;	\
+	const struct FLTYPE* _ptr = (const struct FLTYPE*) ptr; \
             \
     struct flat_node *__node = interval_tree_iter_first(&kflat->FLCTRL.imap_root, (uint64_t)_ptr, (uint64_t)_ptr+FLSIZE-1);    \
     DBGS("flatten_struct_" #FLTYPE "_iter(%lx): [%zu]\n",(uintptr_t)_ptr,FLSIZE);	\
@@ -2396,7 +2397,7 @@ FUNCTION_DEFINE_FLATTEN_STRUCT_TYPE_ARRAY_ITER_SELF_CONTAINED(FLTYPE,FLSIZE)
 				KFLAT_ACCESSOR->errno = err;	\
 			}	\
 			else {	\
-				if (!err || (err==EAGAIN) || (err=EINVAL)) {	\
+				if (!err || (err==EAGAIN) || (err==EINVAL)) {	\
 					struct fixup_set_node* __struct_inode;	\
 					size_t _i;	\
 					err = 0;	\
@@ -2443,7 +2444,7 @@ FUNCTION_DEFINE_FLATTEN_STRUCT_TYPE_ARRAY_ITER_SELF_CONTAINED(FLTYPE,FLSIZE)
 				KFLAT_ACCESSOR->errno = err;	\
 			}	\
 			else {	\
-				if (!err || (err==EAGAIN) || (err=EINVAL)) {	\
+				if (!err || (err==EAGAIN) || (err==EINVAL)) {	\
 					struct fixup_set_node* __struct_inode;	\
 					size_t _i;	\
 					err = 0;	\
@@ -2457,7 +2458,7 @@ FUNCTION_DEFINE_FLATTEN_STRUCT_TYPE_ARRAY_ITER_SELF_CONTAINED(FLTYPE,FLSIZE)
 							__job.offset = 0; \
 							__job.size = 1;	\
 							__job.ptr = (struct flatten_base*)((void*)p+_i*sizeof(struct T));    \
-							__job.fun = (flatten_struct_t)&flatten_struct_array_iter_##T##_##TAG;    \
+							__job.fun = &flatten_struct_array_iter_##T##_##TAG;    \
 							__job.fp = 0;   \
 							__job.convert = 0;  \
 							err = bqueue_push_back(KFLAT_ACCESSOR,__q,&__job,sizeof(struct flatten_job));    \
@@ -2490,7 +2491,7 @@ FUNCTION_DEFINE_FLATTEN_STRUCT_TYPE_ARRAY_ITER_SELF_CONTAINED(FLTYPE,FLSIZE)
 				KFLAT_ACCESSOR->errno = err;	\
 			}	\
 			else {	\
-				if (!err || (err==EAGAIN) || (err=EINVAL)) {	\
+				if (!err || (err==EAGAIN) || (err==EINVAL)) {	\
 					struct fixup_set_node* __struct_inode;	\
 					size_t _i;	\
 					err = 0;	\
@@ -2537,7 +2538,7 @@ FUNCTION_DEFINE_FLATTEN_STRUCT_TYPE_ARRAY_ITER_SELF_CONTAINED(FLTYPE,FLSIZE)
 				KFLAT_ACCESSOR->errno = err;	\
 			}	\
 			else {	\
-				if (!err || (err==EAGAIN) || (err=EINVAL)) {	\
+				if (!err || (err==EAGAIN) || (err==EINVAL)) {	\
 					struct fixup_set_node* __struct_inode;	\
 					size_t _i;	\
 					err = 0;	\
@@ -2584,7 +2585,7 @@ FUNCTION_DEFINE_FLATTEN_STRUCT_TYPE_ARRAY_ITER_SELF_CONTAINED(FLTYPE,FLSIZE)
 				KFLAT_ACCESSOR->errno = err;	\
 			}	\
 			else {	\
-				if (!err || (err==EAGAIN) || (err=EINVAL)) {	\
+				if (!err || (err==EAGAIN) || (err==EINVAL)) {	\
 					struct fixup_set_node* __struct_inode;	\
 					size_t _i;	\
 					err = 0;	\
@@ -2631,7 +2632,7 @@ FUNCTION_DEFINE_FLATTEN_STRUCT_TYPE_ARRAY_ITER_SELF_CONTAINED(FLTYPE,FLSIZE)
 				KFLAT_ACCESSOR->errno = err;	\
 			}	\
 			else {	\
-				if (!err || (err==EAGAIN) || (err=EINVAL)) {	\
+				if (!err || (err==EAGAIN) || (err==EINVAL)) {	\
 					struct fixup_set_node* __struct_inode;	\
 					size_t _i;	\
 					err = 0;	\
@@ -4060,7 +4061,7 @@ FUNCTION_DEFINE_FLATTEN_STRUCT_TYPE_ARRAY_ITER_SELF_CONTAINED(FLTYPE,FLSIZE)
 								__job.offset = 0; \
 								__job.size = 1;	\
 								__job.ptr = (struct flatten_base*)((void*)OFFATTRN(void*,_off,_shift)+_i*N);    \
-								__job.fun = (flatten_struct_t)&flatten_struct_array_iter_##T;    \
+								__job.fun = &flatten_struct_array_iter_##T;    \
 								__job.fp = 0;   \
 								__job.convert = 0;  \
 								err = bqueue_push_back(KFLAT_ACCESSOR,__q,&__job,sizeof(struct flatten_job));    \
@@ -4123,7 +4124,7 @@ FUNCTION_DEFINE_FLATTEN_STRUCT_TYPE_ARRAY_ITER_SELF_CONTAINED(FLTYPE,FLSIZE)
 								__job.offset = 0; \
 								__job.size = 1;	\
 								__job.ptr = (struct flatten_base*)((void*)_fp+_i*N);    \
-								__job.fun = (flatten_struct_t)&flatten_struct_array_iter_##T;    \
+								__job.fun = &flatten_struct_array_iter_##T;    \
 								__job.fp = 0;   \
 								__job.convert = 0;  \
 								err = bqueue_push_back(KFLAT_ACCESSOR,__q,&__job,sizeof(struct flatten_job));    \
@@ -4191,7 +4192,7 @@ FUNCTION_DEFINE_FLATTEN_STRUCT_TYPE_ARRAY_ITER_SELF_CONTAINED(FLTYPE,FLSIZE)
 								__job.offset = 0; \
 								__job.size = 1;	\
 								__job.ptr = (struct flatten_base*)((void*)_fp+_i*N);    \
-								__job.fun = (flatten_struct_t)&flatten_struct_array_iter_##T;    \
+								__job.fun = &flatten_struct_array_iter_##T;    \
 								__job.fp = 0;   \
 								__job.convert = 0;  \
 								err = bqueue_push_back(KFLAT_ACCESSOR,__q,&__job,sizeof(struct flatten_job));    \
@@ -4318,7 +4319,7 @@ FUNCTION_DEFINE_FLATTEN_STRUCT_TYPE_ARRAY_ITER_SELF_CONTAINED(FLTYPE,FLSIZE)
 								__job.offset = 0; \
 								__job.size = 1;	\
 								__job.ptr = (struct flatten_base*)((void*)OFFATTRN(void*,_off,_shift)+_i*N);    \
-								__job.fun = (flatten_struct_t)&flatten_union_array_iter_##T;    \
+								__job.fun = &flatten_union_array_iter_##T;    \
 								__job.fp = 0;   \
 								__job.convert = 0;  \
 								err = bqueue_push_back(KFLAT_ACCESSOR,__q,&__job,sizeof(struct flatten_job));    \
@@ -4443,7 +4444,7 @@ FUNCTION_DEFINE_FLATTEN_STRUCT_TYPE_ARRAY_ITER_SELF_CONTAINED(FLTYPE,FLSIZE)
 								__job.offset = 0; \
 								__job.size = 1;	\
 								__job.ptr = (struct flatten_base*)((void*)OFFATTRN(void*,_off,_shift)+_i*N);    \
-								__job.fun = (flatten_struct_t)&flatten_struct_type_array_iter_##T;    \
+								__job.fun = &flatten_struct_type_array_iter_##T;    \
 								__job.fp = 0;   \
 								__job.convert = 0;  \
 								err = bqueue_push_back(KFLAT_ACCESSOR,__q,&__job,sizeof(struct flatten_job));    \
@@ -4865,8 +4866,6 @@ FUNCTION_DEFINE_FLATTEN_STRUCT_TYPE_ARRAY_ITER_SELF_CONTAINED(FLTYPE,FLSIZE)
 			bool rv = flatten_get_object(__ptr, &__start, &__end);	\
 			(rv)?(__end-__ptr+1):(__default_size);	\
 		})
-
-#define GLOBAL_VARIABLE(MODULE_NAME, OFFSET)		flatten_global_address(MODULE_NAME, OFFSET)
 
 #define PTRNODE(PTRV)	(interval_tree_iter_first(&kflat->FLCTRL.imap_root, (uintptr_t)(PTRV), (uintptr_t)(PTRV)))
 #define KFLAT_ACCESSOR kflat
