@@ -36,13 +36,13 @@ Project directory presents as follow:
 ```yml
 .
 ├── core            // Main implementation of kflat module
-│   └── tests       // Unit-tests
 ├── doc             // Project documentation
 ├── include         // Shared include files
 ├── lib             // Userspace library for unflattening images
 │   └── include
 ├── recipes         // Collection of kflat recipes
 │   └── random_read
+├── tests           // Examples and unit tests
 ├── tools           // Userspace tools used with kflat
 └── utils           // Miscellaneous utilities
 ```
@@ -73,7 +73,7 @@ ls /sys/kernel/debug
 For security reasons, access to this node is restricted only to processes with `CAP_SYS_RAWIO` capability. In case, your application failed to interact with kflat due to `EPERM` (Permission Denied) error, ensure you have the necessary capabilities.
 
 ### Run kflat tests
-Kflat is equipped with set of basic tests to ensure that all the functionalities are working as expected. In order to run the test, use `./kflattest` app located in `tools/` directory.
+Kflat is equipped with set of tests to ensure that all the functionalities are working as expected. In order to run the test, use `./kflattest` app located in `tools/` directory.
 
 ```sh
 # List all available tests
@@ -89,14 +89,9 @@ Kflat is equipped with set of basic tests to ensure that all the functionalities
 ./kflattest -o output CIRCLE
 ```
 
+`./kflattest` automatically validates obtained memory dump and informs whether it's correct (`SUCCESS`) or not (`FAILED`). All tests can be found in `tests/` subdirectory.
+
 Created memory dumps can be analyzed by using `imginfo` program (formerly called `main.cpp` in original kflat repository). As an arguments, `imginfo` takes the name of test that has been run and memory dump associated with it. Under the hood, the dumped memory is recreated in userspace and processed to determine whether all parts of it were correcly saved and restored.
-
-`kflattest` is capable of executing `imginfo` app on every test result. To use this functionality, simply add `-t ./imginfo` option to cmdline
-
-```sh
-# Run test CIRCLE, save its output and print imginfo result
-./kflattest -o output -t ./imginfo CIRCLE
-```
 
 ### Prepare kflat recipe
 Kflat requires a description of target memory called _kflat recipe_. Vast and extensive documentation of recipes format is pending. For sample recipes, refer to directory `recipes/`.
