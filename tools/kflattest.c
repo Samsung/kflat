@@ -147,6 +147,18 @@ kflat_test_case_handler_t get_test_validator(const char* name) {
 	return NULL;
 }
 
+get_function_address_t get_test_gfa(const char* name) {
+    size_t tests_count;
+    struct kflat_test_case** tests;
+    tests_count = get_tests_section(&tests);
+
+	for(size_t i = 0; i < tests_count; i++) {
+		if(!strcmp(name, tests[i]->name))
+			return tests[i]->gfa;
+	}
+	return NULL;
+}
+
 int run_test(struct args* args, const char* name) {
     int ret;
     void* area;
@@ -160,7 +172,8 @@ int run_test(struct args* args, const char* name) {
         .debug_flag = args->debug
     };
 
-    log_info("=> Testing %s...", name);
+    if(args->verbose)
+        log_info("=> Testing %s...", name);
 
     int fd = open(KFLAT_NODE, O_RDONLY);
     if(fd < 0) {
@@ -227,7 +240,7 @@ int run_test(struct args* args, const char* name) {
         assert(file != NULL);
 
         CFlatten flatten = flatten_init(0);
-        ret = flatten_load(flatten, file, NULL);
+        ret = flatten_load(flatten, file, get_test_gfa(name));
         if(ret != 0) {
             log_error("failed to parse flattened image - %d", ret);
             flatten_deinit(flatten);
@@ -244,12 +257,13 @@ int run_test(struct args* args, const char* name) {
         pid_t pid = fork();
         if(pid == 0) {
             ret = validator(memory, 0, flatten);
-            exit(0);
+            exit(ret);
         } else if(pid > 0) {
             int status = 0;
             waitpid(pid, &status, 0);
 
-            if(WEXITSTATUS(status) != 0) {
+            ret = WEXITSTATUS(status);
+            if(ret != 0) {
                 flatten_deinit(flatten);
                 goto munmap_area;
             }

@@ -34,6 +34,7 @@ struct kflat_test_case {
 
 #else
 
+#include <stdbool.h>
 #include <stddef.h>
 #include <stdlib.h>
 #include <string.h>
@@ -45,6 +46,7 @@ typedef int (*kflat_test_case_handler_t)(void* memory, size_t size, CFlatten fla
 struct kflat_test_case {
     const char* name;
     kflat_test_case_handler_t handler;
+    get_function_address_t gfa;
 };
 
 #define container_of(ptr, type, member) ({			\
@@ -79,15 +81,22 @@ extern char _last_assert_tested[MAX_LAST_ASSERT];
             .handler = FUNC,                                    \
         }
 
+#define KFLAT_REGISTER_TEST_GFA(NAME, FUNC, FUNC_USER, GFA)     \
+    KFLAT_REGISTER_TEST(NAME, FUNC, FUNC_USER)
+
 #else
 
-#define KFLAT_REGISTER_TEST(NAME, FUNC, FUNC_USER)              \
+#define KFLAT_REGISTER_TEST_GFA(NAME, FUNC, FUNC_USER, GFA)     \
     const struct kflat_test_case test_case_ ## FUNC             \
         __attribute__((used))                                   \
         = {                                                     \
             .name = NAME,                                       \
             .handler = FUNC_USER,                               \
+            .gfa = GFA,                                         \
         }
+
+#define KFLAT_REGISTER_TEST(NAME, FUNC, FUNC_USER)              \
+    KFLAT_REGISTER_TEST_GFA(NAME, FUNC, FUNC_USER, NULL)
 
 #endif
 

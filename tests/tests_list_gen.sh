@@ -35,6 +35,9 @@ pushd $M/tests > /dev/null
 EXTERNS=`grep -oP 'KFLAT_REGISTER_TEST\(".+", [^,]+' *.c | grep -oP ',\s*.*' | grep -oP '[^\s,]+' | awk '{print "test_case_" $0}' | awk '{print "extern struct kflat_test_case " $0 ";"}'`
 ENTRIES=`grep -oP 'KFLAT_REGISTER_TEST\(".+", [^,]+' *.c | grep -oP ',\s*.*' | grep -oP '[^\s,]+' | awk '{print "test_case_" $0}' | awk '{print "\t&" $0 ","}'`
 
+EXTERNS+=`grep -oP 'KFLAT_REGISTER_TEST_EX\(".+", [^,]+' *.c | grep -oP ',\s*.*' | grep -oP '[^\s,]+' | awk '{print "test_case_" $0}' | awk '{print "extern struct kflat_test_case " $0 ";"}'`
+ENTRIES+=`grep -oP 'KFLAT_REGISTER_TEST_EX\(".+", [^,]+' *.c | grep -oP ',\s*.*' | grep -oP '[^\s,]+' | awk '{print "test_case_" $0}' | awk '{print "\t&" $0 ","}'`
+
 
 echo "$HEADER" > tests_list.h
 echo "$EXTERNS" >> tests_list.h
