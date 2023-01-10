@@ -25,8 +25,9 @@ struct myLongLList {
 };
 
 
-
+/********************************/
 #ifdef __KERNEL__
+/********************************/
 
 FUNCTION_DECLARE_FLATTEN_STRUCT_ARRAY_ITER_SELF_CONTAINED(llist_node,8);
 FUNCTION_DEFINE_FLATTEN_STRUCT_ITER_SELF_CONTAINED(llist_node,8,
@@ -81,7 +82,9 @@ static int kflat_llist_test_iter(struct kflat *kflat) {
 	return 0;
 }
 
+/********************************/
 #else
+/********************************/
 
 static int kflat_llist_test_validate(void* memory, size_t size, CFlatten flatten) {
     size_t list_size = 0;
@@ -100,7 +103,8 @@ static int kflat_llist_test_validate(void* memory, size_t size, CFlatten flatten
 	return 0;
 }
 
+/********************************/
 #endif
-
+/********************************/
 
 KFLAT_REGISTER_TEST("LLIST", kflat_llist_test_iter, kflat_llist_test_validate);

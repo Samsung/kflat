@@ -6,6 +6,7 @@
 
 #include "common.h"
 
+
 #ifdef __KERNEL__
 #include <linux/list.h>
 #else
@@ -19,7 +20,9 @@ struct myLongList {
 	struct list_head v;
 };
 
+/********************************/
 #ifdef __KERNEL__
+/********************************/
 
 FUNCTION_DECLARE_FLATTEN_STRUCT_ARRAY_ITER_SELF_CONTAINED(myLongList,24);
 
@@ -56,7 +59,9 @@ static int kflat_list_test_iter(struct kflat *kflat) {
 	return err;
 }
 
+/********************************/
 #else
+/********************************/
 
 static int kflat_list_validate(void* memory, size_t size, CFlatten flatten) {
     struct list_head *p;
@@ -73,6 +78,8 @@ static int kflat_list_validate(void* memory, size_t size, CFlatten flatten) {
     return 0;
 }
 
+/********************************/
 #endif
+/********************************/
 
 KFLAT_REGISTER_TEST("LONG_LIST", kflat_list_test_iter, kflat_list_validate);

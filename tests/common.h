@@ -12,7 +12,10 @@
 /********************************
  * INCLUDES AND TYPES
  ********************************/
+
+/********************************/
 #ifdef __KERNEL__
+/********************************/
 
 #include <kflat.h>
 
@@ -32,7 +35,9 @@ struct kflat_test_case {
     kflat_test_case_handler_t handler;
 };
 
+/********************************/
 #else
+/********************************/
 
 #include <stdbool.h>
 #include <stddef.h>
@@ -65,13 +70,18 @@ extern char _last_assert_tested[MAX_LAST_ASSERT];
                             }                                                   \
                         } while(0)
 
+/********************************/
 #endif
+/********************************/
 
 
 /********************************
  * TESTS REGISTRATION MACRO
  ********************************/
+
+/********************************/
 #ifdef __KERNEL__
+/********************************/
 
 #define KFLAT_REGISTER_TEST(NAME, FUNC, FUNC_USER)              \
     const struct kflat_test_case test_case_ ## FUNC             \
@@ -84,7 +94,9 @@ extern char _last_assert_tested[MAX_LAST_ASSERT];
 #define KFLAT_REGISTER_TEST_GFA(NAME, FUNC, FUNC_USER, GFA)     \
     KFLAT_REGISTER_TEST(NAME, FUNC, FUNC_USER)
 
+/********************************/
 #else
+/********************************/
 
 #define KFLAT_REGISTER_TEST_GFA(NAME, FUNC, FUNC_USER, GFA)     \
     const struct kflat_test_case test_case_ ## FUNC             \
@@ -98,6 +110,8 @@ extern char _last_assert_tested[MAX_LAST_ASSERT];
 #define KFLAT_REGISTER_TEST(NAME, FUNC, FUNC_USER)              \
     KFLAT_REGISTER_TEST_GFA(NAME, FUNC, FUNC_USER, NULL)
 
+/********************************/
 #endif
+/********************************/
 
 #endif  /*_LINUX_KFLAT_COMMON_H */

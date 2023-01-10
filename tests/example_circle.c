@@ -1,5 +1,5 @@
 /**
- * @file circle.c
+ * @file example_circle.c
  * @author Samsung R&D Poland - Mobile Security Group
  * @brief TODO
  * 
@@ -7,6 +7,7 @@
 
 #include "common.h"
 
+// Common structure types for both userspace and kernel
 struct point {
     double x;
     double y;
@@ -21,7 +22,9 @@ struct figure {
 };
 
 
+/********************************/
 #ifdef __KERNEL__
+/********************************/
 #include "kflat_test_data.h"
 
 
@@ -118,7 +121,9 @@ static int kflat_circle_test_iter(struct kflat *kflat) {
 	return 0;
 }
 
+/********************************/
 #else
+/********************************/
 
 #include <math.h>
 
@@ -157,7 +162,10 @@ static int kflat_circle_validate(void* memory, size_t size, CFlatten flatten) {
 	return 0;
 }
 
+/********************************/
 #endif
+/********************************/
 
+// xxx TODO: remove _ITER variant in near future
 KFLAT_REGISTER_TEST("CIRCLE", kflat_circle_test, kflat_circle_validate);
 KFLAT_REGISTER_TEST("CIRCLE_ITER", kflat_circle_test_iter, kflat_circle_validate);
