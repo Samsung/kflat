@@ -31,17 +31,6 @@ FUNCTION_DEFINE_FLATTEN_STRUCT_TYPE(my_A,
 	AGGREGATE_FLATTEN_STRING(p);
 );
 
-/* ITER version */
-FUNCTION_DEFINE_FLATTEN_STRUCT_TYPE_ITER(my_B);
-FUNCTION_DEFINE_FLATTEN_STRUCT_TYPE_ITER(my_A,
-	STRUCT_ALIGN(120);
-	AGGREGATE_FLATTEN_STRUCT_TYPE_ITER(my_B, pB0);
-	AGGREGATE_FLATTEN_STRUCT_TYPE_ITER(my_B, pB1);
-	AGGREGATE_FLATTEN_STRUCT_TYPE_ITER(my_B, pB2);
-	AGGREGATE_FLATTEN_STRUCT_TYPE_ITER(my_B, pB3);
-	AGGREGATE_FLATTEN_STRING(p);
-);
-
 static int kflat_overlapptr_test(struct kflat *kflat) {
 	int err = 0;
 	my_B arrB[4] = { { 1 }, { 2 }, { 3 }, { 4 } };
@@ -55,26 +44,6 @@ static int kflat_overlapptr_test(struct kflat *kflat) {
 
 	FOR_ROOT_POINTER(&T[1],
 		FLATTEN_STRUCT_TYPE(my_A, &T[1]);
-	);
-
-	return err;
-}
-
-static int kflat_overlapptr_test_iter(struct kflat *kflat) {
-	int err = 0;
-	my_B arrB[4] = { { 1 }, { 2 }, { 3 }, { 4 } };
-	my_A T[3] = { {}, { 0, &arrB[0], &arrB[1], &arrB[2], &arrB[3], "p in struct A" }, {} };
-	unsigned char *p;
-
-	p = (unsigned char *)&T[1] - 8;
-	FOR_ROOT_POINTER(p,
-		FLATTEN_TYPE_ARRAY(unsigned char, p, sizeof(my_A) + 16);
-	);
-
-	FOR_ROOT_POINTER(&T[1],
-		UNDER_ITER_HARNESS(
-			FLATTEN_STRUCT_TYPE_ITER(my_A, &T[1]);
-		);
 	);
 
 	return err;
@@ -95,4 +64,3 @@ static int kflat_overlapptr_test_validate(void *memory, size_t size, CFlatten fl
 #endif
 
 KFLAT_REGISTER_TEST("OVERLAP_PTR", kflat_overlapptr_test, kflat_overlapptr_test_validate);
-KFLAT_REGISTER_TEST("OVERLAP_PTR_ITER", kflat_overlapptr_test_iter, kflat_overlapptr_test_validate);

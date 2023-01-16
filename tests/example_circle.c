@@ -27,8 +27,6 @@ struct figure {
 
 FUNCTION_DECLARE_FLATTEN_STRUCT(point);
 FUNCTION_DECLARE_FLATTEN_STRUCT(figure);
-FUNCTION_DECLARE_FLATTEN_STRUCT_ITER(point);
-FUNCTION_DECLARE_FLATTEN_STRUCT_ITER(figure);
 
 FUNCTION_DEFINE_FLATTEN_STRUCT(point,
 	AGGREGATE_FLATTEN_TYPE_ARRAY(struct point *, other, ATTR(n));
@@ -37,22 +35,11 @@ FUNCTION_DEFINE_FLATTEN_STRUCT(point,
 	);
 );
 
-FUNCTION_DEFINE_FLATTEN_STRUCT_ITER(point,
-	AGGREGATE_FLATTEN_TYPE_ARRAY(struct point *, other, ATTR(n));
-	FOREACH_POINTER(struct point *, p, ATTR(other), ATTR(n),
-		FLATTEN_STRUCT_ITER(point, p);
-	);
-);
-
 FUNCTION_DEFINE_FLATTEN_STRUCT(figure,
 	AGGREGATE_FLATTEN_STRING(name);
 	AGGREGATE_FLATTEN_STRUCT_ARRAY(point, points, ATTR(n));
 );
 
-FUNCTION_DEFINE_FLATTEN_STRUCT_ITER(figure,
-	AGGREGATE_FLATTEN_STRING(name);
-	AGGREGATE_FLATTEN_STRUCT_ARRAY_ITER(point, points, ATTR(n));
-);
 
 #define MAKE_POINT(p, i, N) \
 	p.x = (cosx[i]);    \
@@ -96,22 +83,6 @@ static int kflat_circle_test(struct kflat *kflat) {
 
 	FOR_ROOT_POINTER(&circle,
 		FLATTEN_STRUCT(figure, &circle);
-	);
-
-	free_circle(&circle);
-	return 0;
-}
-
-static int kflat_circle_test_iter(struct kflat *kflat) {
-	struct figure circle;
-
-	circle.name = "circle";
-	create_circle(&circle, 750, cosxi, sinxi);
-
-	FOR_ROOT_POINTER(&circle,
-		UNDER_ITER_HARNESS(
-			FLATTEN_STRUCT_ITER(figure, &circle);
-		);
 	);
 
 	free_circle(&circle);
@@ -162,6 +133,4 @@ static int kflat_circle_validate(void *memory, size_t size, CFlatten flatten) {
 #endif
 /********************************/
 
-// xxx TODO: remove _ITER variant in near future
 KFLAT_REGISTER_TEST("CIRCLE", kflat_circle_test, kflat_circle_validate);
-KFLAT_REGISTER_TEST("CIRCLE_ITER", kflat_circle_test_iter, kflat_circle_validate);

@@ -32,7 +32,6 @@ static inline struct flatten_pointer *fptr_add_color(struct flatten_pointer *fpt
 }
 
 FUNCTION_DECLARE_FLATTEN_STRUCT(string_node);
-FUNCTION_DECLARE_FLATTEN_STRUCT_ITER(string_node);
 
 FUNCTION_DEFINE_FLATTEN_STRUCT(string_node,
 	STRUCT_ALIGN(4);
@@ -42,20 +41,8 @@ FUNCTION_DEFINE_FLATTEN_STRUCT(string_node,
 	AGGREGATE_FLATTEN_STRING(s);
 );
 
-FUNCTION_DEFINE_FLATTEN_STRUCT_ITER(string_node,
-	STRUCT_ALIGN(4);
-	AGGREGATE_FLATTEN_STRUCT_MIXED_POINTER_ITER(string_node, node.__rb_parent_color, ptr_remove_color, fptr_add_color);
-	AGGREGATE_FLATTEN_STRUCT_ITER(string_node, node.rb_right);
-	AGGREGATE_FLATTEN_STRUCT_ITER(string_node, node.rb_left);
-	AGGREGATE_FLATTEN_STRING(s);
-);
-
 FUNCTION_DEFINE_FLATTEN_STRUCT(rb_root,
 	AGGREGATE_FLATTEN_STRUCT(string_node, rb_node);
-);
-
-FUNCTION_DEFINE_FLATTEN_STRUCT_ITER(rb_root,
-	AGGREGATE_FLATTEN_STRUCT_ITER(string_node, rb_node);
 );
 
 static int stringset_insert(const char *s) {
