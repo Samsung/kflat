@@ -30,7 +30,7 @@ static int kflat_global_addr_unit_test(struct kflat *kflat) {
 	// Send results back to user
 	FOR_ROOT_POINTER(&results,
 		FLATTEN_STRUCT(get_global_result, &results);
-    );
+	);
 
 	return 0;
 }

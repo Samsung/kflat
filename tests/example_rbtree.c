@@ -41,21 +41,22 @@ static inline struct flatten_pointer *rbnode_add_color(struct flatten_pointer *f
 FUNCTION_DECLARE_FLATTEN_STRUCT_ARRAY_ITER_SELF_CONTAINED(myTreeNode, 80);
 
 FUNCTION_DEFINE_FLATTEN_STRUCT_ITER_SELF_CONTAINED(myTreeNode, 80,
-        AGGREGATE_FLATTEN_STRUCT_MIXED_POINTER_ARRAY_ITER_SELF_CONTAINED_SHIFTED(myTreeNode, 80, inode.__rb_parent_color, 8,
-                                            rbnode_remove_color, rbnode_add_color, 1, -8);
-        AGGREGATE_FLATTEN_STRUCT_ARRAY_ITER_SELF_CONTAINED_SHIFTED(myTreeNode, 80, inode.rb_right, 16, 1, -8);
-        AGGREGATE_FLATTEN_STRUCT_ARRAY_ITER_SELF_CONTAINED_SHIFTED(myTreeNode, 80, inode.rb_left, 24, 1, -8);
-        AGGREGATE_FLATTEN_STRUCT_MIXED_POINTER_ARRAY_ITER_SELF_CONTAINED_SHIFTED(myTreeNode, 80, snode.__rb_parent_color, 48,
-                                            rbnode_remove_color, rbnode_add_color, 1, -48);
-        AGGREGATE_FLATTEN_STRUCT_ARRAY_ITER_SELF_CONTAINED_SHIFTED(myTreeNode, 80, snode.rb_right, 56, 1, -48);
-        AGGREGATE_FLATTEN_STRUCT_ARRAY_ITER_SELF_CONTAINED_SHIFTED(myTreeNode, 80, snode.rb_left, 64, 1, -48);
-        AGGREGATE_FLATTEN_STRING_SELF_CONTAINED(s, 72);
-    );
+	AGGREGATE_FLATTEN_STRUCT_MIXED_POINTER_ARRAY_ITER_SELF_CONTAINED_SHIFTED(myTreeNode, 80, inode.__rb_parent_color, 8,
+										rbnode_remove_color, rbnode_add_color, 1, -8);
+	AGGREGATE_FLATTEN_STRUCT_ARRAY_ITER_SELF_CONTAINED_SHIFTED(myTreeNode, 80, inode.rb_right, 16, 1, -8);
+	AGGREGATE_FLATTEN_STRUCT_ARRAY_ITER_SELF_CONTAINED_SHIFTED(myTreeNode, 80, inode.rb_left, 24, 1, -8);
+	AGGREGATE_FLATTEN_STRUCT_MIXED_POINTER_ARRAY_ITER_SELF_CONTAINED_SHIFTED(myTreeNode, 80, snode.__rb_parent_color, 48,
+										rbnode_remove_color, rbnode_add_color, 1, -48);
+	AGGREGATE_FLATTEN_STRUCT_ARRAY_ITER_SELF_CONTAINED_SHIFTED(myTreeNode, 80, snode.rb_right, 56, 1, -48);
+	AGGREGATE_FLATTEN_STRUCT_ARRAY_ITER_SELF_CONTAINED_SHIFTED(myTreeNode, 80, snode.rb_left, 64, 1, -48);
+	AGGREGATE_FLATTEN_STRING_SELF_CONTAINED(s, 72);
+);
 
 FUNCTION_DECLARE_FLATTEN_STRUCT_ARRAY_ITER_SELF_CONTAINED_SPECIALIZE(myTreeNode, rb_root, 8);
 
 FUNCTION_DEFINE_FLATTEN_STRUCT_ITER_SELF_CONTAINED_SPECIALIZE(myTreeNode, rb_root, 8,
-							      AGGREGATE_FLATTEN_STRUCT_ARRAY_ITER_SELF_CONTAINED_SHIFTED(myTreeNode, 80, rb_node, 0, 1, -8););
+	AGGREGATE_FLATTEN_STRUCT_ARRAY_ITER_SELF_CONTAINED_SHIFTED(myTreeNode, 80, rb_node, 0, 1, -8);
+);
 
 static int intset_insert(struct rb_root *root, struct myTreeNode *idata) {
 	struct rb_node **new, *parent = 0;
@@ -120,6 +121,7 @@ static void strset_destroy(struct rb_root *root) {
 		rb_erase(p, root);
 		p = rb_next(p);
 		kvfree(data->s);
+		data->s = NULL;
 	}
 }
 
@@ -141,8 +143,10 @@ static int kflat_rbtree_example(struct kflat *kflat) {
 	strcpy(tarr[7].s, "AA1");
 	strcpy(tarr[8].s, "AA8");
 	strcpy(tarr[9].s, "AA3");
-	for (i = 5; i < 15; ++i)
+	for (i = 5; i < 15; ++i) {
 		tarr[i].i = i - 5;
+		tarr[i].s = NULL;
+	}
 
 	for (i = 0; i < 10; ++i)
 		strset_insert(&sroot, &tarr[i]);
@@ -151,15 +155,15 @@ static int kflat_rbtree_example(struct kflat *kflat) {
 
 	UNDER_ITER_HARNESS(
 		FOR_ROOT_POINTER(&iroot,
-		    FLATTEN_STRUCT_ARRAY_ITER_SPECIALIZE(myTreeNode, rb_root, &iroot, 1);
-        );
-    );
+			FLATTEN_STRUCT_ARRAY_ITER_SPECIALIZE(myTreeNode, rb_root, &iroot, 1);
+		);
+	);
 
 	UNDER_ITER_HARNESS(
 		FOR_ROOT_POINTER(&sroot,
 			FLATTEN_STRUCT_ARRAY_ITER_SPECIALIZE(myTreeNode, rb_root, &sroot, 1);
-        );
-    );
+		);
+	);
 
 	strset_destroy(&sroot);
 	intset_destroy(&iroot);

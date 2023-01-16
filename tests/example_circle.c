@@ -1,7 +1,6 @@
 /**
  * @file example_circle.c
  * @author Samsung R&D Poland - Mobile Security Group
- * @brief TODO
  * 
  */
 
@@ -9,24 +8,22 @@
 
 // Common structure types for both userspace and kernel
 struct point {
-    double x;
-    double y;
-    unsigned n;
-    struct point** other;
+	double x;
+	double y;
+	unsigned n;
+	struct point **other;
 };
 
 struct figure {
-    const char* name;
-    unsigned n;
-    struct point* points;
+	const char *name;
+	unsigned n;
+	struct point *points;
 };
-
 
 /********************************/
 #ifdef __KERNEL__
 /********************************/
 #include "kflat_test_data.h"
-
 
 FUNCTION_DECLARE_FLATTEN_STRUCT(point);
 FUNCTION_DECLARE_FLATTEN_STRUCT(figure);
@@ -34,36 +31,36 @@ FUNCTION_DECLARE_FLATTEN_STRUCT_ITER(point);
 FUNCTION_DECLARE_FLATTEN_STRUCT_ITER(figure);
 
 FUNCTION_DEFINE_FLATTEN_STRUCT(point,
-    AGGREGATE_FLATTEN_TYPE_ARRAY(struct point*, other, ATTR(n));
-    FOREACH_POINTER(struct point*, p, ATTR(other), ATTR(n),
-            FLATTEN_STRUCT(point, p);
-    );
+	AGGREGATE_FLATTEN_TYPE_ARRAY(struct point *, other, ATTR(n));
+	FOREACH_POINTER(struct point *, p, ATTR(other), ATTR(n),
+		FLATTEN_STRUCT(point, p);
+	);
 );
 
 FUNCTION_DEFINE_FLATTEN_STRUCT_ITER(point,
-    AGGREGATE_FLATTEN_TYPE_ARRAY(struct point*, other, ATTR(n));
-    FOREACH_POINTER(struct point*, p, ATTR(other), ATTR(n),
-            FLATTEN_STRUCT_ITER(point, p);
-    );
+	AGGREGATE_FLATTEN_TYPE_ARRAY(struct point *, other, ATTR(n));
+	FOREACH_POINTER(struct point *, p, ATTR(other), ATTR(n),
+		FLATTEN_STRUCT_ITER(point, p);
+	);
 );
 
 FUNCTION_DEFINE_FLATTEN_STRUCT(figure,
-    AGGREGATE_FLATTEN_STRING(name);
-    AGGREGATE_FLATTEN_STRUCT_ARRAY(point,points,ATTR(n));
+	AGGREGATE_FLATTEN_STRING(name);
+	AGGREGATE_FLATTEN_STRUCT_ARRAY(point, points, ATTR(n));
 );
 
 FUNCTION_DEFINE_FLATTEN_STRUCT_ITER(figure,
-    AGGREGATE_FLATTEN_STRING(name);
-    AGGREGATE_FLATTEN_STRUCT_ARRAY_ITER(point,points,ATTR(n));
+	AGGREGATE_FLATTEN_STRING(name);
+	AGGREGATE_FLATTEN_STRUCT_ARRAY_ITER(point, points, ATTR(n));
 );
 
-#define MAKE_POINT(p, i, N)   \
-    p.x = (cosx[i]);	\
-    p.y = (sinx[i]);	\
-    p.n = (N);  \
-    p.other = kvzalloc((N)*sizeof*p.other,GFP_KERNEL);
+#define MAKE_POINT(p, i, N) \
+	p.x = (cosx[i]);    \
+	p.y = (sinx[i]);    \
+	p.n = (N);          \
+	p.other = kvzalloc((N) * sizeof *p.other, GFP_KERNEL);
 
-static void create_circle(struct figure* circle, size_t num_points, double* cosx, double* sinx) {
+static void create_circle(struct figure *circle, size_t num_points, double *cosx, double *sinx) {
 	unsigned i, j, u;
 
 	circle->n = num_points;
@@ -82,7 +79,7 @@ static void create_circle(struct figure* circle, size_t num_points, double* cosx
 	}
 }
 
-static void free_circle(struct figure* circle) {
+static void free_circle(struct figure *circle) {
 	unsigned i;
 
 	for (i = 0; i < circle->n; ++i) {
@@ -93,7 +90,7 @@ static void free_circle(struct figure* circle) {
 
 static int kflat_circle_test(struct kflat *kflat) {
 	struct figure circle;
-	
+
 	circle.name = "circle";
 	create_circle(&circle, 30, cosx, sinx);
 
@@ -107,7 +104,7 @@ static int kflat_circle_test(struct kflat *kflat) {
 
 static int kflat_circle_test_iter(struct kflat *kflat) {
 	struct figure circle;
-	
+
 	circle.name = "circle";
 	create_circle(&circle, 750, cosxi, sinxi);
 
@@ -127,16 +124,15 @@ static int kflat_circle_test_iter(struct kflat *kflat) {
 
 #include <math.h>
 
-static int kflat_circle_validate(void* memory, size_t size, CFlatten flatten) {
-	const struct figure* circle = (const struct figure*) memory;
+static int kflat_circle_validate(void *memory, size_t size, CFlatten flatten) {
+	const struct figure *circle = (const struct figure *)memory;
 	double length = 0, circumference = 0;
 	unsigned edge_number = 0;
 	for (unsigned int i = 0; i < circle->n - 1; ++i) {
 		for (unsigned int j = i; j < circle->n - 1; ++j) {
 			if (circle->points[i].other[j]) {
-
-				double path_len = sqrt(  pow(circle->points[i].x-circle->points[i].other[j]->x,2) +
-						pow(circle->points[i].y-circle->points[i].other[j]->y,2) );
+				double path_len = sqrt(pow(circle->points[i].x - circle->points[i].other[j]->x, 2) +
+						       pow(circle->points[i].y - circle->points[i].other[j]->y, 2));
 				length += path_len;
 
 				if (j == i)

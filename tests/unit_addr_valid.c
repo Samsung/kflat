@@ -51,7 +51,7 @@ static int kflat_addr_valid_unit_test(struct kflat *kflat) {
 	results.test_null_pass = !_addr_range_valid(NULL, 1);
 	results.test_null_large_pass = !_addr_range_valid(NULL, PAGE_SIZE * 10);
 	results.test_zero_page_pass = !_addr_range_valid((void *)0xFFF, PAGE_SIZE);
-	results.test_user_ptr_pass = !_addr_range_valid((void *)0x8000200, 1) && !_addr_range_valid((void *)(1ULL << (VA_BITS - 1)), 1);
+	results.test_user_ptr_pass = !_addr_range_valid((void *)0x8000200, 1) && !_addr_range_valid((void *)(1ULL << (46 - 1)), 1);
 	results.test_wild_ptr_pass = !_addr_range_valid((void *)-1ULL, PAGE_SIZE);
 	results.test_huge_size_pass = !_addr_range_valid(&results, PAGE_SIZE * 1024ULL * 1024 * 1024);
 

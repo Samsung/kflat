@@ -6,10 +6,9 @@
 
 #include "common.h"
 
-
 struct unit_A {
 	unsigned long X;
-	struct unit_B* pB;
+	struct unit_B *pB;
 };
 
 struct unit_B {
@@ -17,7 +16,7 @@ struct unit_B {
 };
 
 struct Large {
-    char data[4097];
+	char data[4097];
 };
 
 #ifdef __KERNEL__
@@ -35,37 +34,36 @@ FUNCTION_DEFINE_FLATTEN_STRUCT(Large);
 static int kflat_flatten_struct_unit_test(struct kflat *kflat) {
 	struct unit_B str = { "ABC" };
 	struct unit_A obj = { 0x0000404F, &str };
-	struct unit_A* pA = &obj;
-    struct Large* large = (struct Large*) vmalloc(4096);
+	struct unit_A *pA = &obj;
+	struct Large *large = (struct Large *)vmalloc(4096);
 
 	FOR_ROOT_POINTER(pA,
 		FLATTEN_STRUCT(unit_A, pA);
 	);
 
-    FOR_ROOT_POINTER(&str,
-        FLATTEN_STRUCT(unit_B, &str);
-    );
+	FOR_ROOT_POINTER(&str,
+		FLATTEN_STRUCT(unit_B, &str);
+	);
 
-    FOR_ROOT_POINTER(large,
-        FLATTEN_STRUCT(Large, large);
-    );
+	FOR_ROOT_POINTER(large,
+		FLATTEN_STRUCT(Large, large);
+	);
 
 	return 0;
 }
 
 #else
 
-static int kflat_flatten_struct_unit_validate(void* memory, size_t size, CFlatten flatten) {
-    struct unit_A* pA = (struct unit_A*) flatten_root_pointer_seq(flatten, 0);
-    struct unit_B* str = (struct unit_B*) flatten_root_pointer_seq(flatten, 1);
+static int kflat_flatten_struct_unit_validate(void *memory, size_t size, CFlatten flatten) {
+	struct unit_A *pA = (struct unit_A *)flatten_root_pointer_seq(flatten, 0);
+	struct unit_B *str = (struct unit_B *)flatten_root_pointer_seq(flatten, 1);
 
 	ASSERT(pA->X == 0x0000404F);
 	ASSERT(pA->pB != str);
-    ASSERT(!strcmp((const char*) str->T, "ABC"));
+	ASSERT(!strcmp((const char *)str->T, "ABC"));
 	return 0;
 }
 
 #endif
-
 
 KFLAT_REGISTER_TEST("[UNIT] flatten_struct", kflat_flatten_struct_unit_test, kflat_flatten_struct_unit_validate);

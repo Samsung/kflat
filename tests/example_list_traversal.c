@@ -6,7 +6,6 @@
 
 #include "common.h"
 
-
 #ifdef __KERNEL__
 #include <linux/list.h>
 #else
@@ -24,22 +23,22 @@ struct myLongList {
 #ifdef __KERNEL__
 /********************************/
 
-FUNCTION_DECLARE_FLATTEN_STRUCT_ARRAY_ITER_SELF_CONTAINED(myLongList,24);
+FUNCTION_DECLARE_FLATTEN_STRUCT_ARRAY_ITER_SELF_CONTAINED(myLongList, 24);
 
-FUNCTION_DEFINE_FLATTEN_STRUCT_ITER_SELF_CONTAINED(myLongList,24,
-	AGGREGATE_FLATTEN_STRUCT_ARRAY_ITER_SELF_CONTAINED_SHIFTED(myLongList,24,v.next,8,1,-8);
-	AGGREGATE_FLATTEN_STRUCT_ARRAY_ITER_SELF_CONTAINED_SHIFTED(myLongList,24,v.prev,16,1,-8);
+FUNCTION_DEFINE_FLATTEN_STRUCT_ITER_SELF_CONTAINED(myLongList, 24,
+	AGGREGATE_FLATTEN_STRUCT_ARRAY_ITER_SELF_CONTAINED_SHIFTED(myLongList, 24, v.next, 8, 1, -8);
+	AGGREGATE_FLATTEN_STRUCT_ARRAY_ITER_SELF_CONTAINED_SHIFTED(myLongList, 24, v.prev, 16, 1, -8);
 );
 
 static int kflat_list_test_iter(struct kflat *kflat) {
 	int i, err = 0;
-    struct list_head* head;
-	struct myLongList myhead = {-1};
+	struct list_head *head;
+	struct myLongList myhead = { -1 };
 
 	INIT_LIST_HEAD(&myhead.v);
 	head = &myhead.v;
 	for (i = 0; i < 100; ++i) {
-		struct myLongList* item = kvzalloc(sizeof(struct myLongList), GFP_KERNEL);
+		struct myLongList *item = kvzalloc(sizeof(struct myLongList), GFP_KERNEL);
 		item->k = i + 1;
 		list_add(&item->v, head);
 		head = &item->v;
@@ -47,11 +46,11 @@ static int kflat_list_test_iter(struct kflat *kflat) {
 
 	UNDER_ITER_HARNESS(
 		FOR_ROOT_POINTER(&myhead,
-			FLATTEN_STRUCT_ARRAY_ITER(myLongList,&myhead,1);
+			FLATTEN_STRUCT_ARRAY_ITER(myLongList, &myhead, 1);
 		);
 	);
 
-	while(!list_empty(&myhead.v)) {
+	while (!list_empty(&myhead.v)) {
 		struct myLongList *entry = list_entry(myhead.v.next, struct myLongList, v);
 		list_del(myhead.v.next);
 		kvfree(entry);
@@ -63,19 +62,19 @@ static int kflat_list_test_iter(struct kflat *kflat) {
 #else
 /********************************/
 
-static int kflat_list_validate(void* memory, size_t size, CFlatten flatten) {
-    struct list_head *p;
+static int kflat_list_validate(void *memory, size_t size, CFlatten flatten) {
+	struct list_head *p;
 	size_t list_size = 0;
-    struct myLongList* myhead = (struct myLongList*) memory;
-    
-    for (p = (&myhead->v)->next; p != (&myhead->v); p = p->next) {
-        struct myLongList *entry = container_of(p, struct myLongList, v);
-        list_size++;
-        ASSERT(entry->k == list_size);
-    }
-    ASSERT(list_size == 100);
+	struct myLongList *myhead = (struct myLongList *)memory;
 
-    return 0;
+	for (p = (&myhead->v)->next; p != (&myhead->v); p = p->next) {
+		struct myLongList *entry = container_of(p, struct myLongList, v);
+		list_size++;
+		ASSERT(entry->k == list_size);
+	}
+	ASSERT(list_size == 100);
+
+	return 0;
 }
 
 /********************************/
