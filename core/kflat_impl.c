@@ -1588,6 +1588,58 @@ void flatten_clear_option(struct kflat* kflat, int option) {
 }
 EXPORT_SYMBOL_GPL(flatten_clear_option);
 
+
+
+void flatten_generic(struct kflat* kflat, void* q, struct flatten_pointer* fptr, void* p, size_t el_size, size_t count, flatten_struct_t func_ptr) {
+	int err;
+	size_t i;
+	struct flatten_pointer* flat_ptr;
+
+	if(kflat->errno || !ADDR_RANGE_VALID(p, count * el_size)) {
+		DBGS("flatten_generic: errno(%d), ADDR(0x%lx)", kflat->errno, (uintptr_t) p);
+		return;
+	}
+
+	flat_ptr = flatten_plain_type(kflat, p, count * el_size);
+	if(flat_ptr == NULL) {
+		DBGS("flatten_generic: flatten_plain_type() == NULL");
+		kflat->errno = EFAULT;
+		return;
+	}
+
+	err = fixup_set_insert_force_update(kflat, fptr->node, fptr->offset, flat_ptr);
+	if (err && err != EINVAL && err != EEXIST && err != EAGAIN) {
+		DBGS("flatten_generic: fixup_set_insert_force_update(): err(%d)", err);
+		kflat->errno = err;
+	} else if (err != EEXIST) {
+		struct fixup_set_node* struct_inode;
+		err = 0;
+
+		for (i = 0; i < count; ++i) {
+			void* target = p + i * el_size;
+			struct_inode = fixup_set_search(kflat, (uint64_t)target);
+			if (!struct_inode) {
+				struct flatten_job job = {0, };
+				
+				int err = fixup_set_reserve_address(kflat, (uint64_t)target);
+				if(err)
+					break;
+
+				job.size = 1;
+				job.ptr = (struct flatten_base*)target;
+				job.fun = func_ptr;
+				err = bqueue_push_back(kflat, q, &job, sizeof(struct flatten_job));
+				if (err) 
+					break;
+			}
+		}
+
+		if (err && err != EEXIST)
+			kflat->errno = err;
+	}
+}
+EXPORT_SYMBOL_GPL(flatten_generic);
+
 void flatten_run_iter_harness(struct kflat* kflat, struct bqueue* bq) {
 	size_t n = 0;
 	ktime_t init_time, now;
