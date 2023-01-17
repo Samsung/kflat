@@ -332,6 +332,8 @@ int bqueue_pop_front(struct bqueue* q, void* m, size_t s);
 void flatten_set_option(struct kflat* kflat, int option);
 void flatten_clear_option(struct kflat* kflat, int option);
 
+void flatten_run_iter_harness(struct kflat* kflat, struct bqueue* bq);
+
 extern unsigned long (*kflat_lookup_kallsyms_name)(const char* name);
 bool flatten_get_object(void* ptr, void** start, void** end);
 void* flatten_global_address_by_name(const char* name);
@@ -2905,7 +2907,16 @@ FUNCTION_DEFINE_FLATTEN_UNION_ARRAY_SELF_CONTAINED(FLTYPE,FLSIZE)
 
 
 #define FOR_EXTENDED_ROOT_POINTER(p,__name,__size,...)	\
-	UNDER_ITER_HARNESS_MERGE(								\
+	do {	\
+		struct bqueue bq;	\
+		struct bqueue* __q;	\
+		int err = bqueue_init(KFLAT_ACCESSOR, &bq, DEFAULT_ITER_QUEUE_SIZE);	\
+		if (err) {	\
+			KFLAT_ACCESSOR->errno = err;	\
+			break;	\
+		}	\
+		__q = &bq;	\
+					\
 		DBGM3(FOR_EXTENDED_ROOT_POINTER,p,__name,__size);	\
 		if ((!KFLAT_ACCESSOR->errno)&&(ADDR_VALID(p))) {	\
 			struct flatten_pointer* __fptr = make_flatten_pointer(KFLAT_ACCESSOR,0,0);	\
@@ -2929,80 +2940,11 @@ FUNCTION_DEFINE_FLATTEN_UNION_ARRAY_SELF_CONTAINED(FLTYPE,FLSIZE)
 				KFLAT_ACCESSOR->errno = root_addr_append(KFLAT_ACCESSOR, (uintptr_t)(p) );	\
 			}	\
 		}	\
-	)
+			\
+		flatten_run_iter_harness(KFLAT_ACCESSOR, &bq);	\
+	} while(0)
 
 #define FOR_ROOT_POINTER(p,...) FOR_EXTENDED_ROOT_POINTER(p, NULL, 0, ##__VA_ARGS__)
-
-#define UNDER_ITER_HARNESS_MERGE(...)	\
-		do {	\
-			struct bqueue bq;	\
-			struct bqueue* __q;	\
-			unsigned long __n;	\
-			ktime_t __inittime;	\
-			ktime_t __end;	\
-			s64 __total_time = 0;	\
-			int err = bqueue_init(KFLAT_ACCESSOR,&bq,DEFAULT_ITER_QUEUE_SIZE);	\
-			if (err) {	\
-				KFLAT_ACCESSOR->errno = err;	\
-				break;	\
-			}	\
-			__q = &bq;	\
-			__VA_ARGS__	\
-			__n=0;	\
-			__inittime = ktime_get();	\
-			while((!KFLAT_ACCESSOR->errno)&&(!bqueue_empty(&bq))) {	\
-				struct flatten_job __job;	\
-				ktime_t __now;	\
-				int err;	\
-				DBGS("UNDER_ITER_HARNESS: queue iteration, size: %zu\n",bqueue_size(&bq));	\
-				err = bqueue_pop_front(&bq,&__job,sizeof(struct flatten_job));	\
-				if (err) {	\
-					KFLAT_ACCESSOR->errno = err;	\
-					break;	\
-				}	\
-				if (__job.node!=0) {	\
-					if (!__job.convert)	\
-						err = fixup_set_insert_force_update(KFLAT_ACCESSOR,__job.node,__job.offset,(__job.fun)(KFLAT_ACCESSOR,__job.ptr,__job.size,&bq));	\
-					else	\
-						err = fixup_set_insert_force_update(KFLAT_ACCESSOR,__job.node,__job.offset,__job.convert((__job.fun)(KFLAT_ACCESSOR,__job.fp,__job.size,&bq),__job.ptr));	\
-					if ((err) && (err!=EINVAL) && (err!=EEXIST) && (err!=EAGAIN)) {	\
-						KFLAT_ACCESSOR->errno = err;	\
-						break;	\
-					}	\
-				}	\
-				else {	\
-					void* _fp;	\
-					if (!__job.convert)	\
-						_fp = (__job.fun)(KFLAT_ACCESSOR,__job.ptr,__job.size,&bq);	\
-					else	\
-						_fp = __job.convert((__job.fun)(KFLAT_ACCESSOR,__job.fp,__job.size,&bq),__job.ptr);	\
-					if (!_fp) break;	\
-					kflat_free(_fp);	\
-				}	\
-				__n++;	\
-				__now = ktime_get();	\
-				DBGS("UNDER_ITER_HARNESS: recipes done: %lu, elapsed: %lld\n",__n,__now-__inittime);	\
-				if (__now-__inittime>KFLAT_PING_TIME_NS) {	\
-					__total_time+=__now-__inittime;	\
-					if (__total_time > KFLAT_MAX_TIME_NS) {	\
-						flat_errs("Timeout! Total time %lld [ms] exceeds maximum allowed %lld [ms]\n", 	\
-									__total_time/NSEC_PER_MSEC, KFLAT_MAX_TIME_NS/NSEC_PER_MSEC);		\
-						KFLAT_ACCESSOR->errno = EAGAIN;	\
-						break;	\
-					}	\
-					flat_infos("Still working! done %lu recipes in total time %lld [ms], memory used: %zu, memory avail: %zu \n",	\
-						__n,__total_time/NSEC_PER_MSEC,KFLAT_ACCESSOR->mptrindex,KFLAT_ACCESSOR->msize);	\
-					flat_infos("CPU Freq - %lu [kHz]; core no. %d\n", cpufreq_quick_get(__smp_processor_id()), __smp_processor_id()); \
-					__inittime = ktime_get();	\
-				}	\
-			}	\
-			__end = ktime_get();	\
-			__total_time+=__end-__inittime;	\
-			flat_infos("Done working with %lu recipes in total time %lld [ms], memory used: %zu, memory avail: %zu \n",	\
-				__n,__total_time/NSEC_PER_MSEC,KFLAT_ACCESSOR->mptrindex,KFLAT_ACCESSOR->msize);	\
-			bqueue_destroy(&bq);	\
-			bqueue_release_memory(KFLAT_ACCESSOR);	\
-		} while(0)
 
 
 /* Try to detect the size of the heap object pointed to by '__ptr'

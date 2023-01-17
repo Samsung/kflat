@@ -1588,6 +1588,66 @@ void flatten_clear_option(struct kflat* kflat, int option) {
 }
 EXPORT_SYMBOL_GPL(flatten_clear_option);
 
+void flatten_run_iter_harness(struct kflat* kflat, struct bqueue* bq) {
+	size_t n = 0;
+	ktime_t init_time, now;
+	s64 total_time = 0;
+	void* fp;
+	struct flatten_job job;
+
+	init_time = ktime_get();
+	while((!kflat->errno) && (!bqueue_empty(bq))) {
+		int err;
+
+		DBGS("%s: queue iteration, size: %zu\n",__func__, bqueue_size(bq));
+
+		err = bqueue_pop_front(bq, &job, sizeof(struct flatten_job));
+		if (err) {
+			kflat->errno = err;
+			break;
+		}
+
+		fp = job.fun(kflat, job.ptr, job.size, bq);
+		if (job.convert != NULL)
+			fp = job.convert(fp, job.ptr);
+
+		if (job.node != NULL) {
+			err = fixup_set_insert_force_update(kflat, job.node, job.offset, fp);
+			if (err && err != EINVAL && err != EEXIST && err != EAGAIN) {
+				kflat->errno = err;
+				break;
+			}
+		} else {
+			if (!fp) 
+				break;
+			kflat_free(fp);
+		}
+
+		n++;
+		now = ktime_get();
+		DBGS("UNDER_ITER_HARNESS: recipes done: %lu, elapsed: %lld\n", n, now - init_time);
+
+		if (now - init_time > KFLAT_PING_TIME_NS) {
+			total_time += now - init_time;
+			if (total_time > KFLAT_MAX_TIME_NS) {
+				flat_errs("Timeout! Total time %lld [ms] exceeds maximum allowed %lld [ms]\n", 
+							total_time / NSEC_PER_MSEC, KFLAT_MAX_TIME_NS / NSEC_PER_MSEC);
+				kflat->errno = EAGAIN;
+				break;
+			}
+			flat_infos("Still working! done %lu recipes in total time %lld [ms], memory used: %zu, memory avail: %zu \n",
+				n, total_time / NSEC_PER_MSEC, kflat->mptrindex, kflat->msize);
+			flat_infos("CPU Freq - %lu [kHz]; core no. %d\n", cpufreq_quick_get(__smp_processor_id()), __smp_processor_id());
+			init_time = ktime_get();
+		}
+	}
+	total_time += ktime_get() - init_time;
+	flat_infos("Done working with %lu recipes in total time %lld [ms], memory used: %zu, memory avail: %zu \n",
+		n, total_time / NSEC_PER_MSEC, kflat->mptrindex, kflat->msize);
+	bqueue_destroy(bq);
+	bqueue_release_memory(kflat);
+}
+EXPORT_SYMBOL_GPL(flatten_run_iter_harness);
 
 /*******************************************************
  * GLOBAL VARIABLES SUPPORT
