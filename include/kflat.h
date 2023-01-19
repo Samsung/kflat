@@ -334,7 +334,7 @@ void flatten_clear_option(struct kflat* kflat, int option);
 
 void flatten_run_iter_harness(struct kflat* kflat, struct bqueue* bq);
 void flatten_generic(struct kflat* kflat, void* q, struct flatten_pointer* fptr, void* p, size_t el_size, size_t count, flatten_struct_t func_ptr);
-void* flatten_acquire_node_for_ptr(struct kflat* kflat, void* _ptr, size_t size);
+struct flat_node* flatten_acquire_node_for_ptr(struct kflat* kflat, const void* _ptr, size_t size);
 
 extern unsigned long (*kflat_lookup_kallsyms_name)(const char* name);
 bool flatten_get_object(void* ptr, void** start, void** end);

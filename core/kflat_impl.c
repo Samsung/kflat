@@ -1285,115 +1285,6 @@ int interval_tree_destroy(struct kflat* kflat, struct rb_root *root) {
 	return rv;
 }
 
-struct flatten_pointer* flatten_plain_type(struct kflat* kflat, const void* _ptr, size_t _sz) {
-
-	struct flat_node *node;
-	struct flatten_pointer* r = 0;
-	if (!_sz) {
-		flat_errs("flatten_plain_type - zero size memory");
-		return 0;
-	}
-	node = interval_tree_iter_first(&kflat->FLCTRL.imap_root, (uintptr_t)_ptr, (uintptr_t)_ptr+_sz-1);
-	if (node) {
-		uintptr_t p = (uintptr_t)_ptr;
-		struct flat_node *prev;
-		while(node) {
-			if (node->start>p) {
-				struct flat_node* nn;
-				if (!node->storage) {
-					flat_errs("flat_node missing storage");
-					return 0;
-				}
-				nn = kflat_zalloc(kflat,sizeof(struct flat_node),1);
-				if (nn==0) return 0;
-				nn->start = p;
-				nn->last = node->start-1;
-				nn->storage = binary_stream_insert_front(kflat,(void*)p,node->start-p,node->storage);
-				if (!nn->storage) {
-					kflat_free(nn);
-					return 0;
-				}
-				interval_tree_insert(nn, &kflat->FLCTRL.imap_root);
-				if (r==0) {
-					r = make_flatten_pointer(kflat,nn,0);
-					if (!r) {
-						return 0;
-					}
-				}
-			}
-			else {
-				if (r==0) {
-					r = make_flatten_pointer(kflat,node,p-node->start);
-					if (!r) {
-						return 0;
-					}
-				}
-			}
-			p = node->last+1;
-			prev = node;
-			node = interval_tree_iter_next(node, (uintptr_t)_ptr, (uintptr_t)_ptr+_sz-1);
-		}
-		if ((uintptr_t)_ptr+_sz>p) {
-			struct flat_node* nn;
-			if (!prev->storage) {
-				kflat_free(r);
-				return 0;
-			}
-			nn = kflat_zalloc(kflat,sizeof(struct flat_node),1);
-			if (!nn) {
-				kflat_free(r);
-				return 0;
-			}
-			nn->start = p;
-			nn->last = (uintptr_t)_ptr+_sz-1;
-			nn->storage = binary_stream_insert_back(kflat,(void*)p,(uintptr_t)_ptr+_sz-p,prev->storage);
-			if (!nn->storage) {
-				kflat_free(nn);
-				kflat_free(r);
-				return 0;
-			}
-			interval_tree_insert(nn, &kflat->FLCTRL.imap_root);
-		}
-		return r;
-	}
-	else {
-		struct blstream* storage;
-		struct rb_node* rb;
-		struct rb_node* prev;
-		node = kflat_zalloc(kflat,sizeof(struct flat_node),1);
-		if (!node) {
-			return 0;
-		}
-		node->start = (uintptr_t)_ptr;
-		node->last = (uintptr_t)_ptr + _sz-1;
-		interval_tree_insert(node, &kflat->FLCTRL.imap_root);
-		rb = &node->rb;
-		prev = rb_prev(rb);
-		if (prev) {
-			storage = binary_stream_insert_back(kflat,_ptr,_sz,((struct flat_node*)prev)->storage);
-		}
-		else {
-			struct rb_node* next = rb_next(rb);
-			if (next) {
-				storage = binary_stream_insert_front(kflat,_ptr,_sz,((struct flat_node*)next)->storage);
-			}
-			else {
-				storage = binary_stream_append(kflat,_ptr,_sz);
-			}
-		}
-		if (!storage) {
-			return 0;
-		}
-		node->storage = storage;
-		r = make_flatten_pointer(kflat,node,0);
-		if (!r) {
-			return 0;
-		}
-		return r;
-	}
-}
-EXPORT_SYMBOL_GPL(flatten_plain_type);
-
 int kflat_linear_memory_realloc(struct kflat* kflat, size_t nsize) {
 	void* nmem = 0;
 	if (nsize==kflat->msize) return 0;
@@ -1589,8 +1480,9 @@ void flatten_clear_option(struct kflat* kflat, int option) {
 EXPORT_SYMBOL_GPL(flatten_clear_option);
 
 
-void* flatten_acquire_node_for_ptr(struct kflat* kflat, void* _ptr, size_t size) {
+struct flat_node* flatten_acquire_node_for_ptr(struct kflat* kflat, const void* _ptr, size_t size) {
 	struct flat_node *node = interval_tree_iter_first(&kflat->FLCTRL.imap_root, (uint64_t)_ptr, (uint64_t)_ptr + size - 1);
+	struct flat_node* head_node = 0;
 	if (node) {
 		uintptr_t p = (uintptr_t)_ptr;
     	struct flat_node *prev;
@@ -1612,6 +1504,14 @@ void* flatten_acquire_node_for_ptr(struct kflat* kflat, void* _ptr, size_t size)
 				nn->last = node->start-1;
 				nn->storage = binary_stream_insert_front(kflat, (void*)p, node->start-p, node->storage);
 				interval_tree_insert(nn, &kflat->FLCTRL.imap_root);
+				if (head_node==0) {
+					head_node = node;
+				}
+			}
+			else {
+				if (head_node==0) {
+					head_node = node;
+				}
 			}
 			p = node->last + 1;
 			prev = node;
@@ -1636,7 +1536,7 @@ void* flatten_acquire_node_for_ptr(struct kflat* kflat, void* _ptr, size_t size)
 			nn->storage = binary_stream_insert_back(kflat, (void*)p, (uintptr_t)_ptr + size - p, prev->storage);
 			interval_tree_insert(nn, &kflat->FLCTRL.imap_root);
 		}
-	} else { 
+	} else {
     	struct blstream* storage;
     	struct rb_node* rb;
     	struct rb_node* prev;
@@ -1666,9 +1566,12 @@ void* flatten_acquire_node_for_ptr(struct kflat* kflat, void* _ptr, size_t size)
 			return 0;
 		}
 		node->storage = storage;
+		if (head_node==0) {
+			head_node = node;
+		}
 	}
 
-	return node;
+	return head_node;
 }
 EXPORT_SYMBOL_GPL(flatten_acquire_node_for_ptr);
 
@@ -1721,6 +1624,32 @@ void flatten_generic(struct kflat* kflat, void* q, struct flatten_pointer* fptr,
 	}
 }
 EXPORT_SYMBOL_GPL(flatten_generic);
+
+struct flatten_pointer* flatten_plain_type(struct kflat* kflat, const void* _ptr, size_t _sz) {
+
+	struct flat_node* node;
+	struct flatten_pointer* flat_ptr;
+
+	if (!_sz) {
+		flat_errs("flatten_plain_type - zero size memory");
+		return 0;
+	}
+
+	node = flatten_acquire_node_for_ptr(kflat, _ptr, _sz);
+
+	if (!node) {
+		flat_errs("failed to acquire flatten node");
+		return 0;
+	}
+
+	flat_ptr = make_flatten_pointer(kflat,node,(uintptr_t)_ptr-node->start);
+	if (!flat_ptr) {
+		return 0;
+	}
+
+	return flat_ptr;
+}
+EXPORT_SYMBOL_GPL(flatten_plain_type);
 
 void flatten_run_iter_harness(struct kflat* kflat, struct bqueue* bq) {
 	size_t n = 0;
