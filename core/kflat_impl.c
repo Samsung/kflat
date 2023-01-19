@@ -1828,6 +1828,7 @@ static inline bool _kmem_cache_debug_flags(struct kmem_cache *s, slab_flags_t fl
 }
 
 #if LINUX_VERSION_CODE <= KERNEL_VERSION(5,16,0)
+/* Based on __check_heap_object@mm/slub.c */
 static bool _flatten_get_heap_obj(struct page* page, void* ptr, void** start, void** end) {
 	off_t offset;
 	size_t object_size;
@@ -1838,19 +1839,24 @@ static bool _flatten_get_heap_obj(struct page* page, void* ptr, void** start, vo
 	if(ptr < page_address(page))
 		return false;
 
+	if(is_kfence_address(ptr))
+		// We're unable to handle KFENCE structures/data from module code
+		return false;
+
 	/*
-	 * Calculate the offset between ptr and the start of the object.
-	 * Each object on kmem_cache heap has constant size - use modulo
-	 * to determine offset of pointer
-	 */
+	* Calculate the offset between ptr and the start of the object.
+	* Each object on kmem_cache heap has constant size - use modulo
+	* to determine offset of pointer
+	*/
 	offset = (ptr - page_address(page)) % cache->size;
 
 	/*
-	 * When SLAB_RED_ZONE is enabled, the first few bytes of an
-	 *  object is in fact allocator private data.
-	 */
+	* When SLAB_RED_ZONE is enabled, the first few bytes of an
+	*  object is in fact allocator private data.
+	*/
 	if(_kmem_cache_debug_flags(cache, SLAB_RED_ZONE))
 		offset -= cache->red_left_pad;
+
 	if((ptr - offset) < page_address(page))
 		return false;
 
@@ -1858,10 +1864,17 @@ static bool _flatten_get_heap_obj(struct page* page, void* ptr, void** start, vo
 	if(object_size <= offset)
 		return false;
 
+	if(offset < cache->useroffset || cache->useroffset + cache->usersize < offset)
+		return false;
+
+	printk(KERN_INFO "KFLAT DEBUG: ptr(%llx) offset(%llx) cache->useroffset(%llx) cache->usersize(%llx)",
+		ptr, offset, cache->useroffset, cache->usersize);
+	printk(KERN_INFO "KFLAT DEBUG: object_size(%llx)", object_size);
+
 	if(start)
-		*start = ptr - offset;
+		*start = ptr - offset + cache->useroffset;
 	if(end)
-		*end = ptr - offset + object_size;
+		*end = ptr - offset + cache->useroffset + cache->usersize;
 	return true;
 }
 
@@ -1878,6 +1891,7 @@ static void* flatten_find_heap_object(void* ptr) {
 }
 
 #else
+/* Based on __check_heap_object@mm/slub.c */
 static bool _flatten_get_heap_obj(struct slab* slab, void* ptr, 
 									void** start, void** end) {
 	off_t offset;
@@ -1910,15 +1924,17 @@ static bool _flatten_get_heap_obj(struct slab* slab, void* ptr,
 		return false;
 
 	if(start)
-		*start = ptr - offset;
+		*start = ptr - offset + cache->useroffset;
 	if(end)
-		*end = ptr - offset + object_size;
+		*end = ptr - offset + cache->useroffset + cache->usersize;
 	return true;
 }
 
 static void* flatten_find_heap_object(void* ptr) {
 	struct folio* folio;
 	
+	folio = virt_to_folio(ptr);
+
 	if(folio == NULL)
 		return NULL;
 
@@ -1940,7 +1956,7 @@ static void* flatten_find_heap_object(void* ptr) {
 bool flatten_get_object(void* ptr, void** start, void** end) {
 	void* obj;
 
-	if(virt_addr_valid(ptr)) {
+	if(!is_vmalloc_addr(ptr) && virt_addr_valid(ptr)) {
 		obj = flatten_find_heap_object(ptr);
 		if(obj != NULL)
 			return _flatten_get_heap_obj(obj, ptr, start, end);
