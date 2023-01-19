@@ -254,6 +254,8 @@ int run_test(struct args* args, const char* name) {
             goto munmap_area;
         }
 
+        fflush(stdout);
+        fflush(stderr);
         pid_t pid = fork();
         if(pid == 0) {
             ret = validator(memory, 0, flatten);
