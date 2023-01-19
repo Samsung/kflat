@@ -143,10 +143,8 @@ static int kflat_rbtree_example(struct kflat *kflat) {
 	strcpy(tarr[7].s, "AA1");
 	strcpy(tarr[8].s, "AA8");
 	strcpy(tarr[9].s, "AA3");
-	for (i = 5; i < 15; ++i) {
+	for (i = 5; i < 15; ++i)
 		tarr[i].i = i - 5;
-		tarr[i].s = NULL;
-	}
 
 	for (i = 0; i < 10; ++i)
 		strset_insert(&sroot, &tarr[i]);
