@@ -1589,6 +1589,88 @@ void flatten_clear_option(struct kflat* kflat, int option) {
 EXPORT_SYMBOL_GPL(flatten_clear_option);
 
 
+void* flatten_acquire_node_for_ptr(struct kflat* kflat, void* _ptr, size_t size) {
+	struct flat_node *node = interval_tree_iter_first(&kflat->FLCTRL.imap_root, (uint64_t)_ptr, (uint64_t)_ptr + size - 1);
+	if (node) {
+		uintptr_t p = (uintptr_t)_ptr;
+    	struct flat_node *prev;
+    	while(node) {
+			if (node->start>p) {
+				struct flat_node* nn;
+				if (node->storage == 0) {
+					kflat->errno = EFAULT;
+					DBGS("%s(%lx): EFAULT (node(%lx)->storage==0)\n", __func__, (uintptr_t)_ptr, node);
+					return 0;
+				}
+				nn = kflat_zalloc(kflat,sizeof(struct flat_node),1);
+				if (nn == 0) {
+					kflat->errno = ENOMEM;
+					DBGS("%s(%lx): ENOMEM\n",__func__, (uintptr_t)_ptr);
+					return 0;
+				}
+				nn->start = p;
+				nn->last = node->start-1;
+				nn->storage = binary_stream_insert_front(kflat, (void*)p, node->start-p, node->storage);
+				interval_tree_insert(nn, &kflat->FLCTRL.imap_root);
+			}
+			p = node->last + 1;
+			prev = node;
+			node = interval_tree_iter_next(node, (uintptr_t)_ptr, (uintptr_t)_ptr+ size-1);
+		}
+
+		if ((uintptr_t)_ptr+ size > p) {
+			struct flat_node* nn;
+			if (prev->storage == NULL) {
+				kflat->errno = EFAULT;
+				DBGS("%s(%lx): EFAULT (prev(%llx)->storage==0)\n", __func__, (uintptr_t)_ptr, (uint64_t)prev);
+				return 0;
+			}
+			nn = kflat_zalloc(kflat, sizeof(struct flat_node), 1);
+			if (nn == NULL) {
+				kflat->errno = ENOMEM;
+				DBGS("%s(%lx): ENOMEM\n",__func__, (uintptr_t)_ptr);
+				return 0;
+			}
+			nn->start = p;
+			nn->last = (uintptr_t)_ptr + size - 1;
+			nn->storage = binary_stream_insert_back(kflat, (void*)p, (uintptr_t)_ptr + size - p, prev->storage);
+			interval_tree_insert(nn, &kflat->FLCTRL.imap_root);
+		}
+	} else { 
+    	struct blstream* storage;
+    	struct rb_node* rb;
+    	struct rb_node* prev;
+    	node = kflat_zalloc(kflat, sizeof(struct flat_node), 1);
+    	if (!node) {
+	    	kflat->errno = ENOMEM;
+    		DBGS("%s(%lx): ENOMEM\n", __func__, (uintptr_t)_ptr);
+			return 0;
+		}
+		node->start = (uint64_t)_ptr;
+        node->last = (uint64_t)_ptr +  size - 1;
+        interval_tree_insert(node, &kflat->FLCTRL.imap_root);
+        rb = &node->rb;
+        prev = rb_prev(rb);
+        if (prev) {
+           	storage = binary_stream_insert_back(kflat,_ptr, size,((struct flat_node*)prev)->storage);
+        } else {
+			struct rb_node* next = rb_next(rb);
+			if (next)
+				storage = binary_stream_insert_front(kflat,_ptr, size,((struct flat_node*)next)->storage);
+			else
+				storage = binary_stream_append(kflat,_ptr, size);
+		}
+		if (!storage) {
+			kflat->errno = ENOMEM;
+			DBGS("%s(%lx): ENOMEM\n",__func__, (uintptr_t)_ptr);
+			return 0;
+		}
+		node->storage = storage;
+	}
+
+	return node;
+}
+EXPORT_SYMBOL_GPL(flatten_acquire_node_for_ptr);
 
 void flatten_generic(struct kflat* kflat, void* q, struct flatten_pointer* fptr, void* p, size_t el_size, size_t count, flatten_struct_t func_ptr) {
 	int err;
