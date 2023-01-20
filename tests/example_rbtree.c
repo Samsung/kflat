@@ -132,7 +132,7 @@ static int kflat_rbtree_example(struct kflat *kflat) {
 
 	struct myTreeNode tarr[15] = {};
 	for (i = 0; i < 10; ++i)
-		tarr[i].s = kvzalloc(1, GFP_KERNEL);
+		tarr[i].s = kvzalloc(4, GFP_KERNEL);
 	strcpy(tarr[0].s, "AA0");
 	strcpy(tarr[1].s, "AA5");
 	strcpy(tarr[2].s, "AA9");
