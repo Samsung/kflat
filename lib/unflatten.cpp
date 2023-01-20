@@ -433,7 +433,7 @@ public:
 		return 0;
 	}
 
-	int load(FILE* f, get_function_address_t gfa = NULL) {
+	int load(FILE* f, get_function_address_t gfa = NULL, bool continous_mapping = false) {
 		if(need_unload)
 			unload();
 		readin = 0;
@@ -509,58 +509,72 @@ public:
 		info(" #Unflattening done\n");
 		info(" #Image read time: %lfs\n", time_elapsed());
 
-		time_mark_start();
-		size_t* minfoptr = (size_t*)((char*)FLCTRL.mem + FLCTRL.HDR.ptr_count * sizeof(size_t) + FLCTRL.HDR.fptr_count * sizeof(size_t));
-		void* memptr = flatten_memory_start();
-		info(" * memory size: %lu\n", FLCTRL.HDR.memory_size);
+		if(!continous_mapping) {
+			time_mark_start();
+			size_t* minfoptr = (size_t*)((char*)FLCTRL.mem + FLCTRL.HDR.ptr_count * sizeof(size_t) + FLCTRL.HDR.fptr_count * sizeof(size_t));
+			void* memptr = flatten_memory_start();
+			info(" * memory size: %lu\n", FLCTRL.HDR.memory_size);
 
-		for (size_t i = 0; i < FLCTRL.HDR.mcount; ++i) {
-			size_t index = *minfoptr++;
-			size_t size = *minfoptr++;
-			struct interval_tree_node *node = (struct interval_tree_node*)calloc(1, sizeof(struct interval_tree_node));
-			node->start = index;
-			node->last = index + size - 1;
-			void* fragment = malloc(size);
-			assert(fragment!=NULL);
-			memcpy(fragment, (char*)memptr + index, size);
-			node->mptr = fragment;
-			interval_tree_insert(node, &FLCTRL.imap_root);
+			for (size_t i = 0; i < FLCTRL.HDR.mcount; ++i) {
+				size_t index = *minfoptr++;
+				size_t size = *minfoptr++;
+				struct interval_tree_node *node = (struct interval_tree_node*)calloc(1, sizeof(struct interval_tree_node));
+				node->start = index;
+				node->last = index + size - 1;
+				void* fragment = malloc(size);
+				assert(fragment!=NULL);
+				memcpy(fragment, (char*)memptr + index, size);
+				node->mptr = fragment;
+				interval_tree_insert(node, &FLCTRL.imap_root);
+			}
+			info(" #Creating chunked memory time: %lfs\n", time_elapsed());
 		}
-		info(" #Creating memory time: %lfs\n", time_elapsed());
 
 		time_mark_start();
 		unsigned long fix_count = 0;
 		for (size_t i = 0; i < FLCTRL.HDR.ptr_count; ++i) {
 			void* mem = flatten_memory_start();
 			size_t fix_loc = *((size_t*)FLCTRL.mem + i);
+			uintptr_t ptr = (uintptr_t)( *((void**)((char*)mem + fix_loc)) );
 			debug("fix_loc: %zu\n",fix_loc);
 
-			struct interval_tree_node *node = interval_tree_iter_first(&FLCTRL.imap_root, fix_loc, fix_loc + 8);
-			assert(node != NULL);
+			if(continous_mapping) {
+				*((void**)((unsigned char*)mem + fix_loc)) = (unsigned char*)mem + ptr;
+			} else {
 
-			size_t node_offset = fix_loc-node->start;
-			uintptr_t ptr = (uintptr_t)( *((void**)((char*)mem + fix_loc)) );
-			struct interval_tree_node *ptr_node = interval_tree_iter_first(&FLCTRL.imap_root, ptr, ptr + 8);
-			assert(ptr_node != NULL);
+				struct interval_tree_node *node = interval_tree_iter_first(&FLCTRL.imap_root, fix_loc, fix_loc + 8);
+				assert(node != NULL);
 
-			/* Make the fix */
-			size_t ptr_node_offset = ptr-ptr_node->start;
-			*((void**)((char*)node->mptr + node_offset)) = (char*)ptr_node->mptr + ptr_node_offset;
+				size_t node_offset = fix_loc-node->start;
+				struct interval_tree_node *ptr_node = interval_tree_iter_first(&FLCTRL.imap_root, ptr, ptr + 8);
+				assert(ptr_node != NULL);
 
-			debug("%lx <- %lx (%hhx)\n", fix_loc, ptr, *(unsigned char*)((char*)ptr_node->mptr + ptr_node_offset));
+				/* Make the fix */
+				size_t ptr_node_offset = ptr-ptr_node->start;
+				*((void**)((char*)node->mptr + node_offset)) = (char*)ptr_node->mptr + ptr_node_offset;
+
+				debug("%lx <- %lx (%hhx)\n", fix_loc, ptr, *(unsigned char*)((char*)ptr_node->mptr + ptr_node_offset));
+			}
 			fix_count++;
 		}
 
 		if (FLCTRL.HDR.fptr_count > 0 && gfa) {
+			void* mem = flatten_memory_start();
 			for (size_t fi = 0; fi < FLCTRL.HDR.fptr_count; ++fi) {
 				size_t fptri = ((uintptr_t*)((char*)FLCTRL.mem + FLCTRL.HDR.ptr_count * sizeof(size_t)))[fi];
-				struct interval_tree_node *node = interval_tree_iter_first(&FLCTRL.imap_root, fptri, fptri + 8);
-				assert(node != NULL);
+				if (fptrmap.find(fptri) == fptrmap.end())
+					continue;
+				
+				// Fix function pointer
+				uintptr_t nfptr = (*gfa)(fptrmap[fptri].c_str());
 
-				size_t node_offset = fptri-node->start;
-				if (fptrmap.find(fptri) != fptrmap.end()) {
-					// Fix function pointer
-					uintptr_t nfptr = (*gfa)(fptrmap[fptri].c_str());
+				if(continous_mapping) {
+					*((void**)((char*)mem + fptri)) = (void*)nfptr;
+				} else {
+					struct interval_tree_node *node = interval_tree_iter_first(&FLCTRL.imap_root, fptri, fptri + 8);
+					assert(node != NULL);
+
+					size_t node_offset = fptri-node->start;
 					*((void**)((char*)node->mptr + node_offset)) = (void*)nfptr;
 				}
 			}
@@ -624,8 +638,8 @@ Flatten::~Flatten() {
 	delete engine;
 }
 
-int Flatten::load(FILE* file, get_function_address_t gfa) {
-	return engine->load(file, gfa);
+int Flatten::load(FILE* file, get_function_address_t gfa, bool continous_mapping) {
+	return engine->load(file, gfa, continous_mapping);
 }
 
 int Flatten::info(FILE* file, const char* arg) {
@@ -694,6 +708,18 @@ int flatten_imginfo(CFlatten flatten, FILE* file) {
 		return -1;
 	} catch(...) {
 		fprintf(stderr, "[UnflattenLib] Failed to print image information - exception occurred\n");
+		return -1;
+	}
+}
+
+int flatten_load_continous(CFlatten flatten, FILE* file, get_function_address_t gfa) {
+	try {
+		return ((Unflatten*)flatten)->load(file, gfa, true);
+	} catch(std::exception& ex) { 
+		fprintf(stderr, "[UnflattenLib] Failed to load continous image - `%s`\n", ex.what());
+		return -1;
+	} catch(...) {
+		fprintf(stderr, "[UnflattenLib] Failed to load continous image - exception occurred\n");
 		return -1;
 	}
 }

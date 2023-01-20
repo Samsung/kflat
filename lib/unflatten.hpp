@@ -52,9 +52,12 @@ public:
 	 * 
 	 * @param file pointer to opened file with kflat image
 	 * @param gfa  optional pointer to function resolving func pointers
+	 * @param continous_mapping whether to allocate dumped memory as one huge blob
+	 * 			or as many small malloc objects (second variant is slower, but allows
+	 * 			for detection of buffer overflows with ASAN)
 	 * @return        0 on success, otherwise error code
 	 */
-	int load(FILE* file, get_function_address_t gfa = NULL);
+	int load(FILE* file, get_function_address_t gfa = NULL, bool continous_mapping = false);
 
 	/**
 	 * @brief Provides information regarding kflat image file
@@ -131,6 +134,19 @@ void flatten_deinit(CFlatten flatten);
  * @return        0 on success, -1 if an error occurred
  */
 int flatten_load(CFlatten flatten, FILE* file, get_function_address_t gfa);
+
+/**
+ * @brief Load new kflat image from file. Works as flatten_load except that
+ * 		  loaded image will be stored as one continous blob in memory. Should
+ * 		  provide better performance, but ASAN won't be able to detect overflows
+ * 		  in such memory dump.
+ * 
+ * @param flatten library instance
+ * @param file    pointer to opened file with kflat image
+ * @param gfa     optional pointer to function resolving func pointers
+ * @return        0 on success, -1 if an error occurred
+ */
+int flatten_load_continous(CFlatten flatten, FILE* file, get_function_address_t gfa);
 
 /**
  * @brief Unload kflat image. Normally, there's no need for invoking this
