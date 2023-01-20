@@ -432,7 +432,17 @@ static inline void destroy_flatten_pointer(struct flatten_pointer* fp) {
 }
 
 static inline size_t strmemlen(const char* s) {
-	return strlen(s)+1;
+	size_t str_size;
+	size_t avail_size = kdump_test_address((void*) s, INT_MAX);
+	if(avail_size == 0)
+		return 0;
+
+	str_size = strnlen(s, avail_size);
+	if(str_size >= avail_size)
+		// Missing null termiantor
+		return str_size;
+
+	return str_size + 1;
 }
 
 #define FLATTEN_MAGIC 0x464c415454454e00ULL
@@ -1166,47 +1176,6 @@ struct flatten_pointer* FUNC_NAME(struct kflat* kflat, const void* ptr, struct b
 
 #define AGGREGATE_FLATTEN_TYPE(T,f)	AGGREGATE_FLATTEN_TYPE_ARRAY(T, f, 1)
 
-#define AGGREGATE_FLATTEN_STRING(f)	\
-	do {  \
-		DBGF(AGGREGATE_FLATTEN_STRING,f,"%lx",(unsigned long)ATTR(f));	\
-        if ((!KFLAT_ACCESSOR->errno)&&(ADDR_VALID(ATTR(f)))) {   \
-        	size_t _off = offsetof(_container_type,f);	\
-			struct flat_node *__node = interval_tree_iter_first(&KFLAT_ACCESSOR->FLCTRL.imap_root, (uint64_t)_ptr+_off,\
-					(uint64_t)_ptr+_off+sizeof(char*)-1);    \
-			if (__node==0) {	\
-				KFLAT_ACCESSOR->errno = EFAULT;	\
-			}	\
-			else {	\
-				int err = fixup_set_insert_force_update(KFLAT_ACCESSOR,__node,(uint64_t)_ptr-__node->start+_off,	\
-						flatten_plain_type(KFLAT_ACCESSOR,ATTR(f),strmemlen(ATTR(f))));	\
-				if ((err) && (err!=EEXIST) && (err!=EAGAIN)) {	\
-					KFLAT_ACCESSOR->errno = err;	\
-				}	\
-			}	\
-        }   \
-		else DBGS("AGGREGATE_FLATTEN_STRING: errno(%d), ADDR(%lx)\n",KFLAT_ACCESSOR->errno,(uintptr_t)ATTR(f));	\
-    } while(0)
-
-#define AGGREGATE_FLATTEN_FUNCTION_POINTER(f)	\
-	do {	\
-		DBGF(AGGREGATE_FLATTEN_FUNCTION_POINTER,f,"%lx",(unsigned long)ATTR(f));	\
-        if ((!KFLAT_ACCESSOR->errno)&&(TEXT_ADDR_VALID(ATTR(f)))) {   \
-        	size_t _off = offsetof(_container_type,f);	\
-			struct flat_node *__node = interval_tree_iter_first(&KFLAT_ACCESSOR->FLCTRL.imap_root, (uint64_t)_ptr+_off,\
-					(uint64_t)_ptr+_off+sizeof(int (*)(void))-1);    \
-			if (__node==0) {	\
-				KFLAT_ACCESSOR->errno = EFAULT;	\
-			}	\
-			else {	\
-				int err = fixup_set_insert_fptr_force_update(KFLAT_ACCESSOR,__node,(uint64_t)_ptr-__node->start+_off,(unsigned long)ATTR(f));	\
-				if ((err) && (err!=EEXIST) && (err!=EAGAIN)) {	\
-					KFLAT_ACCESSOR->errno = err;	\
-				}	\
-			}	\
-        }   \
-		else DBGS("AGGREGATE_FLATTEN_FUNCTION_POINTER: errno(%d), ADDR(%lx)\n",KFLAT_ACCESSOR->errno,(uintptr_t)ATTR(f));	\
-	} while (0)
-
 #define AGGREGATE_FLATTEN_COMPOUND_TYPE_ARRAY_SELF_CONTAINED(T,N,f,_off,n)	\
 	do {  \
 		DBGM5(AGGREGATE_FLATTEN_COMPOUND_TYPE_ARRAY_SELF_CONTAINED,T,N,f,_off,n);	\
@@ -1254,6 +1223,8 @@ struct flatten_pointer* FUNC_NAME(struct kflat* kflat, const void* ptr, struct b
 		else DBGS("AGGREGATE_FLATTEN_STRING_SELF_CONTAINED: errno(%d), ADDR(%lx)\n",KFLAT_ACCESSOR->errno,(uintptr_t)OFFATTR(void*,_off));	\
     } while(0)
 
+#define AGGREGATE_FLATTEN_STRING(f)	AGGREGATE_FLATTEN_STRING_SELF_CONTAINED(f, offsetof(_container_type,f))
+
 #define AGGREGATE_FLATTEN_FUNCTION_POINTER_SELF_CONTAINED(f,_off)	\
 	do {	\
 		DBGOF(AGGREGATE_FLATTEN_FUNCTION_POINTER_SELF_CONTAINED,f,"%lx:%zu",(unsigned long)OFFATTR(void*,_off),(size_t)_off);	\
@@ -1274,6 +1245,7 @@ struct flatten_pointer* FUNC_NAME(struct kflat* kflat, const void* ptr, struct b
 		else DBGS("AGGREGATE_FLATTEN_FUNCTION_POINTER_SELF_CONTAINED: errno(%d), ADDR(%lx)\n",KFLAT_ACCESSOR->errno,(uintptr_t)OFFATTR(void*,_off));	\
 	} while (0)
 
+#define AGGREGATE_FLATTEN_FUNCTION_POINTER(f) AGGREGATE_FLATTEN_FUNCTION_POINTER_SELF_CONTAINED(f, offsetof(_container_type,f))
 
 /* TODO: Use ADDR_RANGE_VALID */
 #define FOREACH_POINTER(PTRTYPE,v,p,s,...)	\
@@ -1302,6 +1274,9 @@ struct flatten_pointer* FUNC_NAME(struct kflat* kflat, const void* ptr, struct b
 	FOREACH_POINTER(PTRTYPE, v, p, 1, __VA_ARGS__)
 
 
+/*******************************
+ * FLATTEN entry point
+ *******************************/
 #define FOR_EXTENDED_ROOT_POINTER(p,__name,__size,...)	\
 	do {	\
 		struct bqueue bq;	\
