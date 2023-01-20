@@ -84,15 +84,23 @@ static int kflat_fptr_test(struct kflat *kflat) {
 #define TEST_STREAM_APPEND_ADDRESS (void *)0x1202
 #define TEST_FLATTEN_GLOBAL_ADDRESS (void *)0x1203
 
+bool match_kallsyms_name(const char* str, const char* prefix) {
+	if(strncmp(str, prefix, strlen(prefix)))
+		return false;
+
+	char last = str[strlen(prefix)];
+	return last == ' ' || last == '.';
+}
+
 // Match function name to local pointer
 static uintptr_t kflat_fptr_gfa_handler(const char *fsym) {
-	if (!strcmp(fsym, "vmalloc"))
+	if (match_kallsyms_name(fsym, "vmalloc"))
 		return (uintptr_t)TEST_VMALLOC_ADDRESS;
-	else if (!strcmp(fsym, "fixup_set_reserve_address"))
+	else if (match_kallsyms_name(fsym, "fixup_set_reserve_address"))
 		return (uintptr_t)TEST_SET_RESERVE_ADDRESS;
-	else if (!strcmp(fsym, "binary_stream_append"))
+	else if (match_kallsyms_name(fsym, "binary_stream_append"))
 		return (uintptr_t)TEST_STREAM_APPEND_ADDRESS;
-	else if (!strcmp(fsym, "flatten_global_address_by_name"))
+	else if (match_kallsyms_name(fsym, "flatten_global_address_by_name"))
 		return (uintptr_t)TEST_FLATTEN_GLOBAL_ADDRESS;
 	return (uintptr_t)NULL;
 }
