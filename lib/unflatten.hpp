@@ -11,6 +11,7 @@
  * Exported types
  *******************************/
 typedef void* CFlatten;
+typedef void* CFlattenHeader;
 typedef uintptr_t (*get_function_address_t)(const char* fsym);
 
 
@@ -136,9 +137,17 @@ int flatten_load(CFlatten flatten, FILE* file, get_function_address_t gfa);
  *        function manually - both flatten_load and flatten_deinit invokes
  *        flatten_unload when necessary
  * 
- * @param flatten 
+ * @param flatten library instance
  */
 void flatten_unload(CFlatten flatten);
+
+/**
+ * @brief Print information about the flattened image
+ * 
+ * @param flatten library instance
+ * @param file    pointer to opened file with kflat image
+ */
+int flatten_imginfo(CFlatten flatten, FILE* file);
 
 /**
  * @brief Retrieve the pointer to the next flattened object
@@ -166,6 +175,28 @@ void* flatten_root_pointer_seq(CFlatten flatten, size_t idx);
  * @return void* 	generic pointer to the named flattened object or NULL
  */
 void* flatten_root_pointer_named(CFlatten flatten, const char* name, size_t* size);
+
+/**
+ * @brief Retrieve the pointer to the flatten image header structure
+ * 
+  * @return CFlattenHeader 	generic pointer to the flatten image header structure or NULL
+ */
+CFlattenHeader flatten_get_image_header(CFlatten flatten);
+
+/**
+ * @brief Retrieve the number of fragments in the flatten memory image
+ * 
+ * @param header 			image header instance
+ * @return unsigned long 	number of memory fragments in the image
+ */
+unsigned long flatten_header_fragment_count(CFlattenHeader header);
+
+/**
+ * @brief Retrieve the size of the flatten memory
+ * @param header 	image header instance
+ * @return size_t 	size of the flatten memory
+ */
+size_t flatten_header_memory_size(CFlattenHeader header);
 
 #ifdef __cplusplus
 }

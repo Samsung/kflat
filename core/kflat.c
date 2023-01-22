@@ -359,11 +359,11 @@ int kflat_run_test(struct kflat* kflat, struct kflat_ioctl_tests* test) {
 	
 	for(size_t i = 0; i < tests_count; i++) {
 		if(!strcmp(test->test_name, test_cases[i]->name)) {
+			kflat->debug_flag = test->debug_flag;
 			flatten_init(kflat);
-			kflat->FLCTRL.debug_flag = test->debug_flag;
 
 			err = test_cases[i]->handler(kflat);
-			
+
 			flat_infos("@Flatten done: %d\n",kflat->errno);
 			if (!kflat->errno && !err)
 				err = flatten_write(kflat);

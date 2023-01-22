@@ -34,6 +34,7 @@ struct args {
     bool list;
     bool debug;
     bool validate;
+    bool imginfo;
     bool verbose;
     const char* output_dir;
 };
@@ -167,7 +168,7 @@ int run_test(struct args* args, const char* name) {
     bool success = false;
     const size_t flat_size = 10 * 1024 * 1024;   // 10MB
     ssize_t output_size;
-    
+
     struct kflat_ioctl_tests tests = {
         .debug_flag = args->debug
     };
@@ -195,6 +196,45 @@ int run_test(struct args* args, const char* name) {
         goto munmap_area;
     }
 
+    /* Save debug log early */
+    if (args->debug) {
+        if (args->output_dir) {
+            snprintf(out_name, sizeof(out_name), "%s/flat_%s.log", args->output_dir, name);
+            int save_fd = open(out_name, O_WRONLY | O_CREAT | O_TRUNC, 0700);
+            if(save_fd < 0) {
+                log_info("failed to save flatten log to file %s - %s", out_name, strerror(errno));
+                goto save_image;
+            }
+            unsigned long read_count = 0;
+            static unsigned char logbuff[4096];
+            do {
+                ret = read(fd, logbuff, 4096);
+                if (ret>0) {
+                    read_count+=ret;
+                    int wret;
+                    int write_count = ret;
+                    char* offset = (char*)logbuff;
+                    do {
+                        wret = write(save_fd, offset, write_count);
+                        if(wret > 0) {
+                            write_count -= wret;
+                            offset += wret;
+                        }
+                    } while(wret > 0);
+                    if(wret < 0) {
+                        log_error("failed to write flatten log to file %s - %s", out_name, strerror(errno));
+                        close(save_fd);
+                        goto save_image;
+                    }
+                }
+            } while(ret > 0);
+            close(save_fd);
+            if(!args->validate || args->verbose)
+                log_info("\t saved flatten log to file %s [%lu bytes]", out_name, read_count);
+        }
+    }
+
+save_image:
     if(output_size > flat_size)
         log_abort("test somehow produced image larger than mmaped buffer (kernel bug?)"
                     " - size: %zu; mmap size: %zu", output_size, flat_size);
@@ -221,6 +261,7 @@ int run_test(struct args* args, const char* name) {
         } while(ret > 0);
         if(ret < 0) {
             log_error("failed to write flatten image to file %s - %s", out_name, strerror(errno));
+            close(save_fd);
             goto munmap_area;
         }
 
@@ -240,6 +281,17 @@ int run_test(struct args* args, const char* name) {
         assert(file != NULL);
 
         CFlatten flatten = flatten_init(0);
+
+        if (args->imginfo) {
+            ret = flatten_imginfo(flatten, file);
+            if(ret != 0) {
+                log_error("failed to parse flattened image - %d", ret);
+                flatten_deinit(flatten);
+                goto munmap_area;
+            }
+            rewind(file);
+        }
+
         ret = flatten_load(flatten, file, get_test_gfa(name));
         if(ret != 0) {
             log_error("failed to parse flattened image - %d", ret);
@@ -312,6 +364,7 @@ static struct argp_option options[] = {
     {"output", 'o', "DIR", 0, "Save images to DIR"},
     {"debug", 'd', 0, 0, "Enable kflat debug flag"},
     {"skip-check", 's', 0, 0, "Skip saved image validation"},
+    {"image-info", 'i', 0, 0, "Print image information before validation"},
     {"verbose", 'v', 0, 0, "More verbose logs"},
     { 0 }
 };
@@ -327,6 +380,9 @@ static error_t parse_opt(int key, char* arg, struct argp_state* state) {
         case 'l':
             options->list = true;
             break;
+        case 'i':
+            options->imginfo = true;
+            break;
         case 'd':
             options->debug = true;
             break;
@@ -335,6 +391,7 @@ static error_t parse_opt(int key, char* arg, struct argp_state* state) {
             break;
         case 'v':
             options->verbose = true;
+            break;
         
         case ARGP_KEY_ARG:
             if(!strcmp(arg, "ALL"))

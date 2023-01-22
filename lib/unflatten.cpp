@@ -603,6 +603,10 @@ public:
 		return root_pointer_named(name, size);
 	}
 
+	void* get_image_header() {
+		return &FLCTRL.HDR;
+	}
+
 	~Unflatten() {
 		if(need_unload)
 			unload();
@@ -682,6 +686,18 @@ int flatten_load(CFlatten flatten, FILE* file, get_function_address_t gfa) {
 	}
 }
 
+int flatten_imginfo(CFlatten flatten, FILE* file) {
+	try {
+		return ((Unflatten*)flatten)->imginfo(file,0);
+	} catch(std::exception& ex) { 
+		fprintf(stderr, "[UnflattenLib] Failed to print image information - `%s`\n", ex.what());
+		return -1;
+	} catch(...) {
+		fprintf(stderr, "[UnflattenLib] Failed to print image information - exception occurred\n");
+		return -1;
+	}
+}
+
 void flatten_unload(CFlatten flatten) {
 	try {
 		((Unflatten*)flatten)->unload();
@@ -724,4 +740,24 @@ void* flatten_root_pointer_named(CFlatten flatten, const char* name, size_t* idx
 		fprintf(stderr, "[UnflattenLib] Failed to get named root pointer - exception occurred\n");
 		return NULL;
 	}
+}
+
+CFlattenHeader flatten_get_image_header(CFlatten flatten) {
+	try {
+		return ((Unflatten*)flatten)->get_image_header();
+	}  catch(std::exception& ex) { 
+		fprintf(stderr, "[UnflattenLib] Failed to get image header\n");
+		return NULL;
+	} catch(...) {
+		fprintf(stderr, "[UnflattenLib] Failed to get image header - exception occurred\n");
+		return NULL;
+	}
+}
+
+unsigned long flatten_header_fragment_count(CFlattenHeader header) {
+	return (unsigned long)((struct flatten_header*)header)->mcount;
+}
+
+size_t flatten_header_memory_size(CFlattenHeader header) {
+	return (unsigned long)((struct flatten_header*)header)->memory_size;
 }
