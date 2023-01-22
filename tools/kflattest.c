@@ -35,6 +35,7 @@ struct args {
     bool debug;
     bool validate;
     bool imginfo;
+    bool continuous;
     bool verbose;
     const char* output_dir;
 };
@@ -292,7 +293,12 @@ save_image:
             rewind(file);
         }
 
-        ret = flatten_load(flatten, file, get_test_gfa(name));
+        if (args->continuous) {
+            ret = flatten_load_continuous(flatten, file, get_test_gfa(name));
+        }
+        else {
+            ret = flatten_load(flatten, file, get_test_gfa(name));
+        }
         if(ret != 0) {
             log_error("failed to parse flattened image - %d", ret);
             flatten_deinit(flatten);
@@ -365,6 +371,7 @@ static struct argp_option options[] = {
     {"debug", 'd', 0, 0, "Enable kflat debug flag"},
     {"skip-check", 's', 0, 0, "Skip saved image validation"},
     {"image-info", 'i', 0, 0, "Print image information before validation"},
+    {"continuous", 'c', 0, 0, "Load memory image in continuous fashion during validation"},
     {"verbose", 'v', 0, 0, "More verbose logs"},
     { 0 }
 };
@@ -382,6 +389,9 @@ static error_t parse_opt(int key, char* arg, struct argp_state* state) {
             break;
         case 'i':
             options->imginfo = true;
+            break;
+        case 'c':
+            options->continuous = true;
             break;
         case 'd':
             options->debug = true;

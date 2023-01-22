@@ -433,7 +433,7 @@ public:
 		return 0;
 	}
 
-	int load(FILE* f, get_function_address_t gfa = NULL, bool continous_mapping = false) {
+	int load(FILE* f, get_function_address_t gfa = NULL, bool continuous_mapping = false) {
 		if(need_unload)
 			unload();
 		readin = 0;
@@ -509,7 +509,7 @@ public:
 		info(" #Unflattening done\n");
 		info(" #Image read time: %lfs\n", time_elapsed());
 
-		if(!continous_mapping) {
+		if(!continuous_mapping) {
 			time_mark_start();
 			size_t* minfoptr = (size_t*)((char*)FLCTRL.mem + FLCTRL.HDR.ptr_count * sizeof(size_t) + FLCTRL.HDR.fptr_count * sizeof(size_t));
 			void* memptr = flatten_memory_start();
@@ -538,7 +538,7 @@ public:
 			uintptr_t ptr = (uintptr_t)( *((void**)((char*)mem + fix_loc)) );
 			debug("fix_loc: %zu\n",fix_loc);
 
-			if(continous_mapping) {
+			if(continuous_mapping) {
 				*((void**)((unsigned char*)mem + fix_loc)) = (unsigned char*)mem + ptr;
 			} else {
 
@@ -568,7 +568,7 @@ public:
 				// Fix function pointer
 				uintptr_t nfptr = (*gfa)(fptrmap[fptri].c_str());
 
-				if(continous_mapping) {
+				if(continuous_mapping) {
 					*((void**)((char*)mem + fptri)) = (void*)nfptr;
 				} else {
 					struct interval_tree_node *node = interval_tree_iter_first(&FLCTRL.imap_root, fptri, fptri + 8);
@@ -638,8 +638,8 @@ Flatten::~Flatten() {
 	delete engine;
 }
 
-int Flatten::load(FILE* file, get_function_address_t gfa, bool continous_mapping) {
-	return engine->load(file, gfa, continous_mapping);
+int Flatten::load(FILE* file, get_function_address_t gfa, bool continuous_mapping) {
+	return engine->load(file, gfa, continuous_mapping);
 }
 
 int Flatten::info(FILE* file, const char* arg) {
@@ -712,7 +712,7 @@ int flatten_imginfo(CFlatten flatten, FILE* file) {
 	}
 }
 
-int flatten_load_continous(CFlatten flatten, FILE* file, get_function_address_t gfa) {
+int flatten_load_continuous(CFlatten flatten, FILE* file, get_function_address_t gfa) {
 	try {
 		return ((Unflatten*)flatten)->load(file, gfa, true);
 	} catch(std::exception& ex) { 
