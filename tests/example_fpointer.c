@@ -89,7 +89,7 @@ bool match_kallsyms_name(const char* str, const char* prefix) {
 		return false;
 
 	char last = str[strlen(prefix)];
-	return last == ' ' || last == '.';
+	return last == ' ' || last == '.' || last == '\0' || last == '\n';
 }
 
 // Match function name to local pointer
