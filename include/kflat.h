@@ -722,6 +722,25 @@ struct flatten_pointer* FUNC_NAME(struct kflat* kflat, const void* ptr, struct b
 		else DBGS("AGGREGATE_FLATTEN_GENERIC_STORAGE: errno(%d)\n",KFLAT_ACCESSOR->errno);	\
     } while(0)
 
+#define AGGREGATE_FLATTEN_GENERIC_STORAGE_FLEXIBLE(FLTYPE, FLSIZE, OFF, TARGET)	\
+	do {									\
+		void* start, *end;					\
+		size_t el_cnt, i;					\
+											\
+		bool rv = flatten_get_object((void*)_ptr, &start, &end);	\
+		if(!rv)								\
+			break;							\
+											\
+		el_cnt = (long)(end - start - OFF) / FLSIZE;	\
+		if(el_cnt <= 0)						\
+			break;							\
+		for(i = 0; i < el_cnt; i++) {		\
+			AGGREGATE_FLATTEN_GENERIC_STORAGE(FLTYPE, (((unsigned long)_ptr) + OFF  + i  * FLSIZE), TARGET);	\
+		}									\
+	} while(0)
+
+
+
 #define AGGREGATE_FLATTEN_STRUCT_STORAGE(T,p)	\
 	AGGREGATE_FLATTEN_GENERIC_STORAGE(T, p, flatten_struct_array_##T)
 
@@ -730,6 +749,25 @@ struct flatten_pointer* FUNC_NAME(struct kflat* kflat, const void* ptr, struct b
 
 #define AGGREGATE_FLATTEN_UNION_STORAGE(T,p)	\
 	AGGREGATE_FLATTEN_GENERIC_STORAGE(T, p, flatten_union_array_##T)
+
+
+#define AGGREGATE_FLATTEN_STRUCT_FLEXIBLE(T, f) \
+	AGGREGATE_FLATTEN_GENERIC_STORAGE_FLEXIBLE(T, sizeof(struct T), offsetof(_container_type, f), flatten_struct_array_##T)
+
+#define AGGREGATE_FLATTEN_STRUCT_TYPE_FLEXIBLE(T, f)	\
+	AGGREGATE_FLATTEN_GENERIC_STORAGE_FLEXIBLE(T, sizeof(T), offsetof(_container_type, f), flatten_struct_type_array_##T)
+
+#define AGGREGATE_FLATTEN_UNION_FLEXIBLE(T, f)	\
+	AGGREGATE_FLATTEN_GENERIC_STORAGE_FLEXIBLE(T, sizeof(union T), offsetof(_container_type, f), flatten_union_array_##T)
+
+#define AGGREGATE_FLATTEN_STRUCT_FLEXIBLE_SELF_CONTAINED(T, SIZE, OFF) \
+	AGGREGATE_FLATTEN_GENERIC_STORAGE_FLEXIBLE(T, SIZE, OFF, flatten_struct_array_##T)
+
+#define AGGREGATE_FLATTEN_STRUCT_TYPE_FLEXIBLE_SELF_CONTAINED(T, SIZE, OFF) \
+	AGGREGATE_FLATTEN_GENERIC_STORAGE_FLEXIBLE(T, SIZE, OFF, flatten_struct_type_array_##T)
+
+#define AGGREGATE_FLATTEN_UNION_FLEXIBLE_SELF_CONTAINED(T, SIZE, OFF) \
+	AGGREGATE_FLATTEN_GENERIC_STORAGE_FLEXIBLE(T, SIZE, OFF, flatten_union_array_##T)
 
 
 /* AGGREGATE_* */
