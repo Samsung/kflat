@@ -25,25 +25,20 @@ executor: executor.c common.o
 kflattest: kflattest.c common.o $(TEST_SRCS)
 	$(CC) $(CFLAGS) $(EXTRA_CFLAGS) --static -o $@ $^ $(PWD)/lib/libunflatten_$(ARCH).a -lstdc++ -lm
 
-imginfo: imginfo.cpp
-	$(CXX) -Wall -I${INCLUDE_PATH} -I$(PWD)/lib/include_priv -isystem /usr/aarch64-linux-gnu/include -ggdb3 --static -o $@ imginfo.cpp ../lib/libunflatten_$(ARCH).a
-
-
-ifeq ($(ARCH), arm64)
-imginfo_x86: imginfo.cpp
-	g++ -Wall -I$(PWD)/lib/include_priv -ggdb3 -o $@ $< ../lib/libunflatten_x86_64.a
-
+# ARM specific targets
 common_32.o: common.c
 	arm-linux-gnueabihf-gcc -c -o $@ $^
 
 executor_32: executor.c common_32.o
 	arm-linux-gnueabihf-gcc -DENV_32 -I${INCLUDE_PATH} --static -o $@ $^
 
-all: executor executor_32 kflattest imginfo imginfo_x86
+
+ifeq ($(ARCH), arm64)
+all: executor executor_32 kflattest
 else
-all: executor kflattest imginfo
+all: executor kflattest
 endif
 
 
 clean:
-	rm -f *.o executor executor_32 kflattest imginfo imginfo_x86 $(PWD)/tests/*.o $(PWD)/tests/tests_list.h
+	rm -f *.o executor executor_32 kflattest $(PWD)/tests/*.o $(PWD)/tests/tests_list.h

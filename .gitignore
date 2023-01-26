@@ -5,6 +5,10 @@
 *.o
 *.so
 *.a
+*.cache.mk
+*.img
+*.tar.gz
+*.log
 
 modules.order
 Module.symvers
@@ -13,7 +17,10 @@ Module.symvers
 __pycache__
 
 tools/executor
-tools/imginfo
+tools/executor_32
+tools/output
 tools/kflattest
 
 recipes/output
+
+tests/tests_list.h
