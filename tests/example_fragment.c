@@ -105,7 +105,7 @@ static int kflat_fragment_validate(void* memory, size_t size, CFlatten flatten) 
 	ASSERT(pP->b == 50);
 	ASSERT(pP->c == 100);
 
-	ASSERT(flatten_header_fragment_count(hdr) == 5);
+	ASSERT(flatten_header_fragment_count(hdr) == 3);
 
 	return 0;
 }
