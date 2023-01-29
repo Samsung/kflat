@@ -24,26 +24,26 @@ struct myLongHList {
 
 #ifdef __KERNEL__
 
-FUNCTION_DECLARE_FLATTEN_STRUCT_ARRAY_ITER_SELF_CONTAINED(hlist_node, 16);
-FUNCTION_DEFINE_FLATTEN_STRUCT_ITER_SELF_CONTAINED(hlist_node, 16,
-	AGGREGATE_FLATTEN_STRUCT_ARRAY_ITER_SELF_CONTAINED(hlist_node, 16, next, 0, 1);
-	AGGREGATE_FLATTEN_TYPE_ARRAY_SELF_CONTAINED(struct hlist_node *, pprev, 8, 1);
-	FOR_POINTER(struct hlist_node *, __pprev, OFFATTR(void **, 8),
-		FLATTEN_STRUCT_ARRAY_ITER_SELF_CONTAINED(hlist_node, 16, __pprev, 1);
+FUNCTION_DECLARE_FLATTEN_STRUCT_ARRAY_SELF_CONTAINED(hlist_node, sizeof(struct hlist_node));
+FUNCTION_DEFINE_FLATTEN_STRUCT_SELF_CONTAINED(hlist_node, sizeof(struct hlist_node),
+	AGGREGATE_FLATTEN_STRUCT_ARRAY_SELF_CONTAINED(hlist_node, sizeof(struct hlist_node), next, offsetof(struct hlist_node,next), 1);
+	AGGREGATE_FLATTEN_TYPE_ARRAY_SELF_CONTAINED(struct hlist_node *, pprev, offsetof(struct hlist_node,pprev), 1);
+	FOR_POINTER(struct hlist_node *, __pprev, OFFATTR(void **, offsetof(struct hlist_node,pprev)),
+		FLATTEN_STRUCT_ARRAY_SELF_CONTAINED(hlist_node, sizeof(struct hlist_node), __pprev, 1);
 	);
 );
 
-FUNCTION_DECLARE_FLATTEN_STRUCT_ARRAY_ITER_SELF_CONTAINED(hlist_head, 8);
-FUNCTION_DEFINE_FLATTEN_STRUCT_ITER_SELF_CONTAINED(hlist_head, 8,
-	AGGREGATE_FLATTEN_STRUCT_ARRAY_ITER_SELF_CONTAINED(hlist_node, 16, first, 0, 1);
+FUNCTION_DECLARE_FLATTEN_STRUCT_ARRAY_SELF_CONTAINED(hlist_head, sizeof(struct hlist_head));
+FUNCTION_DEFINE_FLATTEN_STRUCT_SELF_CONTAINED(hlist_head, sizeof(struct hlist_head),
+	AGGREGATE_FLATTEN_STRUCT_ARRAY_SELF_CONTAINED(hlist_node, sizeof(struct hlist_node), first, offsetof(struct hlist_head,first), 1);
 );
 
-FUNCTION_DECLARE_FLATTEN_STRUCT_ARRAY_ITER_SELF_CONTAINED(myLongHList, 24);
-FUNCTION_DEFINE_FLATTEN_STRUCT_ITER_SELF_CONTAINED(myLongHList, 24,
-	AGGREGATE_FLATTEN_STRUCT_ARRAY_ITER_SELF_CONTAINED_SHIFTED(myLongHList, 24, r.next, 8, 1, -8);
-	AGGREGATE_FLATTEN_TYPE_ARRAY_SELF_CONTAINED(struct hlist_node *, pprev, 8, 1);
-	FOR_POINTER(struct hlist_node *, __pprev, OFFATTR(void **, 8),
-		FLATTEN_STRUCT_ARRAY_ITER_SELF_CONTAINED(myLongHList, 24, __pprev, 1);
+FUNCTION_DECLARE_FLATTEN_STRUCT_ARRAY_SELF_CONTAINED(myLongHList, sizeof(struct myLongHList));
+FUNCTION_DEFINE_FLATTEN_STRUCT_SELF_CONTAINED(myLongHList, sizeof(struct myLongHList),
+	AGGREGATE_FLATTEN_STRUCT_ARRAY_SELF_CONTAINED_SHIFTED(myLongHList, sizeof(struct myLongHList), r.next, offsetof(struct myLongHList,r.next), 1, -offsetof(struct myLongHList,r));
+	AGGREGATE_FLATTEN_TYPE_ARRAY_SELF_CONTAINED(struct hlist_node *, r.pprev, offsetof(struct myLongHList,r.pprev), 1);
+	FOR_POINTER(struct hlist_node *, __pprev, OFFATTR(void **, offsetof(struct myLongHList,r.pprev)),
+		FLATTEN_STRUCT_ARRAY_SELF_CONTAINED(myLongHList, sizeof(struct myLongHList), __pprev, 1);
 	);
 );
 
@@ -67,21 +67,17 @@ static int kflat_longhlist_test(struct kflat *kflat) {
 		}
 	}
 
-	UNDER_ITER_HARNESS(
-		FOR_ROOT_POINTER(harr,
-			FLATTEN_STRUCT_ARRAY_ITER(hlist_head, harr, 5);
-		);
+	FOR_ROOT_POINTER(harr,
+		FLATTEN_STRUCT_ARRAY(hlist_head, harr, 5);
 	);
 
-	UNDER_ITER_HARNESS(
-		FOR_ROOT_POINTER(harr,
-			for (i = 0; i < 5; ++i) {
-				hlist_for_each(p, &harr[i]) {
-					struct myLongHList *entry = hlist_entry(p, struct myLongHList, r);
-					FLATTEN_STRUCT_ARRAY_ITER(myLongHList, entry, 1);
-				}
+	FOR_ROOT_POINTER(harr,
+		for (i = 0; i < 5; ++i) {
+			hlist_for_each(p, &harr[i]) {
+				struct myLongHList *entry = hlist_entry(p, struct myLongHList, r);
+				FLATTEN_STRUCT_ARRAY(myLongHList, entry, 1);
 			}
-		);
+		}
 	);
 
 	for (i = 0; i < 5; ++i) {
@@ -101,6 +97,7 @@ static int kflat_longhlist_validate(void *memory, size_t size, CFlatten flatten)
 	int i;
 	struct hlist_node *p;
 	struct hlist_head *harr = (struct hlist_head *)flatten_root_pointer_seq(flatten, 0);
+	struct hlist_head *harr2 = (struct hlist_head *)flatten_root_pointer_seq(flatten, 1);
 
 	for (i = 0; i < 5; ++i) {
 		unsigned long list_size = 0;
@@ -112,11 +109,19 @@ static int kflat_longhlist_validate(void *memory, size_t size, CFlatten flatten)
 		ASSERT(list_size == 10);
 	}
 
-	// TODO: Test 2nd root pointer
+	for (i = 0; i < 5; ++i) {
+		unsigned long list_size = 0;
+		for (p = (&harr2[i])->first; p; p = p->next) {
+			struct myLongHList *entry = container_of(p, struct myLongHList, r);
+			ASSERT(entry->k == i * 10 + list_size + 1);
+			list_size++;
+		}
+		ASSERT(list_size == 10);
+	}
 
 	return 0;
 }
 
 #endif
 
-	KFLAT_REGISTER_TEST("LONGHLIST", kflat_longhlist_test, kflat_longhlist_validate);
+KFLAT_REGISTER_TEST("LONGHLIST", kflat_longhlist_test, kflat_longhlist_validate);

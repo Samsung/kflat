@@ -23,14 +23,14 @@ struct myLongList {
 #ifdef __KERNEL__
 /********************************/
 
-FUNCTION_DECLARE_FLATTEN_STRUCT_ARRAY_ITER_SELF_CONTAINED(myLongList, 24);
+FUNCTION_DECLARE_FLATTEN_STRUCT_ARRAY_SELF_CONTAINED(myLongList, sizeof(struct myLongList));
 
-FUNCTION_DEFINE_FLATTEN_STRUCT_ITER_SELF_CONTAINED(myLongList, 24,
-	AGGREGATE_FLATTEN_STRUCT_ARRAY_ITER_SELF_CONTAINED_SHIFTED(myLongList, 24, v.next, 8, 1, -8);
-	AGGREGATE_FLATTEN_STRUCT_ARRAY_ITER_SELF_CONTAINED_SHIFTED(myLongList, 24, v.prev, 16, 1, -8);
+FUNCTION_DEFINE_FLATTEN_STRUCT_SELF_CONTAINED(myLongList, sizeof(struct myLongList),
+	AGGREGATE_FLATTEN_STRUCT_ARRAY_SELF_CONTAINED_SHIFTED(myLongList, sizeof(struct myLongList), v.next, offsetof(struct myLongList,v.next), 1, -offsetof(struct myLongList,v));
+	AGGREGATE_FLATTEN_STRUCT_ARRAY_SELF_CONTAINED_SHIFTED(myLongList, sizeof(struct myLongList), v.prev, offsetof(struct myLongList,v.prev), 1, -offsetof(struct myLongList,v));
 );
 
-static int kflat_list_test_iter(struct kflat *kflat) {
+static int kflat_list_test(struct kflat *kflat) {
 	int i, err = 0;
 	struct list_head *head;
 	struct myLongList myhead = { -1 };
@@ -44,10 +44,8 @@ static int kflat_list_test_iter(struct kflat *kflat) {
 		head = &item->v;
 	}
 
-	UNDER_ITER_HARNESS(
-		FOR_ROOT_POINTER(&myhead,
-			FLATTEN_STRUCT_ARRAY_ITER(myLongList, &myhead, 1);
-		);
+	FOR_ROOT_POINTER(&myhead,
+		FLATTEN_STRUCT_ARRAY(myLongList, &myhead, 1);
 	);
 
 	while (!list_empty(&myhead.v)) {
@@ -81,4 +79,4 @@ static int kflat_list_validate(void *memory, size_t size, CFlatten flatten) {
 #endif
 /********************************/
 
-KFLAT_REGISTER_TEST("LONG_LIST", kflat_list_test_iter, kflat_list_validate);
+KFLAT_REGISTER_TEST("LONG_LIST", kflat_list_test, kflat_list_validate);

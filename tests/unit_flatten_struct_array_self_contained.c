@@ -1,5 +1,5 @@
 /**
- * @file unit_flatten_struct_array_iter_self_contained.c
+ * @file unit_flatten_struct_array_self_contained.c
  * @author Samsung R&D Poland - Mobile Security Group
  * 
  */
@@ -23,13 +23,13 @@ typedef struct iter_box {
 #ifdef __KERNEL__
 /********************************/
 
-FUNCTION_DEFINE_FLATTEN_STRUCT_ITER_SELF_CONTAINED(iter_bucket, sizeof(bucket_t))
-FUNCTION_DEFINE_FLATTEN_STRUCT_ITER_SELF_CONTAINED(iter_box, sizeof(box_t),
-	AGGREGATE_FLATTEN_STRUCT_ARRAY_ITER_SELF_CONTAINED(iter_bucket, sizeof(bucket_t), tab, offsetof(box_t, tab), 3);
+FUNCTION_DEFINE_FLATTEN_STRUCT_SELF_CONTAINED(iter_bucket, sizeof(bucket_t))
+FUNCTION_DEFINE_FLATTEN_STRUCT_SELF_CONTAINED(iter_box, sizeof(box_t),
+	AGGREGATE_FLATTEN_STRUCT_ARRAY_SELF_CONTAINED(iter_bucket, sizeof(bucket_t), tab, offsetof(box_t, tab), 3);
 	AGGREGATE_FLATTEN_TYPE_ARRAY_SELF_CONTAINED(long long, integers, offsetof(box_t, integers), 10);
 );
 
-static int kflat_flatten_struct_type_array_iter_self_contained_unit_test(struct kflat *kflat) {
+static int kflat_flatten_struct_type_array_self_contained_unit_test(struct kflat *kflat) {
 	long long integers[10];
 	bucket_t el[3];
 	box_t box[2] = {
@@ -44,16 +44,12 @@ static int kflat_flatten_struct_type_array_iter_self_contained_unit_test(struct 
 	}
 
 	FOR_ROOT_POINTER(box,
-		UNDER_ITER_HARNESS(
-			FLATTEN_STRUCT_ARRAY_ITER_SELF_CONTAINED(iter_box, sizeof(box_t), box, 2);
-		);
+		FLATTEN_STRUCT_ARRAY_SELF_CONTAINED(iter_box, sizeof(box_t), box, 2);
 	);
 
 	// Test ADDR_RANGE_VALID macro
 	FOR_ROOT_POINTER(box,
-		UNDER_ITER_HARNESS(
-			FLATTEN_STRUCT_ARRAY_ITER_SELF_CONTAINED(iter_box, sizeof(box_t), box, 10000);
-		);
+		FLATTEN_STRUCT_ARRAY_SELF_CONTAINED(iter_box, sizeof(box_t), box, 10000);
 	);
 
 	return 0;
@@ -63,7 +59,7 @@ static int kflat_flatten_struct_type_array_iter_self_contained_unit_test(struct 
 #else
 /********************************/
 
-static int kflat_flatten_struct_type_array_iter_self_unit_validate(void *memory, size_t size, CFlatten flatten) {
+static int kflat_flatten_struct_type_array_self_unit_validate(void *memory, size_t size, CFlatten flatten) {
 	box_t *box = (box_t *)memory;
 
 	ASSERT(box[0].integers + 4 == box[1].integers);
@@ -82,4 +78,4 @@ static int kflat_flatten_struct_type_array_iter_self_unit_validate(void *memory,
 #endif
 /********************************/
 
-KFLAT_REGISTER_TEST("[UNIT] flatten_struct_type_array_self_contained", kflat_flatten_struct_type_array_iter_self_contained_unit_test, kflat_flatten_struct_type_array_iter_self_unit_validate);
+KFLAT_REGISTER_TEST("[UNIT] flatten_struct_type_array_self_contained", kflat_flatten_struct_type_array_self_contained_unit_test, kflat_flatten_struct_type_array_self_unit_validate);

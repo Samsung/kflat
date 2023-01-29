@@ -19,15 +19,15 @@ struct spec_array {
 #ifdef __KERNEL__
 /********************************/
 
-FUNCTION_DEFINE_FLATTEN_STRUCT_ITER_SELF_CONTAINED_SPECIALIZE(ints, spec_array, sizeof(struct spec_array),
+FUNCTION_DEFINE_FLATTEN_STRUCT_SELF_CONTAINED_SPECIALIZE(ints, spec_array, sizeof(struct spec_array),
 	AGGREGATE_FLATTEN_TYPE_ARRAY_SELF_CONTAINED(int, integers, offsetof(struct spec_array, integers), 10);
 );
 
-FUNCTION_DEFINE_FLATTEN_STRUCT_ITER_SELF_CONTAINED_SPECIALIZE(strs, spec_array, sizeof(struct spec_array),
+FUNCTION_DEFINE_FLATTEN_STRUCT_SELF_CONTAINED_SPECIALIZE(strs, spec_array, sizeof(struct spec_array),
 	AGGREGATE_FLATTEN_STRING_SELF_CONTAINED(string, offsetof(struct spec_array, string));
 );
 
-FUNCTION_DEFINE_FLATTEN_STRUCT_ITER_SELF_CONTAINED_SPECIALIZE(magic, spec_array, sizeof(struct spec_array));
+FUNCTION_DEFINE_FLATTEN_STRUCT_SELF_CONTAINED_SPECIALIZE(magic, spec_array, sizeof(struct spec_array));
 
 static int kflat_flatten_struct_array_specialize_unit_test(struct kflat *kflat) {
 	int numbers[10];
@@ -41,23 +41,18 @@ static int kflat_flatten_struct_array_specialize_unit_test(struct kflat *kflat) 
 	spec_str.string = str;
 	spec_magic.magic = 0xCAFECAFE;
 
-	UNDER_ITER_HARNESS(
-		FOR_ROOT_POINTER(&spec_int,
-			FLATTEN_STRUCT_ARRAY_ITER_SPECIALIZE(ints, spec_array, &spec_int, 1);
-		);
+	FOR_ROOT_POINTER(&spec_int,
+		FLATTEN_STRUCT_ARRAY_SPECIALIZE(ints, spec_array, &spec_int, 1);
 	);
 
-	UNDER_ITER_HARNESS(
-		FOR_ROOT_POINTER(&spec_str,
-			FLATTEN_STRUCT_ARRAY_ITER_SPECIALIZE(strs, spec_array, &spec_str, 1);
-		);
+	FOR_ROOT_POINTER(&spec_str,
+		FLATTEN_STRUCT_ARRAY_SPECIALIZE(strs, spec_array, &spec_str, 1);
 	);
 
-	UNDER_ITER_HARNESS(
-		FOR_ROOT_POINTER(&spec_magic,
-			FLATTEN_STRUCT_ARRAY_ITER_SPECIALIZE(magic, spec_array, &spec_magic, 1);
-		);
+	FOR_ROOT_POINTER(&spec_magic,
+		FLATTEN_STRUCT_ARRAY_SPECIALIZE(magic, spec_array, &spec_magic, 1);
 	);
+
 	return 0;
 }
 

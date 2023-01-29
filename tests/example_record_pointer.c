@@ -16,12 +16,12 @@ int iarr[10] = { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9 };
 
 #ifdef __KERNEL__
 
-FUNCTION_DECLARE_FLATTEN_STRUCT_ARRAY_ITER_SELF_CONTAINED(iptr, 24);
-FUNCTION_DEFINE_FLATTEN_STRUCT_ITER_SELF_CONTAINED(iptr, 24,
-	AGGREGATE_FLATTEN_TYPE_ARRAY_SELF_CONTAINED(int, p, 8, OFFATTR(long, 0));
-	AGGREGATE_FLATTEN_TYPE_ARRAY_SELF_CONTAINED(struct iptr *, pp, 16, 1);
-	FOR_POINTER(struct iptr *, __iptr_1, /*ATTR(pp)*/ OFFATTR(void **, 16), /* not SAFE */
-		FLATTEN_STRUCT_ARRAY_ITER(iptr, __iptr_1, 1); /* not SAFE */
+FUNCTION_DECLARE_FLATTEN_STRUCT_ARRAY_SELF_CONTAINED(iptr, sizeof(struct iptr));
+FUNCTION_DEFINE_FLATTEN_STRUCT_SELF_CONTAINED(iptr, sizeof(struct iptr),
+	AGGREGATE_FLATTEN_TYPE_ARRAY_SELF_CONTAINED(int, p, offsetof(struct iptr,p), OFFATTR(long, offsetof(struct iptr,l)));
+	AGGREGATE_FLATTEN_TYPE_ARRAY_SELF_CONTAINED(struct iptr *, pp, offsetof(struct iptr,pp), 1);
+	FOR_POINTER(struct iptr *, __iptr_1, /*ATTR(pp)*/ OFFATTR(void **, offsetof(struct iptr,pp)),
+		FLATTEN_STRUCT_ARRAY(iptr, __iptr_1, 1); /* not SAFE */
 	);
 );
 
@@ -30,10 +30,8 @@ int kflat_record_pointer_test(struct kflat *kflat) {
 	struct iptr *ppv = &pv;
 	struct iptr pv2 = { 10, iarr, &ppv };
 
-	UNDER_ITER_HARNESS(
-		FOR_ROOT_POINTER(&pv2,
-			FLATTEN_STRUCT_ARRAY_ITER(iptr, &pv2, 1);
-		);
+	FOR_ROOT_POINTER(&pv2,
+		FLATTEN_STRUCT_ARRAY(iptr, &pv2, 1);
 	);
 
 	return 0;
