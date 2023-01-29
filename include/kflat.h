@@ -248,6 +248,7 @@ struct flatten_job {
     struct flat_node* node;
     size_t offset;
     size_t size;
+    uintptr_t custom_val;
     struct flatten_base* ptr;
     flatten_struct_t fun;
     /* Mixed pointer support */
@@ -697,7 +698,7 @@ struct flatten_pointer* FUNC_NAME(struct kflat* kflat, const void* ptr, struct b
  * AGGREGATE macros
  *******************************/
 /* AGGREGATE_*_STORAGE */
-#define AGGREGATE_FLATTEN_GENERIC_STORAGE(T, p, TARGET)		\
+#define AGGREGATE_FLATTEN_GENERIC_STORAGE(T,p,TARGET,CUSTOM_VAL)		\
 	do {	\
 		DBGTF(AGGREGATE_FLATTEN_GENERIC_STORAGE,T,p,"%lx",(unsigned long)p);	\
     	if (!KFLAT_ACCESSOR->errno) {	\
@@ -709,6 +710,7 @@ struct flatten_pointer* FUNC_NAME(struct kflat* kflat, const void* ptr, struct b
 					__job.node = 0;    \
 					__job.offset = 0; \
 					__job.size = 1;	\
+					__job.custom_val = (uintptr_t)CUSTOM_VAL;	\
 					__job.ptr = (struct flatten_base*)p;    \
 					__job.fun = TARGET;    \
 					__job.fp = 0;   \
@@ -771,7 +773,7 @@ struct flatten_pointer* FUNC_NAME(struct kflat* kflat, const void* ptr, struct b
 
 
 /* AGGREGATE_* */
-#define AGGREGATE_FLATTEN_GENERIC(FULL_TYPE, TARGET,N,f,_off,n)	\
+#define AGGREGATE_FLATTEN_GENERIC(FULL_TYPE,TARGET,N,f,_off,n,CUSTOM_VAL)	\
 	do {	\
 		DBGM5(AGGREGATE_FLATTEN_GENERIC,FULL_TYPE,N,f,_off,n);	\
 		DBGS("FULL_TYPE [%lx:%zu -> %lx]\n",(uintptr_t)_ptr,(size_t)_off,(uintptr_t)OFFATTR(void*,_off));	\
@@ -813,6 +815,7 @@ struct flatten_pointer* FUNC_NAME(struct kflat* kflat, const void* ptr, struct b
 								__job.node = 0;    \
 								__job.offset = 0; \
 								__job.size = 1;	\
+								__job.custom_val = (uintptr_t)CUSTOM_VAL;	\
 								__job.ptr = (struct flatten_base*)((void*)OFFATTR(void*,_off)+_i*N);    \
 								__job.fun = TARGET;    \
 								__job.fp = 0;   \
