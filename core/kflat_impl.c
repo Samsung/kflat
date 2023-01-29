@@ -1575,7 +1575,7 @@ struct flat_node* flatten_acquire_node_for_ptr(struct kflat* kflat, const void* 
 }
 EXPORT_SYMBOL_GPL(flatten_acquire_node_for_ptr);
 
-void flatten_generic(struct kflat* kflat, void* q, struct flatten_pointer* fptr, void* p, size_t el_size, size_t count, flatten_struct_t func_ptr) {
+void flatten_generic(struct kflat* kflat, void* q, struct flatten_pointer* fptr, void* p, size_t el_size, size_t count, uintptr_t custom_val, flatten_struct_t func_ptr) {
 	int err;
 	size_t i;
 	struct flatten_pointer* flat_ptr;
@@ -1611,6 +1611,7 @@ void flatten_generic(struct kflat* kflat, void* q, struct flatten_pointer* fptr,
 					break;
 
 				job.size = 1;
+				job.custom_val = custom_val;
 				job.ptr = (struct flatten_base*)target;
 				job.fun = func_ptr;
 				err = bqueue_push_back(kflat, q, &job, sizeof(struct flatten_job));
@@ -1670,7 +1671,7 @@ void flatten_run_iter_harness(struct kflat* kflat, struct bqueue* bq) {
 			break;
 		}
 
-		fp = job.fun(kflat, job.ptr, job.size, bq);
+		fp = job.fun(kflat, job.ptr, job.size, job.custom_val, bq);
 		if (job.convert != NULL)
 			fp = job.convert(fp, job.ptr);
 

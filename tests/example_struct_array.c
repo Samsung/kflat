@@ -18,10 +18,17 @@ struct BB {
 	struct CC *pC;
 };
 
+union K {
+	const char* s;
+	unsigned long v;
+};
+
 struct MM {
 	const char *s;
 	struct BB arrB[4];
 	long *Lx;
+	int has_s[2];
+	union K arrK[2];
 };
 
 /********************************/
@@ -35,6 +42,14 @@ FUNCTION_DEFINE_FLATTEN_STRUCT(BB,
 	AGGREGATE_FLATTEN_STRUCT(CC, pC);
 );
 
+FUNCTION_DECLARE_FLATTEN_UNION(K);
+
+FUNCTION_DEFINE_FLATTEN_UNION(K,
+	if (__cval) {
+		AGGREGATE_FLATTEN_STRING(s);
+	}
+);
+
 FUNCTION_DEFINE_FLATTEN_STRUCT(MM,
 	AGGREGATE_FLATTEN_STRING(s);
 	for (int __i = 0; __i < 4; ++__i) {
@@ -42,6 +57,11 @@ FUNCTION_DEFINE_FLATTEN_STRUCT(MM,
 		AGGREGATE_FLATTEN_STRUCT_STORAGE(BB, p);
 	} 
 	AGGREGATE_FLATTEN_TYPE_ARRAY(long, Lx, 0);
+	for (int __i = 0; __i < 2; ++__i) {
+		const union K *p = ATTR(arrK) + __i;
+		const int* has_s = ATTR(has_s) + __i;
+		AGGREGATE_FLATTEN_UNION_STORAGE_CUSTOM_INFO(K, p, *has_s);
+	} 
 );
 
 static int kflat_structarray_example(struct kflat *kflat) {
@@ -55,6 +75,12 @@ static int kflat_structarray_example(struct kflat *kflat) {
 			{ 15, 40, &T[15], &c2 },
 			{ 15, 66, NULL, NULL },
 		},
+		0,
+		{0,1},
+		{
+			{.v = 999},
+			{"999"},
+		}
 	};
 	unsigned char *p = (unsigned char *)&obM;
 	unsigned char *q = (unsigned char *)&obM.arrB[3].n;
@@ -106,6 +132,15 @@ static int kflat_structarray_validate(void *memory, size_t size, CFlatten flatte
 	ASSERT(obM->arrB[0].pC->i == 0);
 	ASSERT(obM->arrB[1].pC->i == 1000);
 	ASSERT(obM->arrB[2].pC->i == 1000000);
+
+	ASSERT(obM->Lx == 0);
+
+	ASSERT(obM->has_s[0]==0);
+	ASSERT(obM->has_s[1]==1);
+
+	ASSERT(obM->arrK[0].v==999);
+	ASSERT(!strcmp(obM->arrK[1].s,"999"));
+
 	return 0;
 }
 
