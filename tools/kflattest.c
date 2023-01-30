@@ -287,8 +287,7 @@ save_image:
             ret = flatten_imginfo(flatten, file);
             if(ret != 0) {
                 log_error("failed to parse flattened image - %d", ret);
-                flatten_deinit(flatten);
-                goto munmap_area;
+                goto flatten_cleanup;
             }
             rewind(file);
         }
@@ -301,15 +300,13 @@ save_image:
         }
         if(ret != 0) {
             log_error("failed to parse flattened image - %d", ret);
-            flatten_deinit(flatten);
-            goto munmap_area;
+            goto flatten_cleanup;
         }
 
         void* memory = flatten_root_pointer_seq(flatten, 0);
         if(memory == NULL) {
             log_error("failed to acquire first root pointer from image");
-            flatten_deinit(flatten);
-            goto munmap_area;
+            goto flatten_cleanup;
         }
 
         fflush(stdout);
@@ -322,20 +319,14 @@ save_image:
             int status = 0;
             waitpid(pid, &status, 0);
 
-            ret = WEXITSTATUS(status);
-            if(ret != 0) {
-                flatten_deinit(flatten);
-                goto munmap_area;
-            }
+            test_result = WEXITSTATUS(status);
         } else {
             log_error("failed to fork subprocess");
             ret = -1;
+            goto flatten_cleanup;
         }
 
-        flatten_deinit(flatten);
-
-        test_result = ret;
-        switch(ret) {
+        switch(test_result) {
             case KFLAT_TEST_SUCCESS:
                 if(args->verbose)
                     log_info("\t\t=>validator accepted test result");
@@ -350,10 +341,16 @@ save_image:
             default:
                 if(args->verbose)
                     log_error("\t\t=>validator rejected test result - %d", ret);
-                goto munmap_area;
                 break;
         }
+
+flatten_cleanup:
+        flatten_deinit(flatten);
+        goto munmap_area;
     }
+
+    // If we've reached that place, everything went accordingly to plan
+    test_result = KFLAT_TEST_SUCCESS;
 
 munmap_area:
     munmap(area, flat_size);
