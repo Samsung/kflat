@@ -39,9 +39,14 @@ static int kflat_simple_test(struct kflat *kflat) {
 
 static int kflat_simple_validate(void *memory, size_t size, CFlatten flatten) {
 	struct A *pA = (struct A *)memory;
+
 	ASSERT(pA->X == 0x0000404F);
 	ASSERT(!strcmp((const char *)pA->pB->T, "ABC"));
-	return 0;
+	
+	PRINT("struct A = {.X = 0x%08llx, .pB = \"%s\"}",
+			pA->X, pA->pB->T);
+
+	return KFLAT_TEST_SUCCESS;
 }
 
 #endif

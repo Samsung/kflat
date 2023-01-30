@@ -126,6 +126,11 @@ static int kflat_circle_validate(void *memory, size_t size, CFlatten flatten) {
 	ASSERT(circle->n == 750 || circle->n == 30);
 	ASSERT(edge_number == circle->n * (circle->n - 1) / 2);
 	ASSERT(3.13 <= circumference / 2 && circumference / 2 <= 3.15);
+
+	PRINT("Number of edges/diagonals: %d", circle->n / 2);
+	PRINT("Sum of lengths of edges/diagonals: %lf", length);
+	PRINT("Half of the circumference: %lf", circumference / 2);
+
 	return 0;
 }
 

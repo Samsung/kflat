@@ -127,13 +127,14 @@ adb shell ls -la /sys/kernel/debug/kflat
 
 Now kflat must be initialized using proper ioctl call on the `/sys/kernel/debug/kflat` node and then memory buffer should be mapped using mmap system call. This buffer will serve as a intermediary buffer between kernel and user space. When flattening operation is triggered inside the kernel on some internal data structure the data will be stored inside this buffer which can be accessed from the user space. Fortunately there are tools which can do all the necessary setup work and run the tests or trigger internal kernel structure flattening operation on a selected entry point.
 
-Let's start with the tests. `kflat` test suite can be found [here](https://github.com/Samsung/kflat/blob/912e4baa243ee505aaac8e83a5eaa52c4a515929/core/tests/kflat_test.c#L1733). There's also a handy tool to setup and run `kflat` tests for us on the device:
+Let's start with the tests. `kflat` test suite can be found in `tests/` subdirectory. There's also a handy tool to setup and run kflat tests for us on the device:
 ```bash
 adb push tools/kflattest /data/local/tmp
 ```
 
-Let's start with a simple [test](https://github.com/Samsung/kflat/blob/912e4baa243ee505aaac8e83a5eaa52c4a515929/core/tests/kflat_test.c#L44):
+Let's start with test `SIMPLE` - available [HERE](/tests/example_simple.c):
 ```c
+// tests/example_simple.c:19
 struct B {
 	unsigned char T[4];
 };
@@ -143,34 +144,22 @@ struct A {
 };
 
 FUNCTION_DEFINE_FLATTEN_STRUCT(B);
-
 FUNCTION_DEFINE_FLATTEN_STRUCT(A,
-    AGGREGATE_FLATTEN_STRUCT(B,pB);
+	AGGREGATE_FLATTEN_STRUCT(B, pB);
 );
 
 static int kflat_simple_test(struct kflat *kflat) {
-
-	int err = 0;
 	struct B b = { "ABC" };
 	struct A a = { 0x0000404F, &b };
-	struct A* pA = &a;
-	struct A* vpA = (struct A*) 0xdeadbeefdabbad00;
-
-	flatten_init(kflat);
+	struct A *pA = &a;
+	struct A *vpA = (struct A *)0xdeadbeefdabbad00;
 
 	FOR_ROOT_POINTER(pA,
 		FLATTEN_STRUCT(A, vpA);
 		FLATTEN_STRUCT(A, pA);
 	);
 
-	flat_infos("@Flatten done: %d\n",kflat->errno);
-	if (!kflat->errno) {
-		err = flatten_write(kflat);
-	}
-	flatten_fini(kflat);
-
-	return err;
-
+	return 0;
 }
 ```
 
@@ -183,41 +172,35 @@ adb shell /data/local/tmp/kflattest -o /data/local/tmp SIMPLE
 
 You should see something like:
 ```
-[+][  0.000] main      | will be using /data/local/tmp as output directory
-[+][  0.000] run_test  | starting test SIMPLE...
-[+][  0.084] run_test  | recipe produced 156 bytes of flattened memory
-[+][  0.084] run_test  |          saved flatten image to file /data/local/tmp/flat_SIMPLE.img
-[+][  0.084] run_test  |         Test #5 - SUCCESS
+[+][  0.000] main          | Will use `out` as output directory
+[+][  0.000] run_test      | => Testing SIMPLE...
+[+][  0.216] run_test      |     test produced 164 bytes of flattened memory
+[+][  0.216] run_test      |     saved flatten image to file /data/local/tmp/flat_SIMPLE.img
+[+][  0.211] run_test      | Test SIMPLE - SUCCESS
 ```
 
-Now get back to your `kflat` source directory and check the `kflat` verification suite available [here](https://github.com/Samsung/kflat/blob/912e4baa243ee505aaac8e83a5eaa52c4a515929/tools/imginfo.cpp#L379). It reads the image retrieved from the kernel, establishes the image in the process memory and verifies its correctness. It accepts a test name as a parameter. For our simple test this would be:
+Now, let's execute the same test, but with `-v` (verbose) flag added. With this option, `./kflattest` may print extra information including the content of dumped memory for some test cases. For our simple test, the full command would be:
 ```bash
-adb pull /data/local/tmp/flat_SIMPLE.img && ./tools/imginfo flat_SIMPLE.img SIMPLE
+adb shell /data/local/tmp/kflattest -v -o out SIMPLE
 ```
 
 The verification code for our simple case is as follows:
 ```c
-printf("sizeof(struct A): %zu\n", sizeof(struct A));
-		printf("sizeof(struct B): %zu\n", sizeof(struct B));
-		
-		const struct A* pA = (const struct A*) flatten.get_next_root();
-		printf("pA->X: %016lx\n" ,pA->X);
-		printf("pA->pB->T: [%02x%02x%02x%02x]\n", 
-					pA->pB->T[0], pA->pB->T[1], 
-					pA->pB->T[2], pA->pB->T[3]);
+// tests/example_simple.c:40
+struct A *pA = (struct A *)memory;
+
+PRINT("struct A = {.X = 0x%08llx, .pB = {%s}}",
+			pA->X, pA->pB->T);
 ```
 
-After executing it:
+After executing it we end up with the below output:
 ```
-sizeof(struct A): 16
-sizeof(struct B): 4
-pA->X: 000000000000404f
-pA->pB->T: [41424300]
+struct A = {.X = 0x0000404F, .pB = "ABC"}
 ```
 
 Now stop and ponder for a while what actually happened here. We've had around 20 bytes of memory in the running Linux kernel (additionally part of this memory was a pointer to other place in this memory). We were able to save the memory contents to a file and read it back on different machine, different running Linux version and different process, fix the memory so the embedded pointer points to proper location and verify the memory contents as appropriate.
 
-Let's now check some more advanced test from our [suite](https://github.com/Samsung/kflat/blob/912e4baa243ee505aaac8e83a5eaa52c4a515929/core/tests/kflat_test.c#L872):
+Let's now check some more advanced test - `example_circle.c`:
 ```c
 struct point {
     double x;
@@ -261,7 +244,7 @@ The test makes a circle of 30 points and then dumps the memory area of the circl
 
 The verification code reads it back and computes some features of our circle, like approximated length of the circumference:
 ```bash
-adb pull /data/local/tmp/flat_CIRCLE.img && ./tools/imginfo flat_CIRCLE.img CIRCLE
+adb shell adb shell /data/local/tmp/kflattest -v -o /data/local/tmp SIMPLE
 ```
 ```
 Number of edges/diagonals: 435
@@ -269,31 +252,7 @@ Sum of lengths of edges/diagonals: 572.43410063184580849
 Half of the circumference: 3.13585389802960446
 ```
 
-Originally the flattening engine walks and processes all pointers recursively. In large data structures that rely heavily on pointers this may lead to buffer overflow due to maximum recursion depth. There are iterative version of recipes available whenever iterative mode of flattening is required. For example in the below test the circle that consists of 750 points is iteratively serialized (please note that the `-i` option passed to the `kflattest` forces the iterative version of the test):
-```bash
-adb shell /data/local/tmp/kflattest -i -o /data/local/tmp CIRCLE
-```
-```
-[+][  0.000] main      | will be using /data/local/tmp as output directory
-[+][  0.000] run_test  | starting test CIRCLE...
-[+][  0.466] run_test  | recipe produced 9030191 bytes of flattened memory
-[+][  0.473] run_test  |          saved flatten image to file /data/local/tmp/flat_CIRCLE.img
-[+][  0.474] run_test  |         Test #1 - SUCCESS
-```
-
-Reading it back on the host:
-```bash
-adb pull /data/local/tmp/flat_CIRCLE.img && ./tools/imginfo flat_CIRCLE.img CIRCLE
-```
-
-Verification result (note that the circumference length is much better approximated here):
-```
-Number of edges/diagonals: 280875
-Sum of lengths of edges/diagonals: 358098.09835783619200811
-Half of the circumference: 3.14158346655293785
-```
-
-In another [test](https://github.com/Samsung/kflat/blob/912e4baa243ee505aaac8e83a5eaa52c4a515929/core/tests/kflat_test.c#L1499) (`STRINGSET`) we have a red-black tree based implementation for a set of C-style strings. We create such set and fill it with randomly generated strings (50 strings for recursive version and 50k strings for iterative).
+In another `STRINGSET` we have a red-black tree based implementation for a set of C-style strings. We create such set and fill it with randomly generated 50k strings.
 
 ```c
 struct __attribute__((aligned(sizeof(long)))) rb_node {
@@ -336,49 +295,18 @@ FUNCTION_DEFINE_FLATTEN_STRUCT(rb_root,
 This example is a little bit more complicated as the `__rb_parent_color` member of `struct rb_node` is actually a pointer (despite the `uintptr_t` type) which holds the node color in its two least significant bits. This requires additional processing to clear and restore the bits while serializing the memory image.
 
 ```bash
-adb shell /data/local/tmp/kflattest -o /data/local/tmp STRINGSET
-adb pull /data/local/tmp/flat_STRINGSET.img && ./tools/imginfo flat_STRINGSET.img STRINGSET
+adb shell /data/local/tmp/kflattest -v -o /data/local/tmp STRINGSET
 ```
 
 yields:
 ```
+[+][  0.000] main      | will be using /data/local/tmp as output directory
+[+][  0.000] run_test  | starting test STRINGSET...
+[+][  0.056] run_test  | recipe produced 15791 bytes of flattened memory
+
 stringset size: 50
-[
-  ABEEFHBDBB
-  ACEAHEDGIA
-  ADIFJEEAAC
-  AIIFBAHDFB
-  AJAGADDICJ
-  BADADACEJJ
-  BEACDBGBBF
-  BIHGCICDEA
-  CAACDGHBBG
-  CCDEEIFBHI
-  ...
-]
 ```
 
-And the iterative version:
-```bash
-adb shell /data/local/tmp/kflattest -i -o /data/local/tmp STRINGSET
-adb pull /data/local/tmp/flat_STRINGSET.img && ./tools/imginfo flat_STRINGSET.img STRINGSET
-```
-```
-stringset size: 50000
-[
-  AAAACAJCEJ
-  AAAACBGJHI
-  AAAADBJJGG
-  AAAAEACBGJ
-  AAAAEHCGFE
-  AAAAFAGHDC
-  AAAAJIGEJJ
-  AAABAFBIEC
-  AAABCIDJCH
-  AAABGBCBGB
-  ...
-]
-```
 
 Again, think for a moment what just happened. There was a large data structure inside the kernel, heavily linked using pointers (many data structures inside the kernel is actually based on this red-black tree implementation like handling memory regions with interval trees, process scheduling etc.). Writing 17 lines of code with the recipes allowed us to fully serialize this tree and read it back on host machine impeccably in its entirety.
 

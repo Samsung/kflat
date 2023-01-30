@@ -122,6 +122,9 @@ static size_t stringset_count(const struct rb_root *root) {
 static int kflat_stringset_validate(void *memory, size_t size, CFlatten flatten) {
 	const struct rb_root *root = (struct rb_root *)memory;
 	ASSERT(stringset_count(root) == 50);
+
+	PRINT("Stringset size: %ld", stringset_count(root));
+
 	return 0;
 }
 

@@ -98,8 +98,6 @@ Kflat is equipped with set of tests to ensure that all the functionalities are w
 
 `./kflattest` automatically validates obtained memory dump and informs whether it's correct (`SUCCESS`) or not (`FAILED`). All tests can be found in `tests/` subdirectory.
 
-Created memory dumps can be analyzed by using `imginfo` program (formerly called `main.cpp` in original kflat repository). As an arguments, `imginfo` takes the name of test that has been run and memory dump associated with it. Under the hood, the dumped memory is recreated in userspace and processed to determine whether all parts of it were correcly saved and restored.
-
 ### Prepare kflat recipe
 Kflat requires a description of target memory called _kflat recipe_. Vast and extensive documentation of recipes format is pending. For sample recipes, refer to directory `recipes/`.
 
