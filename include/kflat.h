@@ -941,14 +941,14 @@ struct flatten_pointer* FUNC_NAME(struct kflat* kflat, const void* ptr, uintptr_
 	AGGREGATE_FLATTEN_GENERIC_MIXED_POINTER(T, flatten_struct_type_array_##T, N, f, _off, pre_f, post_f)
 
 #define AGGREGATE_FLATTEN_STRUCT_MIXED_POINTER_SELF_CONTAINED(T,N,f,_off,pre_f,post_f) \
-	AGGREGATE_FLATTEN_STRUCT_MIXED_POINTER_ARRAY_SELF_CONTAINED(T,N,f,_off,pre_f,post_f,1)	/* xxx TODO: Check this? */
+	AGGREGATE_FLATTEN_GENERIC_MIXED_POINTER(struct T, flatten_struct_array_##T, N, f, _off, pre_f, post_f)
 
 
 #define AGGREGATE_FLATTEN_STRUCT_MIXED_POINTER_ARRAY_SELF_CONTAINED(T,N,f,_off,pre_f,post_f,n)	\
 	do {	\
 		const struct T* _fp;	\
 		DBGTNFOMF(AGGREGATE_FLATTEN_STRUCT_MIXED_POINTER_ARRAY_SELF_CONTAINED,T,N,f,"%lx:%zu",(unsigned long)OFFATTR(void*,_off),(size_t)_off,pf,ff);  \
-		_fp = pre_f((const T*)OFFATTR(void*,_off)); \
+		_fp = pre_f((const struct T*)OFFATTR(void*,_off)); \
     	if ((!KFLAT_ACCESSOR->errno)&&(ADDR_RANGE_VALID(_fp,(n)*(N)))) {	\
     		struct flat_node *__node = interval_tree_iter_first(&KFLAT_ACCESSOR->FLCTRL.imap_root, (uint64_t)_ptr+_off,\
     				(uint64_t)_ptr+_off+sizeof(struct T*)-1);    \
@@ -964,7 +964,7 @@ struct flatten_pointer* FUNC_NAME(struct kflat* kflat, const void* ptr, uintptr_
 					break;	\
 				}	\
 				err = fixup_set_insert_force_update(KFLAT_ACCESSOR,__node,(uint64_t)_ptr-__node->start+_off,	\
-						post_f(flatten_ptr,(const T*)OFFATTR(void*,_off)));	\
+						post_f(flatten_ptr,(const struct T*)OFFATTR(void*,_off)));	\
 				if ((err) && (err!=EEXIST) && (err!=EAGAIN)) {	\
 					DBGS("AGGREGATE_FLATTEN_STRUCT_MIXED_POINTER_ARRAY_SELF_CONTAINED:fixup_set_insert_force_update(): err(%d)\n",err);	\
 					KFLAT_ACCESSOR->errno = err;	\
