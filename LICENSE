@@ -26,3 +26,9 @@ Please see the following files for details:
 - rbtree.h
 - rbtree_augmented.h
 - interval_tree_generic.h
+
+The code that derives information regarding heap objects was based on
+the ‘__check_heap_object` function from the Linux kernel source tree
+and therefore might be distributed under GNU General Public License v.2
+or any later version.
+Please see core/kflat_impl.c file for details.
