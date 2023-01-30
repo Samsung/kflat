@@ -10,6 +10,7 @@ struct flex_B {
 	int field;
 };
 struct flex_A {
+	int get_obj_supported;
 	size_t cnt;
 	struct flex_B arr[0];
 };
@@ -23,6 +24,7 @@ FUNCTION_DEFINE_FLATTEN_STRUCT(flex_A,
 
 static int kflat_flexible_test(struct kflat *kflat) {
 	struct flex_A *a = kmalloc(sizeof(struct flex_A) + 3 * sizeof(struct flex_B), GFP_KERNEL);
+	a->get_obj_supported = IS_ENABLED(KFLAT_GET_OBJ_SUPPORT);
 	a->cnt = 3;
 	a->arr[0].field = 1;
 	a->arr[1].field = 0xaaddcc;
@@ -40,11 +42,16 @@ static int kflat_flexible_test(struct kflat *kflat) {
 
 static int kflat_flexible_validate(void *memory, size_t size, CFlatten flatten) {
 	struct flex_A *pA = (struct flex_A *)memory;
+	
+	if(!pA->get_obj_supported)
+		return KFLAT_TEST_UNSUPPORTED;
+
 	ASSERT(pA->cnt == 3);
 	ASSERT(pA->arr[0].field == 1);
 	ASSERT(pA->arr[1].field == 0xaaddcc);
 	ASSERT(pA->arr[2].field == 0xcafecafe);
-	return 0;
+
+	return KFLAT_TEST_SUCCESS;
 }
 
 #endif

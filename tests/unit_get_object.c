@@ -106,8 +106,7 @@ static int kflat_get_object_unit_validate(void *memory, size_t size, CFlatten fl
 	struct get_obj_result *pResults = (struct get_obj_result *)memory;
 
 	if (!pResults->get_obj_supported)
-		// xxx We should inform kflattest that test is unsupported in this build
-		return 0;
+		return KFLAT_TEST_UNSUPPORTED;
 
 	ASSERT(pResults->test_kmalloc_200_pass);
 	ASSERT(pResults->test_kmalloc_last_byte_pass);
@@ -115,7 +114,7 @@ static int kflat_get_object_unit_validate(void *memory, size_t size, CFlatten fl
 	ASSERT(pResults->test_globals_pass);
 	ASSERT(pResults->test_code_pass);
 	ASSERT(pResults->test_vmalloc_pass);
-	return 0;
+	return KFLAT_TEST_SUCCESS;
 }
 
 #endif

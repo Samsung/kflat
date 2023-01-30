@@ -166,7 +166,7 @@ int run_test(struct args* args, const char* name) {
     void* area;
     FILE* file;
     char out_name[128];
-    bool success = false;
+    int test_result = KFLAT_TEST_FAIL;
     const size_t flat_size = 10 * 1024 * 1024;   // 10MB
     ssize_t output_size;
 
@@ -331,31 +331,46 @@ save_image:
             log_error("failed to fork subprocess");
             ret = -1;
         }
-        
+
         flatten_deinit(flatten);
-        if(ret != 0) {
-            log_error("validator returned an error - %d", ret);
-            goto munmap_area;
+
+        test_result = ret;
+        switch(ret) {
+            case KFLAT_TEST_SUCCESS:
+                if(args->verbose)
+                    log_info("\t\t=>validator accepted test result");
+                break;
+
+            case KFLAT_TEST_UNSUPPORTED:
+                if(args->verbose)
+                    log_info("\t\t=>this test case is unsupported on current platform/build");
+                break;
+
+            case KFLAT_TEST_FAIL:
+            default:
+                if(args->verbose)
+                    log_error("\t\t=>validator rejected test result - %d", ret);
+                goto munmap_area;
+                break;
         }
-
-        if(args->verbose)
-            log_info("\t\t=> validator accepted result");
     }
-
-    // If we've reached this place, everything went according to plan
-    success = true;
 
 munmap_area:
     munmap(area, flat_size);
 close_fd:
     close(fd);
 exit:
-    if(success)
+    if(test_result == KFLAT_TEST_SUCCESS)
         log_info("Test %-50s - SUCCESS", name);
-    else
+    else if(test_result == KFLAT_TEST_FAIL)
         log_error("Test %-50s - %sFAILED%s", name, 
                 OUTPUT_COLOR(LOG_ERR_COLOR), OUTPUT_COLOR(LOG_DEFAULT_COLOR));
-    return success;
+    else if(test_result == KFLAT_TEST_UNSUPPORTED)
+        log_info("Test %-50s - %sUNSUPPORTED%s", name,
+                OUTPUT_COLOR(LOG_WARN_COLOR), OUTPUT_COLOR(LOG_DEFAULT_COLOR));
+    else
+        abort();
+    return test_result == KFLAT_TEST_SUCCESS || test_result == KFLAT_TEST_UNSUPPORTED;
 }
 
 

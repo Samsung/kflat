@@ -54,10 +54,18 @@ struct kflat_test_case {
     get_function_address_t gfa;
 };
 
+enum {
+    KFLAT_TEST_SUCCESS  =   0,
+    KFLAT_TEST_FAIL,
+    KFLAT_TEST_UNSUPPORTED,
+};
+
 #define container_of(ptr, type, member) ({			\
   	const typeof( ((type *)0)->member ) *__mptr = (ptr);	\
   	(type *)( (char *)__mptr - offsetof(type,member) );})
 
+// Store text of last tested assertion. Used when app ends with sigsegv
+//  to indicated what was tested last
 #define MAX_LAST_ASSERT 4096
 extern char _last_assert_tested[MAX_LAST_ASSERT];
 
@@ -65,8 +73,8 @@ extern char _last_assert_tested[MAX_LAST_ASSERT];
                             snprintf(_last_assert_tested, MAX_LAST_ASSERT,      \
                                 "=> %s:%d %s: Test failed `%s`", __FILE__, __LINE__, __func__, #EXPR); \
                             if(!(EXPR)) {                                       \
-                                fprintf(stderr, "%s\n", _last_assert_tested);     \
-                                return 1;                                       \
+                                fprintf(stderr, "%s\n", _last_assert_tested);   \
+                                return KFLAT_TEST_FAIL;                         \
                             }                                                   \
                         } while(0)
 

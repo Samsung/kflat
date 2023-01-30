@@ -13,6 +13,7 @@
 #define LOG_DEFAULT_COLOR       "\x1b[0m"
 #define LOG_ERR_COLOR           "\x1b[31m"
 #define LOG_INFO_COLOR          "\x1b[32m"
+#define LOG_WARN_COLOR          "\x1b[1;33m"
 #define LOG_TIME_COLOR          "\x1b[36m"
 #define LOG_FUNC_COLOR          "\x1b[33m"
 
