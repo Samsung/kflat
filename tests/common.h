@@ -64,19 +64,39 @@ enum {
   	const typeof( ((type *)0)->member ) *__mptr = (ptr);	\
   	(type *)( (char *)__mptr - offsetof(type,member) );})
 
+
+extern int enable_verbose;
+
 // Store text of last tested assertion. Used when app ends with sigsegv
 //  to indicated what was tested last
 #define MAX_LAST_ASSERT 4096
 extern char _last_assert_tested[MAX_LAST_ASSERT];
 
+// Fails test when EXPR == false
 #define ASSERT(EXPR)    do {                                                    \
                             snprintf(_last_assert_tested, MAX_LAST_ASSERT,      \
-                                "=> %s:%d %s: Test failed `%s`", __FILE__, __LINE__, __func__, #EXPR); \
+                                "=> %s:%d: Test failed `%s`", __FILE__, __LINE__, #EXPR); \
                             if(!(EXPR)) {                                       \
                                 fprintf(stderr, "%s\n", _last_assert_tested);   \
                                 return KFLAT_TEST_FAIL;                         \
                             }                                                   \
                         } while(0)
+
+// Fails test when A != B
+#define ASSERT_EQ(A, B) do {                                                    \
+                            snprintf(_last_assert_tested, MAX_LAST_ASSERT,      \
+                                "=> %s:%d: Test failed `%s` == `%s` (0x%llx != 0x%llx)",    \
+                                __FILE__, __LINE__, #A, #B, (long long)(A), (long long)(B)); \
+                            if((A) != (B)) {                                    \
+                                fprintf(stderr, "%s\n", _last_assert_tested);   \
+                                return 1;                                       \
+                            }                                                   \
+                        } while(0)
+
+// Prints debug message only when kflattest has been started with `-v` flag
+#define PRINT(FMT, ...)                                         \
+                        if(enable_verbose)                      \
+                            printf("\t##" FMT "\n", ##__VA_ARGS__)
 
 /********************************/
 #endif

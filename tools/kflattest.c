@@ -40,6 +40,7 @@ struct args {
     const char* output_dir;
 };
 
+int enable_verbose = 0;
 
 /*******************************************************
  * SIGNAL HANDLER
@@ -450,6 +451,7 @@ int main(int argc, char** argv) {
         log_error("invalid options provided");
         return 1;
     }
+    enable_verbose = opts.verbose;
 
     if(opts.validate && !opts.output_dir)
         opts.output_dir = ".out_tmp";
