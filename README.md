@@ -4,6 +4,13 @@
 
 Currently supported architectures are x86_64 and ARM64.
 
+## Quick start guides
+If you'd like to start using KFLAT, check out quick start guides available for:
+- Linux (x86_64) - [doc/Startup_Linux.md](doc/Startup_Linux.md)
+- Android (emulator) - [doc/Startup_Android.md](doc/Startup_Android.md)
+
+For more general desciption, refer to this README file.
+
 ## Building
 In order to build kflat framework you're gonna need:
 - the source of targeted linux kernel
