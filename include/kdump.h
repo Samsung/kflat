@@ -1,5 +1,16 @@
+/**
+ * @file kdump.h
+ * @author Pawel Wieczorek (p.wieczorek@samsung.com)
+ * @brief Structures and functions responsible of memory disovery
+ *  and pointers validation
+ * 
+ */
+#ifndef _LINUX_KDUMP_H
+#define _LINUX_KDUMP_H
+
 #include <linux/rbtree.h>
 #include <linux/mm.h>
+
 
 /*******************************************************
  * Exported structures
@@ -21,6 +32,7 @@ struct kdump_memory_flat {
     uint64_t start;
     uint64_t end;
 } __packed;
+
 
 /*******************************************************
  * Exported functions
@@ -44,3 +56,6 @@ size_t kdump_tree_total_size(struct kdump_memory_map* kdump);
  *                i.e. when whole address range is valid, returned_value == size
  */
 size_t kdump_test_address(void* addr, size_t size);
+
+
+#endif /* _LINUX_KDUMP_H */

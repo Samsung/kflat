@@ -1,3 +1,12 @@
+/**
+ * @file kflat_recipe.h
+ * @author Pawel Wieczorek (p.wieczorek@samsung.com)
+ * @brief Macros used for recipe modules registration
+ * 
+ */
+#ifndef _LINUX_KFLAT_RECIPE_H
+#define _LINUX_KFLAT_RECIPE_H
+
 #define KFLAT_RECIPE_LIST(...)                  static struct kflat_recipe __kflat_recipes_list[] = { __VA_ARGS__ }
 #define KFLAT_RECIPE(SYM, FUNC)                 {.owner = THIS_MODULE, .symbol = SYM, .handler= FUNC}
 #define KFLAT_RECIPE_EX(SYM, FUNC, PRE_FUNC)    {.owner = THIS_MODULE, .symbol = SYM, .handler = FUNC, .pre_handler = PRE_FUNC}
@@ -35,3 +44,6 @@
 INTERVAL_TREE_DEFINE(struct flat_node, rb,
             uintptr_t, __subtree_last,
             START, LAST, static __used, interval_tree)
+
+
+#endif /* _LINUX_KFLAT_RECIPE_H */
