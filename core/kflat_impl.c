@@ -1711,7 +1711,11 @@ void flatten_run_iter_harness(struct kflat* kflat, struct bqueue* bq) {
 			}
 			flat_infos("Still working! done %lu recipes in total time %lld [ms], memory used: %zu, memory avail: %zu \n",
 				n, total_time / NSEC_PER_MSEC, kflat->mptrindex, kflat->msize);
+#if LINUX_VERSION_CODE < KERNEL_VERSION(5, 3, 0)
+			flat_infos("CPU Freq - %lu [kHz]; core no. %d\n", cpufreq_quick_get(raw_smp_processor_id()), raw_smp_processor_id());
+#else
 			flat_infos("CPU Freq - %lu [kHz]; core no. %d\n", cpufreq_quick_get(__smp_processor_id()), __smp_processor_id());
+#endif
 			init_time = ktime_get();
 		}
 	}
