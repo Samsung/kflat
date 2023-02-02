@@ -1,7 +1,13 @@
 Engineers responsible for this project were:
 
 * Bartosz Zator
-Created original kflat code embedded into the Linux kernel source tree. Created original code of the automatic generation of kflat recipes for the Linux kernel structures.
+Created original kflat code embedded into the Linux kernel source tree. Created
+original code of the automatic generation of kflat recipes for the Linux kernel
+structures.
 
 * Paweł Wieczorek
-Re-designed kflat and implemented as a loadable Linux kernel module which transformed the process of testing and integrating kflat with new products into totally new era. Substantially refactored the original kflat and recipe generation code and finally moved the project from the PoC into the working stage.
+Re-designed kflat and implemented as a loadable Linux kernel module which
+transformed the process of testing and integrating kflat with new products into
+totally new era. Substantially refactored the original kflat and recipe
+generation code and finally moved the project from the PoC into the working 
+stage.
