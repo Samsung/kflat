@@ -59,19 +59,19 @@ FUNCTION_DECLARE_FLATTEN_STRUCT(EC);
 FUNCTION_DECLARE_FLATTEN_STRUCT(FC);
 
 FUNCTION_DEFINE_FLATTEN_STRUCT_SELF_CONTAINED(EA,sizeof(struct EA),
-	AGGREGATE_FLATTEN_STRUCT_TYPE_MIXED_POINTER_ARRAY_SELF_CONTAINED(B_t,sizeof(B_t),ptr,offsetof(struct EA,ptr),char_array_to_ptr,ptr_to_char_array,1);
-	AGGREGATE_FLATTEN_STRUCT_TYPE_MIXED_POINTER_SELF_CONTAINED(B_t,sizeof(B_t),ptr1,offsetof(struct EA,ptr1),char_array_to_ptr,ptr_to_char_array);
-	AGGREGATE_FLATTEN_STRUCT_MIXED_POINTER_SELF_CONTAINED(EC,sizeof(struct EC),ptr2,offsetof(struct EA,ptr2),char_array_to_ptr,ptr_to_char_array);
-	AGGREGATE_FLATTEN_STRUCT_MIXED_POINTER_ARRAY_SELF_CONTAINED(FC,sizeof(struct FC),ptr3,offsetof(struct EA,ptr3),long_to_ptr,ptr_to_long,5);
-	AGGREGATE_FLATTEN_STRUCT_MIXED_POINTER_ARRAY_SELF_CONTAINED_SHIFTED(FC,sizeof(struct FC),ptr4,offsetof(struct EA,ptr4),long_to_ptr,ptr_to_long,5,-offsetof(struct FC,q));
+	AGGREGATE_FLATTEN_STRUCT_TYPE_EMBEDDED_POINTER_ARRAY_SELF_CONTAINED(B_t,sizeof(B_t),ptr,offsetof(struct EA,ptr),char_array_to_ptr,ptr_to_char_array,1);
+	AGGREGATE_FLATTEN_STRUCT_TYPE_EMBEDDED_POINTER_SELF_CONTAINED(B_t,sizeof(B_t),ptr1,offsetof(struct EA,ptr1),char_array_to_ptr,ptr_to_char_array);
+	AGGREGATE_FLATTEN_STRUCT_EMBEDDED_POINTER_SELF_CONTAINED(EC,sizeof(struct EC),ptr2,offsetof(struct EA,ptr2),char_array_to_ptr,ptr_to_char_array);
+	AGGREGATE_FLATTEN_STRUCT_EMBEDDED_POINTER_ARRAY_SELF_CONTAINED(FC,sizeof(struct FC),ptr3,offsetof(struct EA,ptr3),long_to_ptr,ptr_to_long,5);
+	AGGREGATE_FLATTEN_STRUCT_EMBEDDED_POINTER_ARRAY_SELF_CONTAINED_SHIFTED(FC,sizeof(struct FC),ptr4,offsetof(struct EA,ptr4),long_to_ptr,ptr_to_long,5,-offsetof(struct FC,q));
 );
 
 FUNCTION_DEFINE_FLATTEN_STRUCT_SPECIALIZE(no_self_contained,EA,
-	AGGREGATE_FLATTEN_STRUCT_TYPE_MIXED_POINTER_ARRAY(B_t,ptr,char_array_to_ptr,ptr_to_char_array,1);
-	AGGREGATE_FLATTEN_STRUCT_TYPE_MIXED_POINTER(B_t,ptr1,char_array_to_ptr,ptr_to_char_array);
-	AGGREGATE_FLATTEN_STRUCT_MIXED_POINTER(EC,ptr2,char_array_to_ptr,ptr_to_char_array);
-	AGGREGATE_FLATTEN_STRUCT_MIXED_POINTER_ARRAY(FC,ptr3,long_to_ptr,ptr_to_long,5);
-	AGGREGATE_FLATTEN_STRUCT_MIXED_POINTER_ARRAY_SHIFTED(FC,ptr4,long_to_ptr,ptr_to_long,5,-offsetof(struct FC,q));
+	AGGREGATE_FLATTEN_STRUCT_TYPE_EMBEDDED_POINTER_ARRAY(B_t,ptr,char_array_to_ptr,ptr_to_char_array,1);
+	AGGREGATE_FLATTEN_STRUCT_TYPE_EMBEDDED_POINTER(B_t,ptr1,char_array_to_ptr,ptr_to_char_array);
+	AGGREGATE_FLATTEN_STRUCT_EMBEDDED_POINTER(EC,ptr2,char_array_to_ptr,ptr_to_char_array);
+	AGGREGATE_FLATTEN_STRUCT_EMBEDDED_POINTER_ARRAY(FC,ptr3,long_to_ptr,ptr_to_long,5);
+	AGGREGATE_FLATTEN_STRUCT_EMBEDDED_POINTER_ARRAY_SHIFTED(FC,ptr4,long_to_ptr,ptr_to_long,5,-offsetof(struct FC,q));
 );
 
 FUNCTION_DEFINE_FLATTEN_STRUCT_SPECIALIZE(no_mixed,EA,

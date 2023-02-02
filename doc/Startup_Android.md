@@ -281,7 +281,7 @@ static inline struct flatten_pointer* fptr_add_color(struct flatten_pointer* fpt
 
 FUNCTION_DEFINE_FLATTEN_STRUCT(string_node,
 	STRUCT_ALIGN(4);
-	AGGREGATE_FLATTEN_STRUCT_MIXED_POINTER(string_node,node.__rb_parent_color,ptr_remove_color,fptr_add_color);
+	AGGREGATE_FLATTEN_STRUCT_EMBEDDED_POINTER(string_node,node.__rb_parent_color,ptr_remove_color,fptr_add_color);
 	AGGREGATE_FLATTEN_STRUCT(string_node,node.rb_right);
 	AGGREGATE_FLATTEN_STRUCT(string_node,node.rb_left);
 	AGGREGATE_FLATTEN_STRING(s);

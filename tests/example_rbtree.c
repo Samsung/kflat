@@ -41,11 +41,11 @@ static inline struct flatten_pointer *rbnode_add_color(struct flatten_pointer *f
 FUNCTION_DECLARE_FLATTEN_STRUCT_ARRAY_SELF_CONTAINED(myTreeNode, sizeof(struct myTreeNode));
 
 FUNCTION_DEFINE_FLATTEN_STRUCT_SELF_CONTAINED(myTreeNode, sizeof(struct myTreeNode),
-	AGGREGATE_FLATTEN_STRUCT_MIXED_POINTER_ARRAY_SELF_CONTAINED_SHIFTED(myTreeNode, sizeof(struct myTreeNode), inode.__rb_parent_color, offsetof(struct myTreeNode,inode.__rb_parent_color),
+	AGGREGATE_FLATTEN_STRUCT_EMBEDDED_POINTER_ARRAY_SELF_CONTAINED_SHIFTED(myTreeNode, sizeof(struct myTreeNode), inode.__rb_parent_color, offsetof(struct myTreeNode,inode.__rb_parent_color),
 										rbnode_remove_color, rbnode_add_color, 1, -offsetof(struct myTreeNode,inode));
 	AGGREGATE_FLATTEN_STRUCT_ARRAY_SELF_CONTAINED_SHIFTED(myTreeNode, sizeof(struct myTreeNode), inode.rb_right, offsetof(struct myTreeNode,inode.rb_right), 1, -offsetof(struct myTreeNode,inode));
 	AGGREGATE_FLATTEN_STRUCT_ARRAY_SELF_CONTAINED_SHIFTED(myTreeNode, sizeof(struct myTreeNode), inode.rb_left, offsetof(struct myTreeNode,inode.rb_left), 1, -offsetof(struct myTreeNode,inode));
-	AGGREGATE_FLATTEN_STRUCT_MIXED_POINTER_ARRAY_SELF_CONTAINED_SHIFTED(myTreeNode, sizeof(struct myTreeNode), snode.__rb_parent_color, offsetof(struct myTreeNode,snode.__rb_parent_color),
+	AGGREGATE_FLATTEN_STRUCT_EMBEDDED_POINTER_ARRAY_SELF_CONTAINED_SHIFTED(myTreeNode, sizeof(struct myTreeNode), snode.__rb_parent_color, offsetof(struct myTreeNode,snode.__rb_parent_color),
 										rbnode_remove_color, rbnode_add_color, 1, -offsetof(struct myTreeNode,snode.__rb_parent_color));
 	AGGREGATE_FLATTEN_STRUCT_ARRAY_SELF_CONTAINED_SHIFTED(myTreeNode, sizeof(struct myTreeNode), snode.rb_right, offsetof(struct myTreeNode,snode.rb_right), 1, -offsetof(struct myTreeNode,snode.__rb_parent_color));
 	AGGREGATE_FLATTEN_STRUCT_ARRAY_SELF_CONTAINED_SHIFTED(myTreeNode, sizeof(struct myTreeNode), snode.rb_left, offsetof(struct myTreeNode,snode.rb_left), 1, -offsetof(struct myTreeNode,snode.__rb_parent_color));
