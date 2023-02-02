@@ -958,20 +958,16 @@ struct flatten_pointer* FUNC_NAME(struct kflat* kflat, const void* ptr, uintptr_
 	do {	\
 		const FULL_TYPE* _fp;	\
 		DBGTNFOMF(AGGREGATE_FLATTEN_GENERIC_MIXED_POINTER_ARRAY,FULL_TYPE,N,f,"%lx:%zu",(unsigned long)OFFATTR(void*,_off),(size_t)_off,pf,ff);  \
-		DBGS("## AGGREGATE_FLATTEN_GENERIC_MIXED_POINTER_ARRAY: ptr: %lx\n",(const FULL_TYPE*)OFFATTR(void*,_off));	\
 		_fp = pre_f((const FULL_TYPE*)OFFATTR(void*,_off)); \
-		DBGS("## AGGREGATE_FLATTEN_GENERIC_MIXED_POINTER_ARRAY: _fp: %lx\n",_fp);	\
     	if ((!KFLAT_ACCESSOR->errno)&&(ADDR_RANGE_VALID(_fp,(n)*(N)))) {	\
     		struct flat_node *__node = interval_tree_iter_first(&KFLAT_ACCESSOR->FLCTRL.imap_root, (uint64_t)_ptr+_off,\
     				(uint64_t)_ptr+_off+sizeof(FULL_TYPE*)-1);    \
-    		DBGS("## AGGREGATE_FLATTEN_GENERIC_MIXED_POINTER_ARRAY: __node: %lx\n",__node);	\
 			if (__node==0) {	\
 				KFLAT_ACCESSOR->errno = EFAULT;	\
 			}	\
 			else {	\
 				int err;	\
 				struct flatten_pointer* flatten_ptr = flatten_plain_type(KFLAT_ACCESSOR,_fp,(n)*N);	\
-				DBGS("## AGGREGATE_FLATTEN_GENERIC_MIXED_POINTER_ARRAY: flatten_ptr: %lx\n",flatten_ptr);	\
 				if(flatten_ptr == NULL) {	\
 					DBGS("AGGREGATE_FLATTEN_GENERIC_MIXED_POINTER_ARRAY:flatten_plain_type - NULL\n");	\
 					KFLAT_ACCESSOR->errno = EFAULT; \
@@ -979,7 +975,6 @@ struct flatten_pointer* FUNC_NAME(struct kflat* kflat, const void* ptr, uintptr_
 				}	\
 				err = fixup_set_insert_force_update(KFLAT_ACCESSOR,__node,(uint64_t)_ptr-__node->start+_off,	\
 						post_f(flatten_ptr,(const FULL_TYPE*)OFFATTR(void*,_off)));	\
-				DBGS("## AGGREGATE_FLATTEN_GENERIC_MIXED_POINTER_ARRAY: upd err: %d\n",err);	\
 				if ((err) && (err!=EEXIST) && (err!=EAGAIN)) {	\
 					DBGS("AGGREGATE_FLATTEN_GENERIC_MIXED_POINTER_ARRAY:fixup_set_insert_force_update(): err(%d)\n",err);	\
 					KFLAT_ACCESSOR->errno = err;	\
@@ -992,18 +987,11 @@ struct flatten_pointer* FUNC_NAME(struct kflat* kflat, const void* ptr, uintptr_
 						for (_i=0; _i<(n); ++_i) {	\
 							struct flat_node *__struct_node = interval_tree_iter_first(&KFLAT_ACCESSOR->FLCTRL.imap_root,	\
 								(uint64_t)((void*)_fp+_i*N),(uint64_t)((void*)_fp+(_i+1)*N-1));    \
-							DBGS("## AGGREGATE_FLATTEN_GENERIC_MIXED_POINTER_ARRAY: __struct_node: %lx\n",__struct_node);	\
 							if (__struct_node==0) {	\
 								err = EFAULT;	\
 								break;	\
 							}	\
 							__struct_inode = fixup_set_search(KFLAT_ACCESSOR,(uint64_t)((void*)_fp+_i*N));	\
-							DBGS("## AGGREGATE_FLATTEN_GENERIC_MIXED_POINTER_ARRAY: __struct_inode: %lx\n",__struct_inode);	\
-							if (__struct_inode) {	\
-								DBGS("## AGGREGATE_FLATTEN_GENERIC_MIXED_POINTER_ARRAY:   inode: %lx\n",__struct_inode->inode);	\
-								DBGS("## AGGREGATE_FLATTEN_GENERIC_MIXED_POINTER_ARRAY:   offset: %lx\n",__struct_inode->offset);	\
-								DBGS("## AGGREGATE_FLATTEN_GENERIC_MIXED_POINTER_ARRAY:   ptr: %lx\n",__struct_inode->ptr);	\
-							}	\
 							if (!__struct_inode) {	\
 								struct flatten_job __job;   \
 								int err = fixup_set_reserve_address(KFLAT_ACCESSOR,(uint64_t)((void*)_fp+_i*N));	\
