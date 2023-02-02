@@ -2,5 +2,5 @@ export KBUILD_EXTRA_SYMBOLS=${M}/../core/Module.symvers
 ccflags-y := -std=gnu99
 
 obj-m += random_read/
+obj-m += memory_map/
 
-#obj-m += ../output/snd_timer_user_ioctl/
