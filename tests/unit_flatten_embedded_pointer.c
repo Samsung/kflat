@@ -74,7 +74,7 @@ FUNCTION_DEFINE_FLATTEN_STRUCT_SPECIALIZE(no_self_contained,EA,
 	AGGREGATE_FLATTEN_STRUCT_EMBEDDED_POINTER_ARRAY_SHIFTED(FC,ptr4,long_to_ptr,ptr_to_long,5,-offsetof(struct FC,q));
 );
 
-FUNCTION_DEFINE_FLATTEN_STRUCT_SPECIALIZE(no_mixed,EA,
+FUNCTION_DEFINE_FLATTEN_STRUCT_SPECIALIZE(no_embedded,EA,
 	AGGREGATE_FLATTEN_STRUCT_TYPE_ARRAY(B_t,ptr,1);
 	AGGREGATE_FLATTEN_STRUCT_TYPE(B_t,ptr1);
 	AGGREGATE_FLATTEN_STRUCT(EC,ptr2);
@@ -142,7 +142,7 @@ static int kflat_flatten_embedded_pointer_unit_test(struct kflat *kflat) {
 	);
 
 	FOR_ROOT_POINTER(&g_EA2,
-		FLATTEN_STRUCT_SPECIALIZE(no_mixed,EA,&g_EA2);
+		FLATTEN_STRUCT_SPECIALIZE(no_embedded,EA,&g_EA2);
 	);
 
 	for (int i=0; i<40; ++i) {

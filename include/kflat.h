@@ -219,7 +219,7 @@ struct kflat {
 struct flatten_base {};
 
 typedef struct flatten_pointer* (*flatten_struct_t)(struct kflat* kflat, const void*, size_t n, uintptr_t custom_val, struct bqueue*);
-typedef struct flatten_pointer* (*flatten_struct_mixed_convert_t)(struct flatten_pointer*, const struct flatten_base*);
+typedef struct flatten_pointer* (*flatten_struct_embedded_convert_t)(struct flatten_pointer*, const struct flatten_base*);
 
 typedef struct flatten_pointer* (*flatten_struct_iter_f)(struct kflat* kflat, const void* _ptr, struct bqueue* __q);
 typedef struct flatten_pointer* (*flatten_struct_f)(struct kflat* kflat, const void* _ptr);
@@ -254,7 +254,7 @@ struct flatten_job {
     flatten_struct_t fun;
     /* Mixed pointer support */
     const struct flatten_base* fp;
-    flatten_struct_mixed_convert_t convert;
+    flatten_struct_embedded_convert_t convert;
 };
 
 enum flatten_option {
@@ -910,7 +910,7 @@ struct flatten_pointer* FUNC_NAME(struct kflat* kflat, const void* ptr, uintptr_
 						__job.ptr = (struct flatten_base*)OFFATTR(void*, _off);    \
 						__job.fun = TARGET;    \
 						__job.fp = (const struct flatten_base*)_fp; \
-						__job.convert = (flatten_struct_mixed_convert_t)&post_f; \
+						__job.convert = (flatten_struct_embedded_convert_t)&post_f; \
 						err = bqueue_push_back(KFLAT_ACCESSOR,__q,&__job,sizeof(struct flatten_job));    \
 						if (err) {	\
 							KFLAT_ACCESSOR->errno = err;	\
