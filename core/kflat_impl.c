@@ -338,6 +338,11 @@ size_t bqueue_size(struct bqueue* q) {
 }
 EXPORT_SYMBOL_GPL(bqueue_size);
 
+unsigned long bqueue_el_count(struct bqueue* q) {
+
+	return q->el_count;
+}
+EXPORT_SYMBOL_GPL(bqueue_el_count);
 
 int bqueue_push_back(struct kflat* kflat, struct bqueue* q, const void* m, size_t s) {
 
@@ -362,6 +367,7 @@ int bqueue_push_back(struct kflat* kflat, struct bqueue* q, const void* m, size_
         q->front_index = (q->front_index+copy_size)%q->block_size;
     }
     q->size+=copied;
+    q->el_count++;
     return 0;
 }
 EXPORT_SYMBOL_GPL(bqueue_push_back);
@@ -391,6 +397,7 @@ int bqueue_pop_front(struct bqueue* q, void* m, size_t s) {
         q->back_index = (q->back_index+copy_size)%q->block_size;
     }
     q->size-=copied;
+    q->el_count--;
 
     return 0;
 }
@@ -1580,6 +1587,8 @@ void flatten_generic(struct kflat* kflat, void* q, struct flatten_pointer* fptr,
 	size_t i;
 	struct flatten_pointer* flat_ptr;
 
+	DBGS("flatten_generic: ADDR(%lx)\n", (uintptr_t) p);
+
 	if(kflat->errno || !ADDR_RANGE_VALID(p, count * el_size)) {
 		DBGS("flatten_generic: errno(%d), ADDR(0x%lx)", kflat->errno, (uintptr_t) p);
 		return;
@@ -1663,7 +1672,7 @@ void flatten_run_iter_harness(struct kflat* kflat, struct bqueue* bq) {
 	while((!kflat->errno) && (!bqueue_empty(bq))) {
 		int err;
 
-		DBGS("%s: queue iteration, size: %zu\n",__func__, bqueue_size(bq));
+		DBGS("%s: queue iteration, size: %zu el_count: %ld\n",__func__, bqueue_size(bq),bqueue_el_count(bq));
 
 		err = bqueue_pop_front(bq, &job, sizeof(struct flatten_job));
 		if (err) {

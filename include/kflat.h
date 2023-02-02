@@ -116,6 +116,7 @@ struct bqueue {
     size_t front_index;
     struct queue_block* back_block;
     size_t back_index;
+    unsigned long el_count;
 };
 
 #ifdef CONFIG_ARM64
@@ -327,6 +328,7 @@ int bqueue_init(struct kflat* kflat, struct bqueue* q, size_t block_size);
 void bqueue_destroy(struct bqueue* q);
 int bqueue_empty(struct bqueue* q);
 size_t bqueue_size(struct bqueue* q);
+unsigned long bqueue_el_count(struct bqueue* q);
 int bqueue_push_back(struct kflat* kflat, struct bqueue* q, const void* m, size_t s);
 int bqueue_pop_front(struct bqueue* q, void* m, size_t s);
 
@@ -520,13 +522,11 @@ struct flatten_pointer* FUNC_NAME(struct kflat* kflat, const void* ptr, size_t n
 #define FUNCTION_DECLARE_FLATTEN_STRUCT_ARRAY(FLTYPE)	\
 	extern struct flatten_pointer* flatten_struct_array_##FLTYPE(struct kflat* kflat, const void* ptr, size_t n, uintptr_t __cval, struct bqueue* __q);
 
-
 #define FUNCTION_DEFINE_FLATTEN_STRUCT_TYPE_ARRAY(FLTYPE)	\
 	FUNCTION_DEFINE_FLATTEN_GENERIC_COMPLEX(flatten_struct_type_array_##FLTYPE, flatten_struct_type_##FLTYPE, FLTYPE, sizeof(FLTYPE))
 
 #define FUNCTION_DECLARE_FLATTEN_STRUCT_TYPE_ARRAY(FLTYPE)	\
 	extern struct flatten_pointer* flatten_struct_type_array_##FLTYPE(struct kflat* kflat, const void* ptr, size_t n, uintptr_t __cval, struct bqueue* __q);
-
 
 #define FUNCTION_DEFINE_FLATTEN_UNION_ARRAY(FLTYPE) \
 	FUNCTION_DEFINE_FLATTEN_GENERIC_COMPLEX(flatten_union_array_##FLTYPE, flatten_union_##FLTYPE, union FLTYPE, sizeof(union FLTYPE))
@@ -534,6 +534,11 @@ struct flatten_pointer* FUNC_NAME(struct kflat* kflat, const void* ptr, size_t n
 #define FUNCTION_DECLARE_FLATTEN_UNION_ARRAY(FLTYPE) \
 	extern struct flatten_pointer* flatten_union_array_##FLTYPE(struct kflat* kflat, const void* ptr, size_t n, uintptr_t __cval, struct bqueue* __q);
 
+#define FUNCTION_DEFINE_FLATTEN_STRUCT_ARRAY_SPECIALIZE(TAG,FLTYPE)	\
+	FUNCTION_DEFINE_FLATTEN_GENERIC_COMPLEX(flatten_struct_array_##FLTYPE##_##TAG, flatten_struct_##FLTYPE##_##TAG, struct FLTYPE, sizeof(struct FLTYPE))
+
+#define FUNCTION_DECLARE_FLATTEN_STRUCT_ARRAY_SPECIALIZE(TAG,FLTYPE)	\
+	extern struct flatten_pointer* flatten_struct_array_##FLTYPE##_##TAG(struct kflat* kflat, const void* ptr, size_t n, uintptr_t __cval, struct bqueue* __q);
 
 #define FUNCTION_DEFINE_FLATTEN_STRUCT_ARRAY_SELF_CONTAINED(FLTYPE,FLSIZE)	\
 	FUNCTION_DEFINE_FLATTEN_GENERIC_COMPLEX(flatten_struct_array_##FLTYPE, flatten_struct_##FLTYPE, struct FLTYPE, FLSIZE)
@@ -541,20 +546,17 @@ struct flatten_pointer* FUNC_NAME(struct kflat* kflat, const void* ptr, size_t n
 #define FUNCTION_DECLARE_FLATTEN_STRUCT_ARRAY_SELF_CONTAINED(FLTYPE,FLSIZE)	\
 	extern struct flatten_pointer* flatten_struct_array_##FLTYPE(struct kflat* kflat, const void* ptr, size_t n, uintptr_t __cval, struct bqueue* __q);
 
-
 #define FUNCTION_DEFINE_FLATTEN_STRUCT_TYPE_ARRAY_SELF_CONTAINED(FLTYPE,FLSIZE)	\
 	FUNCTION_DEFINE_FLATTEN_GENERIC_COMPLEX(flatten_struct_type_array_##FLTYPE, flatten_struct_type_##FLTYPE, FLTYPE, FLSIZE)
 
 #define FUNCTION_DECLARE_FLATTEN_STRUCT_TYPE_ARRAY_SELF_CONTAINED(FLTYPE,FLSIZE)	\
 	extern struct flatten_pointer* flatten_struct_type_array_##FLTYPE(struct kflat* kflat, const void* _ptr, size_t n, uintptr_t __cval, struct bqueue* __q);
 
-
 #define FUNCTION_DEFINE_FLATTEN_STRUCT_ARRAY_SELF_CONTAINED_SPECIALIZE(TAG,FLTYPE,FLSIZE) \
 	FUNCTION_DEFINE_FLATTEN_GENERIC_COMPLEX(flatten_struct_array_##FLTYPE##_##TAG, flatten_struct_##FLTYPE##_##TAG, struct FLTYPE, FLSIZE)
 
 #define FUNCTION_DECLARE_FLATTEN_STRUCT_ARRAY_SELF_CONTAINED_SPECIALIZE(TAG,FLTYPE,FLSIZE) \
 	extern struct flatten_pointer* flatten_struct_array_##FLTYPE##_##TAG(struct kflat* kflat, const void* _ptr, size_t n, uintptr_t __cval, struct bqueue* __q);
-
 
 #define FUNCTION_DEFINE_FLATTEN_UNION_ARRAY_SELF_CONTAINED(FLTYPE,FLSIZE) \
 	FUNCTION_DEFINE_FLATTEN_GENERIC_COMPLEX(flatten_union_array_##FLTYPE, flatten_union_##FLTYPE, union FLTYPE, FLSIZE)
@@ -650,6 +652,10 @@ struct flatten_pointer* FUNC_NAME(struct kflat* kflat, const void* ptr, uintptr_
 	FUNCTION_DEFINE_FLATTEN_GENERIC_BASE(flatten_union_##FLTYPE, union FLTYPE, FLSIZE, __VA_ARGS__)	\
 	FUNCTION_DEFINE_FLATTEN_UNION_ARRAY_SELF_CONTAINED(FLTYPE,FLSIZE)
 
+#define FUNCTION_DEFINE_FLATTEN_STRUCT_SPECIALIZE(TAG,FLTYPE,...)  \
+	FUNCTION_DEFINE_FLATTEN_GENERIC_BASE(flatten_struct_##FLTYPE##_##TAG, struct FLTYPE, sizeof(struct FLTYPE), __VA_ARGS__)	\
+	FUNCTION_DEFINE_FLATTEN_STRUCT_ARRAY_SPECIALIZE(TAG,FLTYPE)
+
 
 /*******************************
  * FLATTEN macros
@@ -667,6 +673,10 @@ struct flatten_pointer* FUNC_NAME(struct kflat* kflat, const void* ptr, uintptr_
 #define FLATTEN_STRUCT_ARRAY_SPECIALIZE(TAG,T,p,n)	\
 	DBGM3(FLATTEN_STRUCT_ARRAY_SPECIALIZE,T,p,n);	\
 	FLATTEN_GENERIC(p, sizeof(struct T), n, 0, flatten_struct_array_##T##_##TAG)
+
+
+#define FLATTEN_STRUCT_SPECIALIZE(TAG,T,p)	\
+	FLATTEN_STRUCT_ARRAY_SPECIALIZE(TAG,T,p,1)
 
 #define FLATTEN_STRUCT_TYPE_ARRAY(T,p,n)	\
 	DBGM3(FLATTEN_STRUCT_TYPE_ARRAY,T,p,n);	\
@@ -944,29 +954,34 @@ struct flatten_pointer* FUNC_NAME(struct kflat* kflat, const void* ptr, uintptr_
 	AGGREGATE_FLATTEN_GENERIC_MIXED_POINTER(struct T, flatten_struct_array_##T, N, f, _off, pre_f, post_f)
 
 
-#define AGGREGATE_FLATTEN_STRUCT_MIXED_POINTER_ARRAY_SELF_CONTAINED(T,N,f,_off,pre_f,post_f,n)	\
+#define AGGREGATE_FLATTEN_GENERIC_MIXED_POINTER_ARRAY(FULL_TYPE, TARGET, N, f, _off, pre_f, post_f, n)	\
 	do {	\
-		const struct T* _fp;	\
-		DBGTNFOMF(AGGREGATE_FLATTEN_STRUCT_MIXED_POINTER_ARRAY_SELF_CONTAINED,T,N,f,"%lx:%zu",(unsigned long)OFFATTR(void*,_off),(size_t)_off,pf,ff);  \
-		_fp = pre_f((const struct T*)OFFATTR(void*,_off)); \
+		const FULL_TYPE* _fp;	\
+		DBGTNFOMF(AGGREGATE_FLATTEN_GENERIC_MIXED_POINTER_ARRAY,FULL_TYPE,N,f,"%lx:%zu",(unsigned long)OFFATTR(void*,_off),(size_t)_off,pf,ff);  \
+		DBGS("## AGGREGATE_FLATTEN_GENERIC_MIXED_POINTER_ARRAY: ptr: %lx\n",(const FULL_TYPE*)OFFATTR(void*,_off));	\
+		_fp = pre_f((const FULL_TYPE*)OFFATTR(void*,_off)); \
+		DBGS("## AGGREGATE_FLATTEN_GENERIC_MIXED_POINTER_ARRAY: _fp: %lx\n",_fp);	\
     	if ((!KFLAT_ACCESSOR->errno)&&(ADDR_RANGE_VALID(_fp,(n)*(N)))) {	\
     		struct flat_node *__node = interval_tree_iter_first(&KFLAT_ACCESSOR->FLCTRL.imap_root, (uint64_t)_ptr+_off,\
-    				(uint64_t)_ptr+_off+sizeof(struct T*)-1);    \
+    				(uint64_t)_ptr+_off+sizeof(FULL_TYPE*)-1);    \
+    		DBGS("## AGGREGATE_FLATTEN_GENERIC_MIXED_POINTER_ARRAY: __node: %lx\n",__node);	\
 			if (__node==0) {	\
 				KFLAT_ACCESSOR->errno = EFAULT;	\
 			}	\
 			else {	\
 				int err;	\
 				struct flatten_pointer* flatten_ptr = flatten_plain_type(KFLAT_ACCESSOR,_fp,(n)*N);	\
+				DBGS("## AGGREGATE_FLATTEN_GENERIC_MIXED_POINTER_ARRAY: flatten_ptr: %lx\n",flatten_ptr);	\
 				if(flatten_ptr == NULL) {	\
-					DBGS("AGGREGATE_FLATTEN_STRUCT_MIXED_POINTER_ARRAY_SELF_CONTAINED:flatten_plain_type - NULL\n");	\
+					DBGS("AGGREGATE_FLATTEN_GENERIC_MIXED_POINTER_ARRAY:flatten_plain_type - NULL\n");	\
 					KFLAT_ACCESSOR->errno = EFAULT; \
 					break;	\
 				}	\
 				err = fixup_set_insert_force_update(KFLAT_ACCESSOR,__node,(uint64_t)_ptr-__node->start+_off,	\
-						post_f(flatten_ptr,(const struct T*)OFFATTR(void*,_off)));	\
+						post_f(flatten_ptr,(const FULL_TYPE*)OFFATTR(void*,_off)));	\
+				DBGS("## AGGREGATE_FLATTEN_GENERIC_MIXED_POINTER_ARRAY: upd err: %d\n",err);	\
 				if ((err) && (err!=EEXIST) && (err!=EAGAIN)) {	\
-					DBGS("AGGREGATE_FLATTEN_STRUCT_MIXED_POINTER_ARRAY_SELF_CONTAINED:fixup_set_insert_force_update(): err(%d)\n",err);	\
+					DBGS("AGGREGATE_FLATTEN_GENERIC_MIXED_POINTER_ARRAY:fixup_set_insert_force_update(): err(%d)\n",err);	\
 					KFLAT_ACCESSOR->errno = err;	\
 				}	\
 				else {	\
@@ -977,11 +992,18 @@ struct flatten_pointer* FUNC_NAME(struct kflat* kflat, const void* ptr, uintptr_
 						for (_i=0; _i<(n); ++_i) {	\
 							struct flat_node *__struct_node = interval_tree_iter_first(&KFLAT_ACCESSOR->FLCTRL.imap_root,	\
 								(uint64_t)((void*)_fp+_i*N),(uint64_t)((void*)_fp+(_i+1)*N-1));    \
+							DBGS("## AGGREGATE_FLATTEN_GENERIC_MIXED_POINTER_ARRAY: __struct_node: %lx\n",__struct_node);	\
 							if (__struct_node==0) {	\
 								err = EFAULT;	\
 								break;	\
 							}	\
 							__struct_inode = fixup_set_search(KFLAT_ACCESSOR,(uint64_t)((void*)_fp+_i*N));	\
+							DBGS("## AGGREGATE_FLATTEN_GENERIC_MIXED_POINTER_ARRAY: __struct_inode: %lx\n",__struct_inode);	\
+							if (__struct_inode) {	\
+								DBGS("## AGGREGATE_FLATTEN_GENERIC_MIXED_POINTER_ARRAY:   inode: %lx\n",__struct_inode->inode);	\
+								DBGS("## AGGREGATE_FLATTEN_GENERIC_MIXED_POINTER_ARRAY:   offset: %lx\n",__struct_inode->offset);	\
+								DBGS("## AGGREGATE_FLATTEN_GENERIC_MIXED_POINTER_ARRAY:   ptr: %lx\n",__struct_inode->ptr);	\
+							}	\
 							if (!__struct_inode) {	\
 								struct flatten_job __job;   \
 								int err = fixup_set_reserve_address(KFLAT_ACCESSOR,(uint64_t)((void*)_fp+_i*N));	\
@@ -990,7 +1012,7 @@ struct flatten_pointer* FUNC_NAME(struct kflat* kflat, const void* ptr, uintptr_
 								__job.offset = 0; \
 								__job.size = 1;	\
 								__job.ptr = (struct flatten_base*)((void*)_fp+_i*N);    \
-								__job.fun = &flatten_struct_array_##T;    \
+								__job.fun = TARGET;    \
 								__job.fp = 0;   \
 								__job.convert = 0;  \
 								err = bqueue_push_back(KFLAT_ACCESSOR,__q,&__job,sizeof(struct flatten_job));    \
@@ -1004,9 +1026,20 @@ struct flatten_pointer* FUNC_NAME(struct kflat* kflat, const void* ptr, uintptr_
 				}	\
 			}	\
 		}	\
-		else DBGS("AGGREGATE_FLATTEN_STRUCT_MIXED_POINTER_ARRAY_SELF_CONTAINED: errno(%d), ADDR(%lx)\n",KFLAT_ACCESSOR->errno,(uintptr_t)OFFATTR(void*,_off));	\
+		else DBGS("AGGREGATE_FLATTEN_GENERIC_MIXED_POINTER_ARRAY: errno(%d), ADDR(%lx)\n",KFLAT_ACCESSOR->errno,(uintptr_t)OFFATTR(void*,_off));	\
 	} while(0)
 
+#define AGGREGATE_FLATTEN_STRUCT_MIXED_POINTER_ARRAY(T,f,pre_f,post_f,n)	\
+	AGGREGATE_FLATTEN_GENERIC_MIXED_POINTER_ARRAY(struct T, flatten_struct_array_##T, sizeof(struct T), f, offsetof(_container_type, f), pre_f, post_f, n)
+
+#define AGGREGATE_FLATTEN_STRUCT_TYPE_MIXED_POINTER_ARRAY(T,f,pre_f,post_f,n)	\
+	AGGREGATE_FLATTEN_GENERIC_MIXED_POINTER_ARRAY(T, flatten_struct_type_array_##T, sizeof(T), f, offsetof(_container_type, f), pre_f, post_f, n)
+
+#define AGGREGATE_FLATTEN_STRUCT_MIXED_POINTER_ARRAY_SELF_CONTAINED(T,N,f,_off,pre_f,post_f,n)	\
+	AGGREGATE_FLATTEN_GENERIC_MIXED_POINTER_ARRAY(struct T, flatten_struct_array_##T, N, f, _off, pre_f, post_f, n)
+
+#define AGGREGATE_FLATTEN_STRUCT_TYPE_MIXED_POINTER_ARRAY_SELF_CONTAINED(T,N,f,_off,pre_f,post_f,n)	\
+	AGGREGATE_FLATTEN_GENERIC_MIXED_POINTER_ARRAY(T, flatten_struct_type_array_##T, N, f, _off, pre_f, post_f, n)
 
 /* AGGREGATE_SHIFTED */
 #define AGGREGATE_FLATTEN_GENERIC_SHIFTED(FULL_TYPE, TARGET, N,f,_off,n,_shift)	\
@@ -1084,6 +1117,12 @@ struct flatten_pointer* FUNC_NAME(struct kflat* kflat, const void* ptr, uintptr_
 #define AGGREGATE_FLATTEN_STRUCT_TYPE_ARRAY_SELF_CONTAINED_SHIFTED(T,N,f,_off,n,_shift)	\
 	AGGREGATE_FLATTEN_GENERIC_SHIFTED(T, flatten_struct_type_array_##T, N,f,_off,n,_shift)
 
+#define AGGREGATE_FLATTEN_STRUCT_ARRAY_SHIFTED(T,f,n,_shift)	\
+	AGGREGATE_FLATTEN_GENERIC_SHIFTED(struct T, flatten_struct_array_##T, sizeof(struct T),f,offsetof(_container_type,f),n,_shift)
+
+#define AGGREGATE_FLATTEN_STRUCT_TYPE_ARRAY_SHIFTED(T,f,n,_shift)	\
+	AGGREGATE_FLATTEN_GENERIC_SHIFTED(T, flatten_struct_type_array_##T, sizeof(T),f,offsetof(_container_type,f),n,_shift)
+
 #define AGGREGATE_FLATTEN_STRUCT_MIXED_POINTER_ARRAY_SELF_CONTAINED_SHIFTED(T,N,f,_off,pre_f,post_f,n,_shift)	\
 	do {	\
 		void* _p = pre_f((const struct T*)OFFATTR(void*,_off));	\
@@ -1152,6 +1191,8 @@ struct flatten_pointer* FUNC_NAME(struct kflat* kflat, const void* ptr, uintptr_
 		else DBGS("AGGREGATE_FLATTEN_STRUCT_MIXED_POINTER_ARRAY_SELF_CONTAINED_SHIFTED: errno(%d), ADDR(%lx)\n",KFLAT_ACCESSOR->errno,(uintptr_t)OFFATTR(void*,_off));	\
 	} while(0)
 
+#define AGGREGATE_FLATTEN_STRUCT_MIXED_POINTER_ARRAY_SHIFTED(T,f,pre_f,post_f,n,_shift)	\
+	AGGREGATE_FLATTEN_STRUCT_MIXED_POINTER_ARRAY_SELF_CONTAINED_SHIFTED(T, sizeof(struct T), f, offsetof(_container_type, f), pre_f, post_f, n, _shift)
 
 /*******************************
  * AGGERGATE & FLATTEN macros for
