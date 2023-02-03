@@ -219,6 +219,7 @@ struct kflat {
 struct flatten_base {};
 
 typedef struct flatten_pointer* (*flatten_struct_t)(struct kflat* kflat, const void*, size_t n, uintptr_t custom_val, struct bqueue*);
+typedef void* (*flatten_struct_embedded_extract_t)(const void *ptr);
 typedef struct flatten_pointer* (*flatten_struct_embedded_convert_t)(struct flatten_pointer*, const struct flatten_base*);
 
 typedef struct flatten_pointer* (*flatten_struct_iter_f)(struct kflat* kflat, const void* _ptr, struct bqueue* __q);
@@ -785,22 +786,29 @@ struct flatten_pointer* FUNC_NAME(struct kflat* kflat, const void* ptr, uintptr_
 
 
 /* AGGREGATE_* */
-#define AGGREGATE_FLATTEN_GENERIC(FULL_TYPE,TARGET,N,f,_off,n,CUSTOM_VAL)	\
+#define AGGREGATE_FLATTEN_GENERIC(FULL_TYPE,TARGET,N,f,_off,n,CUSTOM_VAL,pre_f, post_f)	\
 	do {	\
 		DBGM5(AGGREGATE_FLATTEN_GENERIC,FULL_TYPE,N,f,_off,n);	\
 		DBGS("FULL_TYPE [%lx:%zu -> %lx]\n",(uintptr_t)_ptr,(size_t)_off,(uintptr_t)OFFATTR(void*,_off));	\
-    	if ((!KFLAT_ACCESSOR->errno)&&(ADDR_RANGE_VALID(OFFATTR(void*,_off), (n) * (N)))) {	\
+		const FULL_TYPE* _fp = OFFATTR(const FULL_TYPE*,_off);	\
+		if (pre_f) {	\
+			_fp = (*(flatten_struct_embedded_extract_t)pre_f)(_fp); \
+		}	\
+    	if ((!KFLAT_ACCESSOR->errno)&&(ADDR_RANGE_VALID(_fp,(n)*(N)))) {	\
     		struct flat_node *__node = interval_tree_iter_first(&KFLAT_ACCESSOR->FLCTRL.imap_root, (uint64_t)_ptr+_off,\
-    				(uint64_t)_ptr+_off+sizeof(void*)-1);    \
+    				(uint64_t)_ptr+_off+sizeof(FULL_TYPE*)-1);    \
 			if (__node==0) {	\
 				KFLAT_ACCESSOR->errno = EFAULT;	\
 			} else {	\
 				int err;	\
-				struct flatten_pointer* flat_ptr = flatten_plain_type(KFLAT_ACCESSOR,OFFATTR(void*,_off),(n)*N);	\
+				struct flatten_pointer* flat_ptr = flatten_plain_type(KFLAT_ACCESSOR,_fp,(n)*N);	\
 				if(flat_ptr == NULL) {	\
 					DBGS("AGGREGATE_FLATTEN_GENERIC:flatten_plain_type(): NULL");	\
 					KFLAT_ACCESSOR->errno = EFAULT;	\
 					break;	\
+				}	\
+				if (post_f) {	\
+					flat_ptr = (*(flatten_struct_embedded_convert_t)post_f)(flat_ptr,(const struct flatten_base*)OFFATTR(const FULL_TYPE*,_off));	\
 				}	\
 				err = fixup_set_insert_force_update(KFLAT_ACCESSOR,__node,(uint64_t)_ptr-__node->start+_off, flat_ptr);	\
 				if (err && err != EEXIST && err != EAGAIN) {	\
@@ -814,21 +822,21 @@ struct flatten_pointer* FUNC_NAME(struct kflat* kflat, const void* ptr, uintptr_
 						err = 0;	\
 						for (_i=0; _i<(n); ++_i) {	\
 							struct flat_node *__struct_node = interval_tree_iter_first(&KFLAT_ACCESSOR->FLCTRL.imap_root,	\
-								(uint64_t)((void*)OFFATTR(void*,_off)+_i*N),(uint64_t)((void*)OFFATTR(void*,_off)+(_i+1)*N-1));    \
+								(uint64_t)((void*)_fp+_i*N),(uint64_t)((void*)_fp+(_i+1)*N-1));    \
 							if (__struct_node==0) {	\
 								err = EFAULT;	\
 								break;	\
 							}	\
-							__struct_inode = fixup_set_search(KFLAT_ACCESSOR,(uint64_t)((void*)OFFATTR(void*,_off)+_i*N));	\
+							__struct_inode = fixup_set_search(KFLAT_ACCESSOR,(uint64_t)((void*)_fp+_i*N));	\
 							if (!__struct_inode) {	\
 								struct flatten_job __job;   \
-								int err = fixup_set_reserve_address(KFLAT_ACCESSOR,(uint64_t)((void*)OFFATTR(void*,_off)+_i*N));	\
+								int err = fixup_set_reserve_address(KFLAT_ACCESSOR,(uint64_t)((void*)_fp+_i*N));	\
 								if (err) break;	\
 								__job.node = 0;    \
 								__job.offset = 0; \
 								__job.size = 1;	\
 								__job.custom_val = (uintptr_t)CUSTOM_VAL;	\
-								__job.ptr = (struct flatten_base*)((void*)OFFATTR(void*,_off)+_i*N);    \
+								__job.ptr = (struct flatten_base*)((void*)_fp+_i*N);    \
 								__job.fun = TARGET;    \
 								__job.fp = 0;   \
 								__job.convert = 0;  \
@@ -847,13 +855,13 @@ struct flatten_pointer* FUNC_NAME(struct kflat* kflat, const void* ptr, uintptr_
 	} while(0)
 
 #define AGGREGATE_FLATTEN_STRUCT_ARRAY_SELF_CONTAINED(T,N,f,_off,n) \
-	AGGREGATE_FLATTEN_GENERIC(struct T, flatten_struct_array_##T, N, f, _off, n, 0)
+	AGGREGATE_FLATTEN_GENERIC(struct T, flatten_struct_array_##T, N, f, _off, n, 0, 0, 0)
 
 #define AGGREGATE_FLATTEN_STRUCT_TYPE_ARRAY_SELF_CONTAINED(T,N,f,_off,n)	\
-	AGGREGATE_FLATTEN_GENERIC(T, flatten_struct_type_array_##T, N, f, _off, n, 0)
+	AGGREGATE_FLATTEN_GENERIC(T, flatten_struct_type_array_##T, N, f, _off, n, 0, 0, 0)
 
 #define AGGREGATE_FLATTEN_UNION_ARRAY_SELF_CONTAINED(T,N,f,_off,n)	\
-	AGGREGATE_FLATTEN_GENERIC(union T, flatten_union_array_##T, N, f, _off, n, 0)
+	AGGREGATE_FLATTEN_GENERIC(union T, flatten_union_array_##T, N, f, _off, n, 0, 0, 0)
 
 #define AGGREGATE_FLATTEN_STRUCT_ARRAY(T,f,n)	\
 	DBGM3(AGGREGATE_FLATTEN_STRUCT_ARRAY,T,f,n); \
@@ -874,91 +882,17 @@ struct flatten_pointer* FUNC_NAME(struct kflat* kflat, const void* ptr, uintptr_
 #define AGGREGATE_FLATTEN_STRUCT_TYPE(T,f)	\
 	AGGREGATE_FLATTEN_STRUCT_TYPE_ARRAY(T,f,1)
 
-
-/* AGGREGATE_*_EMBEDDED_POINTER */
-/* We would probably want the following versions at some point in time as well:
- * AGGREGATE_FLATTEN_STRUCT_STORAGE_ARRAY
- * AGGREGATE_FLATTEN_STRUCT_TYPE_STORAGE_ARRAY
- * AGGREGATE_FLATTEN_STRUCT_EMBEDDED_POINTER_ARRAY
- * AGGREGATE_FLATTEN_STRUCT_TYPE_EMBEDDED_POINTER_ARRAY
- * AGGREGATE_FLATTEN_STRUCT_STORAGE_EMBEDDED_POINTER_ARRAY
- * AGGREGATE_FLATTEN_STRUCT_TYPE_STORAGE_EMBEDDED_POINTER_ARRAY
- */
-
-#define AGGREGATE_FLATTEN_GENERIC_EMBEDDED_POINTER(FULL_TYPE, TARGET, N, f, _off, pre_f, post_f, n)	\
-	do {	\
-		const FULL_TYPE* _fp;	\
-		DBGTNFOMF(AGGREGATE_FLATTEN_GENERIC_EMBEDDED_POINTER,FULL_TYPE,N,f,"%lx:%zu",(unsigned long)OFFATTR(void*,_off),(size_t)_off,pf,ff);  \
-		_fp = pre_f((const FULL_TYPE*)OFFATTR(void*,_off)); \
-    	if ((!KFLAT_ACCESSOR->errno)&&(ADDR_RANGE_VALID(_fp,(n)*(N)))) {	\
-    		struct flat_node *__node = interval_tree_iter_first(&KFLAT_ACCESSOR->FLCTRL.imap_root, (uint64_t)_ptr+_off,\
-    				(uint64_t)_ptr+_off+sizeof(FULL_TYPE*)-1);    \
-			if (__node==0) {	\
-				KFLAT_ACCESSOR->errno = EFAULT;	\
-			}	\
-			else {	\
-				int err;	\
-				struct flatten_pointer* flatten_ptr = flatten_plain_type(KFLAT_ACCESSOR,_fp,(n)*N);	\
-				if(flatten_ptr == NULL) {	\
-					DBGS("AGGREGATE_FLATTEN_GENERIC_EMBEDDED_POINTER:flatten_plain_type - NULL\n");	\
-					KFLAT_ACCESSOR->errno = EFAULT; \
-					break;	\
-				}	\
-				err = fixup_set_insert_force_update(KFLAT_ACCESSOR,__node,(uint64_t)_ptr-__node->start+_off,	\
-						post_f(flatten_ptr,(const FULL_TYPE*)OFFATTR(void*,_off)));	\
-				if ((err) && (err!=EEXIST) && (err!=EAGAIN)) {	\
-					DBGS("AGGREGATE_FLATTEN_GENERIC_EMBEDDED_POINTER:fixup_set_insert_force_update(): err(%d)\n",err);	\
-					KFLAT_ACCESSOR->errno = err;	\
-				}	\
-				else {	\
-					if (!err || (err==EAGAIN)) {	\
-						struct fixup_set_node* __struct_inode;	\
-						size_t _i;	\
-						err = 0;	\
-						for (_i=0; _i<(n); ++_i) {	\
-							struct flat_node *__struct_node = interval_tree_iter_first(&KFLAT_ACCESSOR->FLCTRL.imap_root,	\
-								(uint64_t)((void*)_fp+_i*N),(uint64_t)((void*)_fp+(_i+1)*N-1));    \
-							if (__struct_node==0) {	\
-								err = EFAULT;	\
-								break;	\
-							}	\
-							__struct_inode = fixup_set_search(KFLAT_ACCESSOR,(uint64_t)((void*)_fp+_i*N));	\
-							if (!__struct_inode) {	\
-								struct flatten_job __job;   \
-								int err = fixup_set_reserve_address(KFLAT_ACCESSOR,(uint64_t)((void*)_fp+_i*N));	\
-								if (err) break;	\
-								__job.node = 0;    \
-								__job.offset = 0; \
-								__job.size = 1;	\
-								__job.ptr = (struct flatten_base*)((void*)_fp+_i*N);    \
-								__job.fun = TARGET;    \
-								__job.fp = 0;   \
-								__job.convert = 0;  \
-								err = bqueue_push_back(KFLAT_ACCESSOR,__q,&__job,sizeof(struct flatten_job));    \
-								if (err) break;	\
-							}	\
-						}	\
-						if ((err) && (err!=EEXIST)) {	\
-							KFLAT_ACCESSOR->errno = err;	\
-						}	\
-					}	\
-				}	\
-			}	\
-		}	\
-		else DBGS("AGGREGATE_FLATTEN_GENERIC_EMBEDDED_POINTER: errno(%d), ADDR(%lx)\n",KFLAT_ACCESSOR->errno,(uintptr_t)OFFATTR(void*,_off));	\
-	} while(0)
-
 #define AGGREGATE_FLATTEN_STRUCT_EMBEDDED_POINTER_ARRAY(T,f,pre_f,post_f,n)	\
-	AGGREGATE_FLATTEN_GENERIC_EMBEDDED_POINTER(struct T, flatten_struct_array_##T, sizeof(struct T), f, offsetof(_container_type, f), pre_f, post_f, n)
+	AGGREGATE_FLATTEN_GENERIC(struct T, flatten_struct_array_##T, sizeof(struct T), f, offsetof(_container_type, f), n, 0, pre_f, post_f)
 
 #define AGGREGATE_FLATTEN_STRUCT_TYPE_EMBEDDED_POINTER_ARRAY(T,f,pre_f,post_f,n)	\
-	AGGREGATE_FLATTEN_GENERIC_EMBEDDED_POINTER(T, flatten_struct_type_array_##T, sizeof(T), f, offsetof(_container_type, f), pre_f, post_f, n)
+	AGGREGATE_FLATTEN_GENERIC(T, flatten_struct_type_array_##T, sizeof(T), f, offsetof(_container_type, f), n, 0, pre_f, post_f)
 
 #define AGGREGATE_FLATTEN_STRUCT_EMBEDDED_POINTER_ARRAY_SELF_CONTAINED(T,N,f,_off,pre_f,post_f,n)	\
-	AGGREGATE_FLATTEN_GENERIC_EMBEDDED_POINTER(struct T, flatten_struct_array_##T, N, f, _off, pre_f, post_f, n)
+	AGGREGATE_FLATTEN_GENERIC(struct T, flatten_struct_array_##T, N, f, _off, n, 0, pre_f, post_f)
 
 #define AGGREGATE_FLATTEN_STRUCT_TYPE_EMBEDDED_POINTER_ARRAY_SELF_CONTAINED(T,N,f,_off,pre_f,post_f,n)	\
-	AGGREGATE_FLATTEN_GENERIC_EMBEDDED_POINTER(T, flatten_struct_type_array_##T, N, f, _off, pre_f, post_f, n)
+	AGGREGATE_FLATTEN_GENERIC(T, flatten_struct_type_array_##T, N, f, _off, n, 0, pre_f, post_f)
 
 #define AGGREGATE_FLATTEN_STRUCT_EMBEDDED_POINTER(T,f,pre_f,post_f)	\
 	AGGREGATE_FLATTEN_STRUCT_EMBEDDED_POINTER_ARRAY(T, f, pre_f, post_f, 1)
@@ -972,6 +906,15 @@ struct flatten_pointer* FUNC_NAME(struct kflat* kflat, const void* ptr, uintptr_
 #define AGGREGATE_FLATTEN_STRUCT_EMBEDDED_POINTER_SELF_CONTAINED(T,N,f,_off,pre_f,post_f) \
 	AGGREGATE_FLATTEN_STRUCT_EMBEDDED_POINTER_ARRAY_SELF_CONTAINED(T, N, f, _off, pre_f, post_f, 1)
 
+/* AGGREGATE_*_EMBEDDED_POINTER */
+/* We would probably want the following versions at some point in time as well:
+ * AGGREGATE_FLATTEN_STRUCT_STORAGE_ARRAY
+ * AGGREGATE_FLATTEN_STRUCT_TYPE_STORAGE_ARRAY
+ * AGGREGATE_FLATTEN_STRUCT_EMBEDDED_POINTER_ARRAY
+ * AGGREGATE_FLATTEN_STRUCT_TYPE_EMBEDDED_POINTER_ARRAY
+ * AGGREGATE_FLATTEN_STRUCT_STORAGE_EMBEDDED_POINTER_ARRAY
+ * AGGREGATE_FLATTEN_STRUCT_TYPE_STORAGE_EMBEDDED_POINTER_ARRAY
+ */
 
 /* AGGREGATE_SHIFTED */
 #define AGGREGATE_FLATTEN_GENERIC_SHIFTED(FULL_TYPE, TARGET, N,f,_off,n,_shift)	\
