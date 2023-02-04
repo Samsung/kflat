@@ -218,7 +218,7 @@ struct kflat {
 
 struct flatten_base {};
 
-typedef struct flatten_pointer* (*flatten_struct_t)(struct kflat* kflat, const void*, size_t n, uintptr_t custom_val, struct bqueue*);
+typedef struct flatten_pointer* (*flatten_struct_t)(struct kflat* kflat, const void*, size_t n, uintptr_t custom_val, unsigned long index, struct bqueue*);
 typedef void* (*flatten_struct_embedded_extract_t)(const void *ptr);
 typedef struct flatten_pointer* (*flatten_struct_embedded_convert_t)(struct flatten_pointer*, const struct flatten_base*);
 
@@ -251,6 +251,7 @@ struct flatten_job {
     size_t offset;
     size_t size;
     uintptr_t custom_val;
+    unsigned long index;
     struct flatten_base* ptr;
     flatten_struct_t fun;
     /* Mixed pointer support */
@@ -496,13 +497,13 @@ static __used bool _addr_range_valid(void* ptr, size_t size) {
  * FUNCTION_FLATTEN macros for ARRAYS
  *************************************/
 #define FUNCTION_DEFINE_FLATTEN_GENERIC_ARRAY(FUNC_NAME, TARGET_FUNC, FULL_TYPE, FLSIZE)	\
-struct flatten_pointer* FUNC_NAME(struct kflat* kflat, const void* ptr, size_t n, uintptr_t custom_val, struct bqueue* __q) {    \
+struct flatten_pointer* FUNC_NAME(struct kflat* kflat, const void* ptr, size_t n, uintptr_t custom_val, unsigned long index, struct bqueue* __q) {    \
 	size_t _i;			\
 	void* _fp_first = NULL;		\
 	const FULL_TYPE* _ptr = (const FULL_TYPE*) ptr;			\
 	DBGS("%s(%lx,%zu)\n", __func__, (uintptr_t)_ptr, n);		\
 	for (_i = 0; _i < n; ++_i) {					\
-		void* _fp = (void*)TARGET_FUNC(kflat, (FULL_TYPE*)((u8*)_ptr + _i * FLSIZE), custom_val, __q);	\
+		void* _fp = (void*)TARGET_FUNC(kflat, (FULL_TYPE*)((u8*)_ptr + _i * FLSIZE), custom_val, index, __q);	\
 		if (_fp == NULL) {			\
 			kflat_free(_fp_first);		\
 			_fp_first = NULL;		\
@@ -521,49 +522,49 @@ struct flatten_pointer* FUNC_NAME(struct kflat* kflat, const void* ptr, size_t n
 	FUNCTION_DEFINE_FLATTEN_GENERIC_ARRAY(flatten_struct_array_##FLTYPE, flatten_struct_##FLTYPE, struct FLTYPE, sizeof(struct FLTYPE))
 
 #define FUNCTION_DECLARE_FLATTEN_STRUCT_ARRAY(FLTYPE)	\
-	extern struct flatten_pointer* flatten_struct_array_##FLTYPE(struct kflat* kflat, const void* ptr, size_t n, uintptr_t __cval, struct bqueue* __q);
+	extern struct flatten_pointer* flatten_struct_array_##FLTYPE(struct kflat* kflat, const void* ptr, size_t n, uintptr_t __cval, unsigned long __index, struct bqueue* __q);
 
 #define FUNCTION_DEFINE_FLATTEN_STRUCT_TYPE_ARRAY(FLTYPE)	\
 	FUNCTION_DEFINE_FLATTEN_GENERIC_ARRAY(flatten_struct_type_array_##FLTYPE, flatten_struct_type_##FLTYPE, FLTYPE, sizeof(FLTYPE))
 
 #define FUNCTION_DECLARE_FLATTEN_STRUCT_TYPE_ARRAY(FLTYPE)	\
-	extern struct flatten_pointer* flatten_struct_type_array_##FLTYPE(struct kflat* kflat, const void* ptr, size_t n, uintptr_t __cval, struct bqueue* __q);
+	extern struct flatten_pointer* flatten_struct_type_array_##FLTYPE(struct kflat* kflat, const void* ptr, size_t n, uintptr_t __cval, unsigned long __index, struct bqueue* __q);
 
 #define FUNCTION_DEFINE_FLATTEN_UNION_ARRAY(FLTYPE) \
 	FUNCTION_DEFINE_FLATTEN_GENERIC_ARRAY(flatten_union_array_##FLTYPE, flatten_union_##FLTYPE, union FLTYPE, sizeof(union FLTYPE))
 
 #define FUNCTION_DECLARE_FLATTEN_UNION_ARRAY(FLTYPE) \
-	extern struct flatten_pointer* flatten_union_array_##FLTYPE(struct kflat* kflat, const void* ptr, size_t n, uintptr_t __cval, struct bqueue* __q);
+	extern struct flatten_pointer* flatten_union_array_##FLTYPE(struct kflat* kflat, const void* ptr, size_t n, uintptr_t __cval, unsigned long __index, struct bqueue* __q);
 
 #define FUNCTION_DEFINE_FLATTEN_STRUCT_ARRAY_SPECIALIZE(TAG,FLTYPE)	\
 	FUNCTION_DEFINE_FLATTEN_GENERIC_ARRAY(flatten_struct_array_##FLTYPE##_##TAG, flatten_struct_##FLTYPE##_##TAG, struct FLTYPE, sizeof(struct FLTYPE))
 
 #define FUNCTION_DECLARE_FLATTEN_STRUCT_ARRAY_SPECIALIZE(TAG,FLTYPE)	\
-	extern struct flatten_pointer* flatten_struct_array_##FLTYPE##_##TAG(struct kflat* kflat, const void* ptr, size_t n, uintptr_t __cval, struct bqueue* __q);
+	extern struct flatten_pointer* flatten_struct_array_##FLTYPE##_##TAG(struct kflat* kflat, const void* ptr, size_t n, uintptr_t __cval, unsigned long __index, struct bqueue* __q);
 
 #define FUNCTION_DEFINE_FLATTEN_STRUCT_ARRAY_SELF_CONTAINED(FLTYPE,FLSIZE)	\
 	FUNCTION_DEFINE_FLATTEN_GENERIC_ARRAY(flatten_struct_array_##FLTYPE, flatten_struct_##FLTYPE, struct FLTYPE, FLSIZE)
 
 #define FUNCTION_DECLARE_FLATTEN_STRUCT_ARRAY_SELF_CONTAINED(FLTYPE,FLSIZE)	\
-	extern struct flatten_pointer* flatten_struct_array_##FLTYPE(struct kflat* kflat, const void* ptr, size_t n, uintptr_t __cval, struct bqueue* __q);
+	extern struct flatten_pointer* flatten_struct_array_##FLTYPE(struct kflat* kflat, const void* ptr, size_t n, uintptr_t __cval, unsigned long __index, struct bqueue* __q);
 
 #define FUNCTION_DEFINE_FLATTEN_STRUCT_TYPE_ARRAY_SELF_CONTAINED(FLTYPE,FLSIZE)	\
 	FUNCTION_DEFINE_FLATTEN_GENERIC_ARRAY(flatten_struct_type_array_##FLTYPE, flatten_struct_type_##FLTYPE, FLTYPE, FLSIZE)
 
 #define FUNCTION_DECLARE_FLATTEN_STRUCT_TYPE_ARRAY_SELF_CONTAINED(FLTYPE,FLSIZE)	\
-	extern struct flatten_pointer* flatten_struct_type_array_##FLTYPE(struct kflat* kflat, const void* _ptr, size_t n, uintptr_t __cval, struct bqueue* __q);
+	extern struct flatten_pointer* flatten_struct_type_array_##FLTYPE(struct kflat* kflat, const void* _ptr, size_t n, uintptr_t __cval, unsigned long __index, struct bqueue* __q);
 
 #define FUNCTION_DEFINE_FLATTEN_STRUCT_ARRAY_SELF_CONTAINED_SPECIALIZE(TAG,FLTYPE,FLSIZE) \
 	FUNCTION_DEFINE_FLATTEN_GENERIC_ARRAY(flatten_struct_array_##FLTYPE##_##TAG, flatten_struct_##FLTYPE##_##TAG, struct FLTYPE, FLSIZE)
 
 #define FUNCTION_DECLARE_FLATTEN_STRUCT_ARRAY_SELF_CONTAINED_SPECIALIZE(TAG,FLTYPE,FLSIZE) \
-	extern struct flatten_pointer* flatten_struct_array_##FLTYPE##_##TAG(struct kflat* kflat, const void* _ptr, size_t n, uintptr_t __cval, struct bqueue* __q);
+	extern struct flatten_pointer* flatten_struct_array_##FLTYPE##_##TAG(struct kflat* kflat, const void* _ptr, size_t n, uintptr_t __cval, unsigned long __index, struct bqueue* __q);
 
 #define FUNCTION_DEFINE_FLATTEN_UNION_ARRAY_SELF_CONTAINED(FLTYPE,FLSIZE) \
 	FUNCTION_DEFINE_FLATTEN_GENERIC_ARRAY(flatten_union_array_##FLTYPE, flatten_union_##FLTYPE, union FLTYPE, FLSIZE)
 
 #define FUNCTION_DECLARE_FLATTEN_UNION_ARRAY_SELF_CONTAINED(FLTYPE,FLSIZE) \
-	extern struct flatten_pointer* flatten_union_array_##FLTYPE(struct kflat* kflat, const void* ptr, size_t n, uintptr_t __cval, struct bqueue* __q);
+	extern struct flatten_pointer* flatten_union_array_##FLTYPE(struct kflat* kflat, const void* ptr, size_t n, uintptr_t __cval, unsigned long __index, struct bqueue* __q);
 
 
 /*************************************
@@ -571,7 +572,7 @@ struct flatten_pointer* FUNC_NAME(struct kflat* kflat, const void* ptr, size_t n
  *************************************/
 #define FUNCTION_DEFINE_FLATTEN_GENERIC_BASE(FUNC_NAME, FULL_TYPE, FLSIZE, ...)  \
 			\
-struct flatten_pointer* FUNC_NAME(struct kflat* kflat, const void* ptr, uintptr_t __cval, struct bqueue* __q) {    \
+struct flatten_pointer* FUNC_NAME(struct kflat* kflat, const void* ptr, uintptr_t __cval, unsigned long __index, struct bqueue* __q) {    \
             \
 	struct flat_node *__node;		\
 	typedef FULL_TYPE _container_type; \
@@ -612,7 +613,7 @@ struct flatten_pointer* FUNC_NAME(struct kflat* kflat, const void* ptr, uintptr_
 	FUNCTION_DEFINE_FLATTEN_STRUCT_ARRAY(FLTYPE)
 
 #define FUNCTION_DECLARE_FLATTEN_STRUCT(FLTYPE)	\
-	extern struct flatten_pointer* flatten_struct_##FLTYPE(struct kflat* kflat, const void*, uintptr_t __cval, struct bqueue*);	\
+	extern struct flatten_pointer* flatten_struct_##FLTYPE(struct kflat* kflat, const void*, uintptr_t __cval, unsigned long __index, struct bqueue*);	\
 	FUNCTION_DECLARE_FLATTEN_STRUCT_ARRAY(FLTYPE)
 
 
@@ -626,7 +627,7 @@ struct flatten_pointer* FUNC_NAME(struct kflat* kflat, const void* ptr, uintptr_
 	FUNCTION_DEFINE_FLATTEN_STRUCT_TYPE_ARRAY(FLTYPE)
 
 #define FUNCTION_DECLARE_FLATTEN_STRUCT_TYPE(FLTYPE)	\
-	extern struct flatten_pointer* flatten_struct_type_##FLTYPE(struct kflat* kflat, const void*, uintptr_t __cval, struct bqueue*);	\
+	extern struct flatten_pointer* flatten_struct_type_##FLTYPE(struct kflat* kflat, const void*, uintptr_t __cval, unsigned long __index, struct bqueue*);	\
 	FUNCTION_DECLARE_FLATTEN_STRUCT_TYPE_ARRAY(FLTYPE)
 
 
@@ -640,7 +641,7 @@ struct flatten_pointer* FUNC_NAME(struct kflat* kflat, const void* ptr, uintptr_
 	FUNCTION_DEFINE_FLATTEN_UNION_ARRAY(FLTYPE)
 
 #define FUNCTION_DECLARE_FLATTEN_UNION(FLTYPE) \
-	extern struct flatten_pointer* flatten_union_##FLTYPE(struct kflat* kflat, const void*, uintptr_t __cval, struct bqueue*);	\
+	extern struct flatten_pointer* flatten_union_##FLTYPE(struct kflat* kflat, const void*, uintptr_t __cval, unsigned long __index, struct bqueue*);	\
 	FUNCTION_DECLARE_FLATTEN_UNION_ARRAY(FLTYPE)
 
 
@@ -703,41 +704,48 @@ struct flatten_pointer* FUNC_NAME(struct kflat* kflat, const void* ptr, uintptr_
 #define FLATTEN_STRUCT_TYPE_SELF_CONTAINED(T,N,p)	\
 	FLATTEN_STRUCT_TYPE_ARRAY_SELF_CONTAINED(T,N,p,1)
 
-
 /*******************************
  * AGGREGATE macros
  *******************************/
 /* AGGREGATE_*_STORAGE */
-#define AGGREGATE_FLATTEN_GENERIC_STORAGE(T,p,CUSTOM_VAL,TARGET)		\
+#define AGGREGATE_FLATTEN_GENERIC_STORAGE(FULL_TYPE,TARGET,_off,n,CUSTOM_VAL)		\
 	do {	\
-		DBGTF(AGGREGATE_FLATTEN_GENERIC_STORAGE,T,p,"%lx",(unsigned long)p);	\
-    	if (!KFLAT_ACCESSOR->errno) {	\
-    		struct fixup_set_node* __inode = fixup_set_search(KFLAT_ACCESSOR,(uint64_t)p);	\
-    		if (!__inode) {	\
-    			int err = fixup_set_reserve_address(KFLAT_ACCESSOR,(uintptr_t)p);	\
-    			if (!err) {	\
-    				struct flatten_job __job;   \
+		DBGM3(AGGREGATE_FLATTEN_GENERIC_STORAGE,FULL_TYPE,_off,n);	\
+		DBGS("FULL_TYPE [%lx:%zu -> %lx]\n",(uintptr_t)_ptr,(size_t)_off,(uintptr_t)((const FULL_TYPE*)((unsigned char*)(_ptr)+_off)));	\
+		for (int __i = 0; __i < n; ++__i) {	\
+			const FULL_TYPE* __p = ((const FULL_TYPE*)((unsigned char*)(_ptr)+_off))+__i;	\
+			if (!KFLAT_ACCESSOR->errno) {	\
+				int err = 0;	\
+				struct fixup_set_node* __inode = fixup_set_search(KFLAT_ACCESSOR,(uint64_t)__p);	\
+				if (!__inode) {	\
+					err = fixup_set_reserve_address(KFLAT_ACCESSOR,(uintptr_t)__p);	\
+				}	\
+				if (!err) {	\
+					struct flatten_job __job;   \
 					__job.node = 0;    \
 					__job.offset = 0; \
 					__job.size = 1;	\
 					__job.custom_val = (uintptr_t)CUSTOM_VAL;	\
-					__job.ptr = (struct flatten_base*)p;    \
+					__job.index = __i;	\
+					__job.ptr = (struct flatten_base*)__p;    \
 					__job.fun = TARGET;    \
 					__job.fp = 0;   \
 					__job.convert = 0;  \
 					bqueue_push_back(KFLAT_ACCESSOR,__q,&__job,sizeof(struct flatten_job));    \
     			}	\
-				if (err && err != EEXIST) \
+				if (err && err != EEXIST) { \
 					KFLAT_ACCESSOR->errno = err;	\
+					DBGS("AGGREGATE_FLATTEN_GENERIC_STORAGE: errno(%d)\n",KFLAT_ACCESSOR->errno);	\
+					break;	\
+				}	\
     		}	\
 		}	\
-		else DBGS("AGGREGATE_FLATTEN_GENERIC_STORAGE: errno(%d)\n",KFLAT_ACCESSOR->errno);	\
     } while(0)
 
-#define AGGREGATE_FLATTEN_GENERIC_STORAGE_FLEXIBLE(FLTYPE, FLSIZE, OFF, CUSTOM_VAL, TARGET)	\
+#define AGGREGATE_FLATTEN_GENERIC_STORAGE_FLEXIBLE(FULL_TYPE, FLSIZE, OFF, CUSTOM_VAL, TARGET)	\
 	do {									\
 		void* start, *end;					\
-		size_t el_cnt, i;					\
+		size_t el_cnt;						\
 											\
 		bool rv = flatten_get_object((void*)_ptr, &start, &end);	\
 		if(!rv)								\
@@ -746,41 +754,53 @@ struct flatten_pointer* FUNC_NAME(struct kflat* kflat, const void* ptr, uintptr_
 		el_cnt = (long)(end - start - OFF) / FLSIZE;	\
 		if(el_cnt <= 0)						\
 			break;							\
-		for(i = 0; i < el_cnt; i++) {		\
-			AGGREGATE_FLATTEN_GENERIC_STORAGE(FLTYPE, (((unsigned long)_ptr) + OFF  + i  * FLSIZE), CUSTOM_VAL, TARGET);	\
-		}									\
+		AGGREGATE_FLATTEN_GENERIC_STORAGE(FULL_TYPE, TARGET, OFF, el_cnt, CUSTOM_VAL);	\
 	} while(0)
 
 
-#define AGGREGATE_FLATTEN_STRUCT_STORAGE(T,p)	\
-	AGGREGATE_FLATTEN_GENERIC_STORAGE(T, p, 0, flatten_struct_array_##T)
+#define AGGREGATE_FLATTEN_STRUCT_ARRAY_STORAGE(T,f,n)	\
+	AGGREGATE_FLATTEN_GENERIC_STORAGE(struct T, flatten_struct_array_##T, offsetof(_container_type,f), n, 0)
 
-#define AGGREGATE_FLATTEN_STRUCT_TYPE_STORAGE(T,p)	\
-	AGGREGATE_FLATTEN_GENERIC_STORAGE(T, p, 0, flatten_struct_type_array_##T)
+#define AGGREGATE_FLATTEN_STRUCT_TYPE_ARRAY_STORAGE(T,f,n)	\
+	AGGREGATE_FLATTEN_GENERIC_STORAGE(T, flatten_struct_type_array_##T, offsetof(_container_type,f), n, 0)
 
-#define AGGREGATE_FLATTEN_UNION_STORAGE(T,p)	\
-	AGGREGATE_FLATTEN_GENERIC_STORAGE(T, p, 0, flatten_union_array_##T)
+#define AGGREGATE_FLATTEN_UNION_ARRAY_STORAGE(T,f,n)	\
+	AGGREGATE_FLATTEN_GENERIC_STORAGE(union T, flatten_union_array_##T, offsetof(_container_type,f), n, 0)
 
-#define AGGREGATE_FLATTEN_UNION_STORAGE_CUSTOM_INFO(T,p,CUSTOM_VAL)	\
-	AGGREGATE_FLATTEN_GENERIC_STORAGE(T, p, CUSTOM_VAL, flatten_union_array_##T)
+#define AGGREGATE_FLATTEN_UNION_ARRAY_STORAGE_CUSTOM_INFO(T,f,n,CUSTOM_VAL)	\
+	AGGREGATE_FLATTEN_GENERIC_STORAGE(union T, flatten_union_array_##T, offsetof(_container_type,f), n, CUSTOM_VAL)
+
+#define AGGREGATE_FLATTEN_STRUCT_STORAGE(T,f)	\
+	AGGREGATE_FLATTEN_STRUCT_ARRAY_STORAGE(T,f,1)
+
+#define AGGREGATE_FLATTEN_STRUCT_TYPE_STORAGE(T,f)	\
+	AGGREGATE_FLATTEN_STRUCT_TYPE_ARRAY_STORAGE(T,f,1)
+
+#define AGGREGATE_FLATTEN_UNION_STORAGE(T,f)	\
+	AGGREGATE_FLATTEN_UNION_ARRAY_STORAGE(T,f,1)
+
+#define AGGREGATE_FLATTEN_UNION_STORAGE_CUSTOM_INFO(T,f,CUSTOM_VAL)	\
+	AGGREGATE_FLATTEN_UNION_ARRAY_STORAGE_CUSTOM_INFO(T,f,1,CUSTOM_VAL)
 
 #define AGGREGATE_FLATTEN_STRUCT_FLEXIBLE(T, f) \
-	AGGREGATE_FLATTEN_GENERIC_STORAGE_FLEXIBLE(T, sizeof(struct T), offsetof(_container_type, f), 0, flatten_struct_array_##T)
+	AGGREGATE_FLATTEN_GENERIC_STORAGE_FLEXIBLE(struct T, sizeof(struct T), offsetof(_container_type, f), 0, flatten_struct_array_##T)
 
 #define AGGREGATE_FLATTEN_STRUCT_TYPE_FLEXIBLE(T, f)	\
 	AGGREGATE_FLATTEN_GENERIC_STORAGE_FLEXIBLE(T, sizeof(T), offsetof(_container_type, f), 0, flatten_struct_type_array_##T)
 
 #define AGGREGATE_FLATTEN_UNION_FLEXIBLE(T, f)	\
-	AGGREGATE_FLATTEN_GENERIC_STORAGE_FLEXIBLE(T, sizeof(union T), offsetof(_container_type, f), 0, flatten_union_array_##T)
+	AGGREGATE_FLATTEN_GENERIC_STORAGE_FLEXIBLE(union T, sizeof(union T), offsetof(_container_type, f), 0, flatten_union_array_##T)
 
 #define AGGREGATE_FLATTEN_STRUCT_FLEXIBLE_SELF_CONTAINED(T, SIZE, OFF) \
-	AGGREGATE_FLATTEN_GENERIC_STORAGE_FLEXIBLE(T, SIZE, OFF, 0, flatten_struct_array_##T)
+	AGGREGATE_FLATTEN_GENERIC_STORAGE_FLEXIBLE(struct T, SIZE, OFF, 0, flatten_struct_array_##T)
 
 #define AGGREGATE_FLATTEN_STRUCT_TYPE_FLEXIBLE_SELF_CONTAINED(T, SIZE, OFF) \
 	AGGREGATE_FLATTEN_GENERIC_STORAGE_FLEXIBLE(T, SIZE, OFF, 0, flatten_struct_type_array_##T)
 
 #define AGGREGATE_FLATTEN_UNION_FLEXIBLE_SELF_CONTAINED(T, SIZE, OFF) \
-	AGGREGATE_FLATTEN_GENERIC_STORAGE_FLEXIBLE(T, SIZE, OFF, 0, flatten_union_array_##T)
+	AGGREGATE_FLATTEN_GENERIC_STORAGE_FLEXIBLE(union T, SIZE, OFF, 0, flatten_union_array_##T)
+
+#define AGGREGATE_FLATTEN_TYPE_ARRAY_FLEXIBLE(T, f) /* TODO */
 
 /* AGGREGATE_* */
 #define AGGREGATE_FLATTEN_GENERIC(FULL_TYPE,TARGET,N,f,_off,n,CUSTOM_VAL,pre_f,post_f,_shift)	\
@@ -842,6 +862,7 @@ struct flatten_pointer* FUNC_NAME(struct kflat* kflat, const void* ptr, uintptr_
 								__job.offset = 0; \
 								__job.size = 1;	\
 								__job.custom_val = (uintptr_t)CUSTOM_VAL;	\
+								__job.index = _i;	\
 								__job.ptr = (struct flatten_base*)((void*)_fp+_i*N);    \
 								__job.fun = TARGET;    \
 								__job.fp = 0;   \

@@ -45,23 +45,16 @@ FUNCTION_DEFINE_FLATTEN_STRUCT(BB,
 FUNCTION_DECLARE_FLATTEN_UNION(K);
 
 FUNCTION_DEFINE_FLATTEN_UNION(K,
-	if (__cval) {
+	if (__cval && ((int*)__cval)[__index]) {
 		AGGREGATE_FLATTEN_STRING(s);
 	}
 );
 
 FUNCTION_DEFINE_FLATTEN_STRUCT(MM,
 	AGGREGATE_FLATTEN_STRING(s);
-	for (int __i = 0; __i < 4; ++__i) {
-		const struct BB *p = ATTR(arrB) + __i;
-		AGGREGATE_FLATTEN_STRUCT_STORAGE(BB, p);
-	} 
+	AGGREGATE_FLATTEN_STRUCT_ARRAY_STORAGE(BB, arrB, 4);
 	AGGREGATE_FLATTEN_TYPE_ARRAY(long, Lx, 0);
-	for (int __i = 0; __i < 2; ++__i) {
-		const union K *p = ATTR(arrK) + __i;
-		const int* has_s = ATTR(has_s) + __i;
-		AGGREGATE_FLATTEN_UNION_STORAGE_CUSTOM_INFO(K, p, *has_s);
-	} 
+	AGGREGATE_FLATTEN_UNION_ARRAY_STORAGE_CUSTOM_INFO(K, arrK, 2, ATTR(has_s));
 );
 
 static int kflat_structarray_example(struct kflat *kflat) {

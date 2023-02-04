@@ -1621,6 +1621,7 @@ void flatten_generic(struct kflat* kflat, void* q, struct flatten_pointer* fptr,
 
 				job.size = 1;
 				job.custom_val = custom_val;
+				job.index = i;
 				job.ptr = (struct flatten_base*)target;
 				job.fun = func_ptr;
 				err = bqueue_push_back(kflat, q, &job, sizeof(struct flatten_job));
@@ -1680,7 +1681,7 @@ void flatten_run_iter_harness(struct kflat* kflat, struct bqueue* bq) {
 			break;
 		}
 
-		fp = job.fun(kflat, job.ptr, job.size, job.custom_val, bq);
+		fp = job.fun(kflat, job.ptr, job.size, job.custom_val, job.index, bq);
 		if (job.convert != NULL)
 			fp = job.convert(fp, job.ptr);
 

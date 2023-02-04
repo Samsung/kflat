@@ -1,7 +1,7 @@
 /**
  * @file unit_flatten_embedded_pointer.c
  * @author Samsung R&D Poland - Mobile Security Group
- * 
+ *
  */
 
 #include "common.h"
@@ -97,9 +97,10 @@ FUNCTION_DEFINE_FLATTEN_STRUCT(FC,
 struct EA EAarr[5];
 struct EA g_EA;
 struct EA g_EA2;
+B_t g_B[4] = { {"ABC"},{"DEF"},{"GHI"},{"JKL"} };
 
 static int kflat_flatten_embedded_pointer_unit_test(struct kflat *kflat) {
-	
+
 	B_t Bnfo[5] = { {info[0]},{info[1]},{info[2]},{info[3]},{info[4]}, };
 	struct EC Cnfo[5] = { {info[0]},{info[1]},{info[2]},{info[3]},{info[4]}, };
 	struct FC crr[40] = {};
@@ -145,6 +146,10 @@ static int kflat_flatten_embedded_pointer_unit_test(struct kflat *kflat) {
 		FLATTEN_STRUCT_SPECIALIZE(no_embedded,EA,&g_EA2);
 	);
 
+	FOR_ROOT_POINTER(&g_B,
+		FLATTEN_STRUCT_TYPE_ARRAY_SELF_CONTAINED(B_t,sizeof(B_t),&g_B,4);
+	);
+
 	for (int i=0; i<40; ++i) {
 		kvfree(crr[i].s);
 	}
@@ -159,6 +164,7 @@ static int kflat_flatten_embedded_pointer_unit_validate(void *memory, size_t siz
 	struct EA* pEA = (struct EA*)flatten_root_pointer_seq(flatten, 0);
 	struct EA* gEA = (struct EA*)flatten_root_pointer_seq(flatten, 1);
 	struct EA* gEA2 = (struct EA*)flatten_root_pointer_seq(flatten, 2);
+	B_t* g_B = (B_t*)flatten_root_pointer_seq(flatten, 3);
 
 	for (int i=0; i<5; ++i) {
 		char n[4];
@@ -187,6 +193,11 @@ static int kflat_flatten_embedded_pointer_unit_validate(void *memory, size_t siz
 	ASSERT( !strcmp((*((const struct EC**)gEA2->ptr2))->s,info[4]) );
 	ASSERT( !strcmp(((struct FC*)(gEA2->ptr3))->s,"255") );
 	ASSERT( !strcmp(((struct FC*)(gEA2->ptr4-offsetof(struct FC,q)))->s,"505") );
+
+	ASSERT( !strcmp(g_B[0].s,"ABC") );
+	ASSERT( !strcmp(g_B[1].s,"DEF") );
+	ASSERT( !strcmp(g_B[2].s,"GHI") );
+	ASSERT( !strcmp(g_B[3].s,"JKL") );
 
 	return 0;
 }
