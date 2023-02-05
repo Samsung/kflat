@@ -757,6 +757,27 @@ struct flatten_pointer* FUNC_NAME(struct kflat* kflat, const void* ptr, uintptr_
 		AGGREGATE_FLATTEN_GENERIC_STORAGE(FULL_TYPE, TARGET, OFF, el_cnt, CUSTOM_VAL);	\
 	} while(0)
 
+#define AGGREGATE_FLATTEN_GENERIC_COMPOUND_TYPE_STORAGE_FLEXIBLE(T,SIZE,OFF)	\
+	do {									\
+		void* start, *end;					\
+		size_t el_cnt;						\
+											\
+		bool rv = flatten_get_object((void*)_ptr, &start, &end);	\
+		if(!rv)								\
+			break;							\
+											\
+		el_cnt = (long)(end - start - OFF) / SIZE;	\
+		if(el_cnt <= 0)						\
+			break;							\
+		const T* __p = (const T*)((unsigned char*)(_ptr)+OFF);	\
+		if (!KFLAT_ACCESSOR->errno) {	\
+			struct flatten_pointer* fptr = flatten_plain_type(KFLAT_ACCESSOR,__p,(el_cnt)*SIZE);	\
+			if (fptr == NULL) {	\
+				DBGS("AGGREGATE_FLATTEN_GENERIC_COMPOUND_TYPE_STORAGE_FLEXIBLE:flatten_plain_type(): NULL");	\
+				KFLAT_ACCESSOR->errno = EFAULT;	\
+			}	\
+		}	\
+	} while(0)
 
 #define AGGREGATE_FLATTEN_STRUCT_ARRAY_STORAGE(T,f,n)	\
 	AGGREGATE_FLATTEN_GENERIC_STORAGE(struct T, flatten_struct_array_##T, offsetof(_container_type,f), n, 0)
@@ -800,7 +821,8 @@ struct flatten_pointer* FUNC_NAME(struct kflat* kflat, const void* ptr, uintptr_
 #define AGGREGATE_FLATTEN_UNION_FLEXIBLE_SELF_CONTAINED(T, SIZE, OFF) \
 	AGGREGATE_FLATTEN_GENERIC_STORAGE_FLEXIBLE(union T, SIZE, OFF, 0, flatten_union_array_##T)
 
-#define AGGREGATE_FLATTEN_TYPE_ARRAY_FLEXIBLE(T, f) /* TODO */
+#define AGGREGATE_FLATTEN_TYPE_ARRAY_FLEXIBLE(T, f)	\
+	AGGREGATE_FLATTEN_GENERIC_COMPOUND_TYPE_STORAGE_FLEXIBLE(T,sizeof(T),offsetof(_container_type,f))
 
 /* AGGREGATE_* */
 #define AGGREGATE_FLATTEN_GENERIC(FULL_TYPE,TARGET,N,f,_off,n,CUSTOM_VAL,pre_f,post_f,_shift)	\
