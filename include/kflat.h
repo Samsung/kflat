@@ -1075,7 +1075,7 @@ struct flatten_pointer* FUNC_NAME(struct kflat* kflat, const void* ptr, uintptr_
 
 #define AGGREGATE_FLATTEN_TYPE_ARRAY_SELF_CONTAINED(T,f,_off,n) \
 	AGGREGATE_FLATTEN_COMPOUND_TYPE_ARRAY_SELF_CONTAINED(T,sizeof(T),f,_off,n)
-#define AGGREGATE_FLATTEN_TYPE_SELF_CONTAINED(T,N,f,_off) \
+#define AGGREGATE_FLATTEN_TYPE_SELF_CONTAINED(T,f,_off) \
 	AGGREGATE_FLATTEN_COMPOUND_TYPE_ARRAY_SELF_CONTAINED(T,sizeof(T),f,_off,1)
 
 
