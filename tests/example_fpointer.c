@@ -121,7 +121,7 @@ static int kflat_fptr_validate(void *memory, size_t size, CFlatten flatten) {
 	ASSERT(fptr_sc->global_address == TEST_FLATTEN_GLOBAL_ADDRESS);
 	ASSERT(fptr_sc->invalid == NULL);
 
-	return 0;
+	return KFLAT_TEST_SUCCESS;
 }
 
 /********************************/

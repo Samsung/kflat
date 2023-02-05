@@ -125,7 +125,7 @@ static int kflat_stringset_validate(void *memory, size_t size, CFlatten flatten)
 
 	PRINT("Stringset size: %ld", stringset_count(root));
 
-	return 0;
+	return KFLAT_TEST_SUCCESS;
 }
 
 #endif

@@ -95,7 +95,7 @@ static int kflat_flatten_struct_type_array_unit_validate(void *memory, size_t si
 		ASSERT(!strcmp(brick->u,n));
 	}
 
-	return 0;
+	return KFLAT_TEST_SUCCESS;
 }
 
 #endif

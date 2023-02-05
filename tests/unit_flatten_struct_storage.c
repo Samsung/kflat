@@ -1,7 +1,7 @@
 /**
  * @file unit_flatten_struct_storage.c
  * @author Samsung R&D Poland - Mobile Security Group
- * 
+ *
  */
 
 #include "common.h"
@@ -37,7 +37,7 @@ FUNCTION_DEFINE_FLATTEN_STRUCT(SA,
 );
 
 static int kflat_flatten_struct_storage_unit_test(struct kflat *kflat) {
-	
+
     struct SA sa = { 0x34569872, {{"in_union"}}, {{"0"},{"1"},{"2"},{"3"}}, "DEADBEEF" };
 
     FOR_ROOT_POINTER(&sa,
@@ -61,7 +61,7 @@ static int kflat_flatten_struct_storage_unit_validate(void *memory, size_t size,
     ASSERT(!strcmp(sa->sarr[3].s,"3"));
     ASSERT(!strcmp(sa->c,"DEADBEEF"));
 
-	return 0;
+	return KFLAT_TEST_SUCCESS;
 }
 
 #endif

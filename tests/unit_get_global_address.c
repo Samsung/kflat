@@ -44,7 +44,8 @@ static int kflat_global_addr_unit_validate(void *memory, size_t size, CFlatten f
 	ASSERT(pResults->test_module_global_pass);
 	ASSERT(pResults->test_kernel_global_pass);
 	ASSERT(pResults->test_module_func_pass);
-	return 0;
+
+	return KFLAT_TEST_SUCCESS;
 }
 
 #endif

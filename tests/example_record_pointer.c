@@ -48,7 +48,8 @@ static int kflat_record_pointer_validate(void *memory, size_t size, CFlatten fla
 	ASSERT(pv->l == 0);
 	ASSERT(pv->p == 0);
 	ASSERT(pv->pp == 0);
-	return 0;
+
+	return KFLAT_TEST_SUCCESS;
 }
 
 #endif

@@ -105,7 +105,8 @@ static int kflat_addr_valid_unit_validate(void *memory, size_t size, CFlatten fl
 	ASSERT(pResults->test_page_offset_3_pass);
 	ASSERT(pResults->test_page_offset_4_pass);
 	ASSERT(pResults->test_page_offset_5_pass);
-	return 0;
+
+	return KFLAT_TEST_SUCCESS;
 }
 
 #endif

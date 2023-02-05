@@ -57,7 +57,7 @@ static int kflat_flatten_union_unit_validate(void *memory, size_t size, CFlatten
     ASSERT_EQ(pmu->uAtab[1].c,0);
     ASSERT_EQ(pmu->uAtab[2].c,1);
 
-	return 0;
+	return KFLAT_TEST_SUCCESS;
 }
 
 #endif

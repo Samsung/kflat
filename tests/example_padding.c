@@ -63,7 +63,8 @@ static int kflat_padding_validate(void *memory, size_t size, CFlatten flatten) {
 	ASSERT(r->b->c == '3');
 	ASSERT(r->a1->i == 33);
 	ASSERT(r->c->c == 'x');
-	return 0;
+
+	return KFLAT_TEST_SUCCESS;
 }
 
 #endif

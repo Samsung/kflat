@@ -199,7 +199,7 @@ static int kflat_flatten_embedded_pointer_unit_validate(void *memory, size_t siz
 	ASSERT( !strcmp(g_B[2].s,"GHI") );
 	ASSERT( !strcmp(g_B[3].s,"JKL") );
 
-	return 0;
+	return KFLAT_TEST_SUCCESS;
 }
 
 #endif

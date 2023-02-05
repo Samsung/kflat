@@ -72,7 +72,7 @@ static int kflat_list_validate(void *memory, size_t size, CFlatten flatten) {
 	}
 	ASSERT(list_size == 100);
 
-	return 0;
+	return KFLAT_TEST_SUCCESS;
 }
 
 /********************************/

@@ -30,10 +30,12 @@ static int kflat_pointer_test(struct kflat *kflat) {
 #else
 
 static int kflat_pointer_validate(void *memory, size_t size, CFlatten flatten) {
+
 	double ***trio = (double ***)memory;
 	double magic_number = ***trio;
 	ASSERT(3.140 <= magic_number && magic_number <= 3.145);
-	return 0;
+
+	return KFLAT_TEST_SUCCESS;
 }
 
 #endif

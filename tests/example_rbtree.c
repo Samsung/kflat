@@ -212,7 +212,7 @@ static int kflat_rbtree_validate(void *memory, size_t size, CFlatten flatten) {
 	ASSERT(visited == 0b1111111111);
 	ASSERT(count == 10);
 
-	return 0;
+	return KFLAT_TEST_SUCCESS;
 }
 
 /********************************/

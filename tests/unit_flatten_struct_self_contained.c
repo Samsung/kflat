@@ -63,7 +63,8 @@ static int kflat_flatten_struct_self_contained_unit_validate(void *memory, size_
 	ASSERT(pA->X == 0xCAFECAFE);
 	ASSERT(pA->pB == str);
 	ASSERT(!strcmp((const char *)str->T, "CDF"));
-	return 0;
+
+	return KFLAT_TEST_SUCCESS;
 }
 
 #endif

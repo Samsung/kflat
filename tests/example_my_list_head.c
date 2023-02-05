@@ -68,7 +68,8 @@ static int kflat_overlaplist_validate(void *memory, size_t size, CFlatten flatte
 	ASSERT(task->u.next == task->u.prev);
 	ASSERT(task->u.next == &task->u);
 	ASSERT(task->im->plh == &task->u);
-	return 0;
+
+	return KFLAT_TEST_SUCCESS;
 }
 
 #endif

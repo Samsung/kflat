@@ -1,7 +1,7 @@
 /**
  * @file example_fragment.c
  * @author Samsung R&D Poland - Mobile Security Group
- * 
+ *
  */
 
 #include "common.h"
@@ -44,7 +44,7 @@ FUNCTION_DEFINE_FLATTEN_STRUCT(P,
 	AGGREGATE_FLATTEN_STRUCT(X,pX);
 );
 
-static int kflat_fragment_test(struct kflat *kflat) {
+static int 	(struct kflat *kflat) {
 	struct X xarr[10];
 	struct S stack = {"ABCDEFGHIJ",{1000,"Pobject",{-3,-2,-1,0,1,2,3,4,5,6},1.0,0,{1000000,"ABCD"},0,50,100},"KLMNOPQRST"};
 
@@ -60,7 +60,7 @@ static int kflat_fragment_test(struct kflat *kflat) {
 	FOR_ROOT_POINTER(&stack,
 		FLATTEN_TYPE_ARRAY(char, &stack,20);
 	);
-	
+
 	FOR_ROOT_POINTER(&stack.obP.q,
 		FLATTEN_STRUCT(Q,&stack.obP.q);
 	);
@@ -107,7 +107,7 @@ static int kflat_fragment_validate(void* memory, size_t size, CFlatten flatten) 
 
 	ASSERT(flatten_header_fragment_count(hdr) == 3);
 
-	return 0;
+	return KFLAT_TEST_SUCCESS;
 }
 
 #endif

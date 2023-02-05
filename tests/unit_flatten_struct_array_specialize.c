@@ -74,7 +74,7 @@ static int kflat_flatten_struct_array_specialize_unit_validate(void *memory, siz
 	ASSERT(!strcmp(spec_str->string, "Hello kflat!"));
 	ASSERT(spec_magic->magic == 0xCAFECAFE);
 
-	return 0;
+	return KFLAT_TEST_SUCCESS;
 }
 
 /********************************/

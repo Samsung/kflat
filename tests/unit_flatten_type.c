@@ -77,7 +77,7 @@ static int kflat_flatten_struct_type_validate(void *memory, size_t size, CFlatte
     ASSERT_EQ(*gx->f1,2.0);
     ASSERT_EQ(*gx->f2,4.0);
 
-	return 0;
+	return KFLAT_TEST_SUCCESS;
 }
 
 #endif

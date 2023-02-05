@@ -58,7 +58,8 @@ static int kflat_overlapptr_test_validate(void *memory, size_t size, CFlatten fl
 	ASSERT(pA->pB2->i == 3);
 	ASSERT(pA->pB3->i == 4);
 	ASSERT(pA->p && !strcmp(pA->p, "p in struct A"));
-	return 0;
+
+	return KFLAT_TEST_SUCCESS;
 }
 
 #endif

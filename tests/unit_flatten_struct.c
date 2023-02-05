@@ -61,7 +61,8 @@ static int kflat_flatten_struct_unit_validate(void *memory, size_t size, CFlatte
 	ASSERT(pA->X == 0x0000404F);
 	ASSERT(pA->pB != str);
 	ASSERT(!strcmp((const char *)str->T, "ABC"));
-	return 0;
+
+	return KFLAT_TEST_SUCCESS;
 }
 
 #endif

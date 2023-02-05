@@ -131,7 +131,7 @@ static int kflat_circle_validate(void *memory, size_t size, CFlatten flatten) {
 	PRINT("Sum of lengths of edges/diagonals: %lf", length);
 	PRINT("Half of the circumference: %lf", circumference / 2);
 
-	return 0;
+	return KFLAT_TEST_SUCCESS;
 }
 
 /********************************/

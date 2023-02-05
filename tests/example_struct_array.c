@@ -134,7 +134,7 @@ static int kflat_structarray_validate(void *memory, size_t size, CFlatten flatte
 	ASSERT(obM->arrK[0].v==999);
 	ASSERT(!strcmp(obM->arrK[1].s,"999"));
 
-	return 0;
+	return KFLAT_TEST_SUCCESS;
 }
 
 #endif

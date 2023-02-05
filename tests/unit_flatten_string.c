@@ -113,7 +113,7 @@ static int kflat_flatten_string_validate(void *memory, size_t size, CFlatten fla
 	for(size_t i = 0; i < 4096; i++)
 		ASSERT(str1->strNotTerminated[i] == 'A');
 
-	return 0;
+	return KFLAT_TEST_SUCCESS;
 }
 
 #endif

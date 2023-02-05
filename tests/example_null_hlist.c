@@ -127,7 +127,7 @@ static int kflat_hlist_nulls_test_validate(void *memory, size_t size, CFlatten f
 		ASSERT(list_size == 10);
 	}
 
-	return 0;
+	return KFLAT_TEST_SUCCESS;
 }
 
 #endif

@@ -71,7 +71,8 @@ static int kflat_flatten_struct_type_array_self_unit_validate(void *memory, size
 		ASSERT(box[0].tab[i].magic == 0xCAFECAFE + i);
 		ASSERT(!strcmp(box[0].tab[i].str, test_string));
 	}
-	return 0;
+
+	return KFLAT_TEST_SUCCESS;
 }
 
 /********************************/
