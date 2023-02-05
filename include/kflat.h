@@ -968,8 +968,8 @@ struct flatten_pointer* FUNC_NAME(struct kflat* kflat, const void* ptr, uintptr_
 #define AGGREGATE_FLATTEN_STRUCT_ARRAY_SELF_CONTAINED_SHIFTED(T,N,f,_off,n,_shift)	\
 	AGGREGATE_FLATTEN_GENERIC(struct T, flatten_struct_array_##T, N,f,_off,n,0,0,0,_shift)
 
-#define AGGREGATE_FLATTEN_UNION_ARRAY_SELF_CONTAINED_SHIFTED(T,N,f,_off,n,_shift)	\
-	AGGREGATE_FLATTEN_GENERIC(union T, flatten_union_array_##T, N,f,_off,n,0,0,0,_shift)
+/* Macro AGGREGATE_FLATTEN_UNION_ARRAY_SELF_CONTAINED_SHIFTED doesn't have much sense in case of union
+ as we cannot point to the middle of the union with a pointer */
 
 #define AGGREGATE_FLATTEN_STRUCT_TYPE_ARRAY_SELF_CONTAINED_SHIFTED(T,N,f,_off,n,_shift)	\
 	AGGREGATE_FLATTEN_GENERIC(T, flatten_struct_type_array_##T, N,f,_off,n,0,0,0,_shift)
