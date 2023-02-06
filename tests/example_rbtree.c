@@ -33,7 +33,7 @@ static inline void *rbnode_remove_color(const void *ptr) {
 	return (void *)((uintptr_t)ptr & ~3);
 }
 
-static inline struct flatten_pointer *rbnode_add_color(struct flatten_pointer *fptr, const void *ptr) {
+static inline struct flatten_pointer *rbnode_add_color(struct flatten_pointer *fptr, const struct flatten_base *ptr) {
 	fptr->offset |= (size_t)((uintptr_t)ptr & 3);
 	return fptr;
 }

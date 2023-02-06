@@ -22,11 +22,11 @@ struct string_node {
 
 static struct rb_root stringset_root = RB_ROOT;
 
-static inline const struct string_node *ptr_remove_color(const struct string_node *ptr) {
-	return (const struct string_node *)((uintptr_t)ptr & ~3);
+static inline void* ptr_remove_color(const void* ptr) {
+	return (void*)((uintptr_t)ptr & ~3);
 }
 
-static inline struct flatten_pointer *fptr_add_color(struct flatten_pointer *fptr, const struct string_node *ptr) {
+static inline struct flatten_pointer *fptr_add_color(struct flatten_pointer *fptr, const struct flatten_base *ptr) {
 	fptr->offset |= (size_t)((uintptr_t)ptr & 3);
 	return fptr;
 }

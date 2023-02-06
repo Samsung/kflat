@@ -42,7 +42,7 @@ static inline void *char_array_to_ptr(const void *ptr) {
 	return (void*)ptr;
 }
 
-static inline struct flatten_pointer *ptr_to_char_array(struct flatten_pointer *fptr, const void *ptr) {
+static inline struct flatten_pointer *ptr_to_char_array(struct flatten_pointer *fptr, const struct flatten_base *ptr) {
 	return fptr;
 }
 
@@ -50,7 +50,7 @@ static inline void *long_to_ptr(const void *ptr) {
 	return (void*)ptr;
 }
 
-static inline struct flatten_pointer *ptr_to_long(struct flatten_pointer *fptr, const void *ptr) {
+static inline struct flatten_pointer *ptr_to_long(struct flatten_pointer *fptr, const struct flatten_base *ptr) {
 	return fptr;
 }
 
