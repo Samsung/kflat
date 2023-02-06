@@ -41,6 +41,7 @@ struct args {
 };
 
 int enable_verbose = 0;
+static const char* current_test_name = NULL;
 
 /*******************************************************
  * SIGNAL HANDLER
@@ -54,6 +55,7 @@ static void signal_handler(int signo, siginfo_t* si, void* raw_ucontext) {
 
     printf("\n=======================\n");
     log_error("SIGNAL %s", strsignal(signo)); 
+    log_error(" * Failed test: %s", current_test_name ? : "unknown");
     // log_error(" * PC = %lx", ucontext->uc_mcontext.gregs[REG_RIP]);
 
     switch(signo) {
@@ -61,7 +63,7 @@ static void signal_handler(int signo, siginfo_t* si, void* raw_ucontext) {
         case SIGILL:
         case SIGBUS:
         case SIGFPE:
-            log_error(" * Problematic address = %llx", si->si_addr);
+            log_error(" * Problematic address = 0x%llx", si->si_addr);
             break;
     }
 
@@ -177,6 +179,8 @@ int run_test(struct args* args, const char* name) {
 
     if(args->verbose)
         log_info("=> Testing %s...", name);
+    current_test_name = name;
+    memset(_last_assert_tested, 0, sizeof(_last_assert_tested));
 
     int fd = open(KFLAT_NODE, O_RDONLY);
     if(fd < 0) {
@@ -360,14 +364,12 @@ close_fd:
 exit:
     if(test_result == KFLAT_TEST_SUCCESS)
         log_info("Test %-50s - SUCCESS", name);
-    else if(test_result == KFLAT_TEST_FAIL)
-        log_error("Test %-50s - %sFAILED%s", name, 
-                OUTPUT_COLOR(LOG_ERR_COLOR), OUTPUT_COLOR(LOG_DEFAULT_COLOR));
     else if(test_result == KFLAT_TEST_UNSUPPORTED)
         log_info("Test %-50s - %sUNSUPPORTED%s", name,
                 OUTPUT_COLOR(LOG_WARN_COLOR), OUTPUT_COLOR(LOG_DEFAULT_COLOR));
     else
-        abort();
+        log_error("Test %-50s - %sFAILED%s", name, 
+                OUTPUT_COLOR(LOG_ERR_COLOR), OUTPUT_COLOR(LOG_DEFAULT_COLOR));
     return test_result == KFLAT_TEST_SUCCESS || test_result == KFLAT_TEST_UNSUPPORTED;
 }
 

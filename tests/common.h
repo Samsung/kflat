@@ -75,9 +75,9 @@ extern char _last_assert_tested[MAX_LAST_ASSERT];
 // Fails test when EXPR == false
 #define ASSERT(EXPR)    do {                                                    \
                             snprintf(_last_assert_tested, MAX_LAST_ASSERT,      \
-                                "=> %s:%d: Test failed `%s`", __FILE__, __LINE__, #EXPR); \
+                                "[%s:%d] `%s`", __FILE__, __LINE__, #EXPR);     \
                             if(!(EXPR)) {                                       \
-                                fprintf(stderr, "%s\n", _last_assert_tested);   \
+                                fprintf(stderr, "=> Test failed: %s\n", _last_assert_tested);   \
                                 return KFLAT_TEST_FAIL;                         \
                             }                                                   \
                         } while(0)
@@ -85,10 +85,10 @@ extern char _last_assert_tested[MAX_LAST_ASSERT];
 // Fails test when A != B
 #define ASSERT_EQ(A, B) do {                                                    \
                             snprintf(_last_assert_tested, MAX_LAST_ASSERT,      \
-                                "=> %s:%d: Test failed `%s` == `%s` (0x%llx != 0x%llx)",    \
+                                "[%s:%d] `%s` == `%s` (0x%llx == 0x%llx)",      \
                                 __FILE__, __LINE__, #A, #B, (long long)(A), (long long)(B)); \
                             if((A) != (B)) {                                    \
-                                fprintf(stderr, "%s\n", _last_assert_tested);   \
+                                fprintf(stderr, "=> Test failed: %s\n", _last_assert_tested);   \
                                 return 1;                                       \
                             }                                                   \
                         } while(0)
