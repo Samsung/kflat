@@ -63,27 +63,32 @@ FUNCTION_DEFINE_FLATTEN_STRUCT(flex_G,
 );
 
 static int kflat_flexible_test(struct kflat *kflat) {
-	struct flex_A *a = kmalloc(sizeof(struct flex_A) + 3 * sizeof(struct flex_B), GFP_KERNEL);
+	struct flex_A *a;
+	struct flex_C *c;
+	struct flex_E *e;
+	struct flex_G *g;
+
+	a = kmalloc(sizeof(struct flex_A) + 3 * sizeof(struct flex_B), GFP_KERNEL);
 	a->get_obj_supported = IS_ENABLED(KFLAT_GET_OBJ_SUPPORT);
 	a->cnt = 3;
 	a->arr[0].field = 1;
 	a->arr[1].field = 0xaaddcc;
 	a->arr[2].field = 0xcafecafe;
 
-	struct flex_C *c = kmalloc(sizeof(struct flex_C) + 10 * sizeof(unsigned long), GFP_KERNEL);
+	c = kmalloc(sizeof(struct flex_C) + 10 * sizeof(unsigned long), GFP_KERNEL);
 	c->l = 0xBEEFBEEF;
 	c->name = "Flexible array of longs";
 	for (int i=0; i<10; ++i) {
 		c->arr[i] = ((c->l + 888*i) >> 4)% 16;
 	}
 
-	struct flex_E *e = kmalloc(sizeof(struct flex_E) + 3 * sizeof(flex_D), GFP_KERNEL);
+	e = kmalloc(sizeof(struct flex_E) + 3 * sizeof(flex_D), GFP_KERNEL);
 	e->cnt = 3;
 	e->arr[0].field = 2;
 	e->arr[1].field = 0xcceeff;
 	e->arr[2].field = 0xba5eba11;
 
-	struct flex_G *g = kmalloc(sizeof(struct flex_G) + 3 * sizeof(union flex_F), GFP_KERNEL);
+	g = kmalloc(sizeof(struct flex_G) + 3 * sizeof(union flex_F), GFP_KERNEL);
 	g->cnt = 3;
 	g->arr[0].field = 3;
 	g->arr[1].field = 0xddeeaa;

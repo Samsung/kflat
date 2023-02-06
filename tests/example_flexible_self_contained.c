@@ -56,20 +56,24 @@ FUNCTION_DEFINE_FLATTEN_STRUCT(flexsc_G,
 );
 
 static int kflat_flexible_self_contained_test(struct kflat *kflat) {
-	struct flexsc_A *a = kmalloc(sizeof(struct flexsc_A) + 3 * sizeof(struct flexsc_B), GFP_KERNEL);
+	struct flexsc_A *a;
+	struct flexsc_E *e;
+	struct flexsc_G *g;
+
+	a = kmalloc(sizeof(struct flexsc_A) + 3 * sizeof(struct flexsc_B), GFP_KERNEL);
 	a->get_obj_supported = IS_ENABLED(KFLAT_GET_OBJ_SUPPORT);
 	a->cnt = 3;
 	a->arr[0].field = 1;
 	a->arr[1].field = 0xaaddcc;
 	a->arr[2].field = 0xcafecafe;
 
-	struct flexsc_E *e = kmalloc(sizeof(struct flexsc_E) + 3 * sizeof(flexsc_D), GFP_KERNEL);
+	e = kmalloc(sizeof(struct flexsc_E) + 3 * sizeof(flexsc_D), GFP_KERNEL);
 	e->cnt = 3;
 	e->arr[0].field = 2;
 	e->arr[1].field = 0xcceeff;
 	e->arr[2].field = 0xba5eba11;
 
-	struct flexsc_G *g = kmalloc(sizeof(struct flexsc_G) + 3 * sizeof(union flexsc_F), GFP_KERNEL);
+	g = kmalloc(sizeof(struct flexsc_G) + 3 * sizeof(union flexsc_F), GFP_KERNEL);
 	g->cnt = 3;
 	g->arr[0].field = 3;
 	g->arr[1].field = 0xddeeaa;

@@ -44,7 +44,7 @@ FUNCTION_DEFINE_FLATTEN_STRUCT(P,
 	AGGREGATE_FLATTEN_STRUCT(X,pX);
 );
 
-static int 	(struct kflat *kflat) {
+static int kflat_fragment_test(struct kflat *kflat) {
 	struct X xarr[10];
 	struct S stack = {"ABCDEFGHIJ",{1000,"Pobject",{-3,-2,-1,0,1,2,3,4,5,6},1.0,0,{1000000,"ABCD"},0,50,100},"KLMNOPQRST"};
 

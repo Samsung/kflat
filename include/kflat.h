@@ -761,6 +761,7 @@ struct flatten_pointer* FUNC_NAME(struct kflat* kflat, const void* ptr, uintptr_
 	do {									\
 		void* start, *end;					\
 		size_t el_cnt;						\
+		const T* __p;						\
 											\
 		bool rv = flatten_get_object((void*)_ptr, &start, &end);	\
 		if(!rv)								\
@@ -769,7 +770,7 @@ struct flatten_pointer* FUNC_NAME(struct kflat* kflat, const void* ptr, uintptr_
 		el_cnt = (long)(end - start - OFF) / SIZE;	\
 		if(el_cnt <= 0)						\
 			break;							\
-		const T* __p = (const T*)((unsigned char*)(_ptr)+OFF);	\
+		__p = (const T*)((unsigned char*)(_ptr)+OFF);	\
 		if (!KFLAT_ACCESSOR->errno) {	\
 			struct flatten_pointer* fptr = flatten_plain_type(KFLAT_ACCESSOR,__p,(el_cnt)*SIZE);	\
 			if (fptr == NULL) {	\
@@ -827,13 +828,14 @@ struct flatten_pointer* FUNC_NAME(struct kflat* kflat, const void* ptr, uintptr_
 /* AGGREGATE_* */
 #define AGGREGATE_FLATTEN_GENERIC(FULL_TYPE,TARGET,N,f,_off,n,CUSTOM_VAL,pre_f,post_f,_shift)	\
 	do {	\
+		void* _p;	\
+		const FULL_TYPE* _fp = 0;	\
 		DBGM5(AGGREGATE_FLATTEN_GENERIC,FULL_TYPE,N,f,_off,n);	\
 		DBGS("FULL_TYPE [%lx:%zu -> %lx]\n",(uintptr_t)_ptr,(size_t)_off,(uintptr_t)OFFATTRN(_off,_shift));	\
-		void* _p = (void*)OFFATTR(const FULL_TYPE*,_off);	\
+		_p = (void*)OFFATTR(const FULL_TYPE*,_off);	\
 		if (pre_f) {	\
 			_p = (*(flatten_struct_embedded_extract_t)pre_f)(_p); \
 		}	\
-		const FULL_TYPE* _fp = 0;	\
 		if (_p) _fp = (const FULL_TYPE*)( _p+_shift);	\
 		DBGTNFOMF(AGGREGATE_FLATTEN_GENERIC,FULL_TYPE,N,f,"%lx:%zu",_fp,(size_t)_off,pre_f,post_f);  \
     	if ((!KFLAT_ACCESSOR->errno)&&(ADDR_RANGE_VALID(_fp,(n)*(N)))) {	\
