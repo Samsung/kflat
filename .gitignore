@@ -9,6 +9,8 @@
 *.img
 *.tar.gz
 *.log
+*.o.ur-detected
+*.o.ur-safe
 
 modules.order
 Module.symvers
