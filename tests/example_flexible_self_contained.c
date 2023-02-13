@@ -20,6 +20,12 @@ struct flexsc_A {
 	struct flexsc_B arr[0];
 };
 
+struct flexsc_C {
+	long l;
+	const char* name;
+	unsigned long arr[0];
+};
+
 typedef struct {
 	int field;
 } flexsc_D;
@@ -42,21 +48,27 @@ struct flexsc_G {
 
 FUNCTION_DEFINE_FLATTEN_STRUCT(flexsc_B);
 FUNCTION_DEFINE_FLATTEN_STRUCT(flexsc_A,
-	AGGREGATE_FLATTEN_STRUCT_FLEXIBLE_SELF_CONTAINED(flexsc_B, sizeof(struct flexsc_B), offsetof(struct flexsc_A,arr));
+	AGGREGATE_FLATTEN_STRUCT_FLEXIBLE_SELF_CONTAINED(flexsc_B, sizeof(struct flexsc_B), arr, offsetof(struct flexsc_A,arr));
+);
+
+FUNCTION_DEFINE_FLATTEN_STRUCT(flexsc_C,
+	AGGREGATE_FLATTEN_STRING(name);
+	AGGREGATE_FLATTEN_TYPE_ARRAY_FLEXIBLE_SELF_CONTAINED(unsigned long, arr, offsetof(struct flexsc_C,arr));
 );
 
 FUNCTION_DEFINE_FLATTEN_STRUCT_TYPE(flexsc_D);
 FUNCTION_DEFINE_FLATTEN_STRUCT(flexsc_E,
-	AGGREGATE_FLATTEN_STRUCT_TYPE_FLEXIBLE_SELF_CONTAINED(flexsc_D, sizeof(flexsc_D), offsetof(struct flexsc_E,arr));
+	AGGREGATE_FLATTEN_STRUCT_TYPE_FLEXIBLE_SELF_CONTAINED(flexsc_D, sizeof(flexsc_D), arr, offsetof(struct flexsc_E,arr));
 );
 
 FUNCTION_DEFINE_FLATTEN_UNION(flexsc_F);
 FUNCTION_DEFINE_FLATTEN_STRUCT(flexsc_G,
-	AGGREGATE_FLATTEN_UNION_FLEXIBLE_SELF_CONTAINED(flexsc_F, sizeof(union flexsc_F), offsetof(struct flexsc_G,arr));
+	AGGREGATE_FLATTEN_UNION_FLEXIBLE_SELF_CONTAINED(flexsc_F, sizeof(union flexsc_F), arr, offsetof(struct flexsc_G,arr));
 );
 
 static int kflat_flexible_self_contained_test(struct kflat *kflat) {
 	struct flexsc_A *a;
+	struct flexsc_C *c;
 	struct flexsc_E *e;
 	struct flexsc_G *g;
 
@@ -66,6 +78,13 @@ static int kflat_flexible_self_contained_test(struct kflat *kflat) {
 	a->arr[0].field = 1;
 	a->arr[1].field = 0xaaddcc;
 	a->arr[2].field = 0xcafecafe;
+
+	c = kmalloc(sizeof(struct flexsc_C) + 10 * sizeof(unsigned long), GFP_KERNEL);
+	c->l = 0xBEEFBEEF;
+	c->name = "Flexible array of longs";
+	for (int i=0; i<10; ++i) {
+		c->arr[i] = ((c->l + 888*i) >> 4)% 16;
+	}
 
 	e = kmalloc(sizeof(struct flexsc_E) + 3 * sizeof(flexsc_D), GFP_KERNEL);
 	e->cnt = 3;
@@ -81,17 +100,22 @@ static int kflat_flexible_self_contained_test(struct kflat *kflat) {
 
 	FOR_ROOT_POINTER(a,
 		FLATTEN_STRUCT(flexsc_A, a);
-    );
+	);
 
-    FOR_ROOT_POINTER(e,
+	FOR_ROOT_POINTER(c,
+		FLATTEN_STRUCT(flexsc_C, c);
+	);
+
+	FOR_ROOT_POINTER(e,
 		FLATTEN_STRUCT(flexsc_E, e);
-    );
+	);
 
-    FOR_ROOT_POINTER(g,
+	FOR_ROOT_POINTER(g,
 		FLATTEN_STRUCT(flexsc_G, g);
-    );
+	);
 
 	kfree(a);
+	kfree(c);
 	kfree(e);
 	kfree(g);
 	return 0;
@@ -101,8 +125,9 @@ static int kflat_flexible_self_contained_test(struct kflat *kflat) {
 
 static int kflat_flexible_self_contained_validate(void *memory, size_t size, CFlatten flatten) {
 	struct flexsc_A *pA = (struct flexsc_A*)flatten_root_pointer_seq(flatten, 0);
-	struct flexsc_E *pE = (struct flexsc_E*)flatten_root_pointer_seq(flatten, 1);
-	struct flexsc_G *pG = (struct flexsc_G*)flatten_root_pointer_seq(flatten, 2);
+	struct flexsc_C *pC = (struct flexsc_C*)flatten_root_pointer_seq(flatten, 1);
+	struct flexsc_E *pE = (struct flexsc_E*)flatten_root_pointer_seq(flatten, 2);
+	struct flexsc_G *pG = (struct flexsc_G*)flatten_root_pointer_seq(flatten, 3);
 	
 	if(!pA->get_obj_supported)
 		return KFLAT_TEST_UNSUPPORTED;
@@ -111,6 +136,12 @@ static int kflat_flexible_self_contained_validate(void *memory, size_t size, CFl
 	ASSERT(pA->arr[0].field == 1);
 	ASSERT(pA->arr[1].field == 0xaaddcc);
 	ASSERT(pA->arr[2].field == 0xcafecafe);
+
+	ASSERT_EQ(pC->l,0xBEEFBEEF);
+	ASSERT(!strcmp(pC->name,"Flexible array of longs"));
+	for (int i=0; i<10; ++i) {
+		ASSERT_EQ(pC->arr[i],((pC->l + 888*i) >> 4)% 16);
+	}
 
 	ASSERT(pE->cnt == 3);
 	ASSERT(pE->arr[0].field == 2);
