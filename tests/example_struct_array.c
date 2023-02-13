@@ -26,6 +26,7 @@ union K {
 struct MM {
 	const char *s;
 	struct BB arrB[4];
+	union K arrK0[2];
 	long *Lx;
 	int has_s[2];
 	union K arrK[2];
@@ -53,6 +54,7 @@ FUNCTION_DEFINE_FLATTEN_UNION(K,
 FUNCTION_DEFINE_FLATTEN_STRUCT(MM,
 	AGGREGATE_FLATTEN_STRING(s);
 	AGGREGATE_FLATTEN_STRUCT_ARRAY_STORAGE(BB, arrB, 4);
+	AGGREGATE_FLATTEN_UNION_ARRAY_STORAGE(K, arrK0, 2);
 	AGGREGATE_FLATTEN_TYPE_ARRAY(long, Lx, 0);
 	AGGREGATE_FLATTEN_UNION_ARRAY_STORAGE_CUSTOM_INFO(K, arrK, 2, ATTR(has_s));
 );
@@ -67,6 +69,9 @@ static int kflat_structarray_example(struct kflat *kflat) {
 			{ 10, 20, &T[10], &c1 },
 			{ 15, 40, &T[15], &c2 },
 			{ 15, 66, NULL, NULL },
+		},
+		{
+			{.v=333333},{.v=444444}
 		},
 		0,
 		{0,1},
@@ -125,6 +130,9 @@ static int kflat_structarray_validate(void *memory, size_t size, CFlatten flatte
 	ASSERT(obM->arrB[0].pC->i == 0);
 	ASSERT(obM->arrB[1].pC->i == 1000);
 	ASSERT(obM->arrB[2].pC->i == 1000000);
+
+	ASSERT(obM->arrK0[0].v == 333333);
+	ASSERT(obM->arrK0[1].v == 444444);
 
 	ASSERT(obM->Lx == 0);
 
