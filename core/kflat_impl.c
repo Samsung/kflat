@@ -1582,7 +1582,7 @@ struct flat_node* flatten_acquire_node_for_ptr(struct kflat* kflat, const void* 
 }
 EXPORT_SYMBOL_GPL(flatten_acquire_node_for_ptr);
 
-void flatten_generic(struct kflat* kflat, void* q, struct flatten_pointer* fptr, void* p, size_t el_size, size_t count, uintptr_t custom_val, flatten_struct_t func_ptr) {
+void flatten_generic(struct kflat* kflat, void* q, struct flatten_pointer* fptr, const void* p, size_t el_size, size_t count, uintptr_t custom_val, flatten_struct_t func_ptr) {
 	int err;
 	size_t i;
 	struct flatten_pointer* flat_ptr;
@@ -1610,7 +1610,7 @@ void flatten_generic(struct kflat* kflat, void* q, struct flatten_pointer* fptr,
 		err = 0;
 
 		for (i = 0; i < count; ++i) {
-			void* target = p + i * el_size;
+			const void* target = p + i * el_size;
 			struct_inode = fixup_set_search(kflat, (uint64_t)target);
 			if (!struct_inode) {
 				struct flatten_job job = {0, };
