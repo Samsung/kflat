@@ -118,11 +118,10 @@ static int kflat_flatten_struct_storage_self_contained_unit_test(struct kflat *k
             {"999"},
         }
     };
+    struct SAS sa = { 0x34569872, {{"in_union"}}, {{"in_union2"}}, {"BADDCAFE"}, {{"0"},{"1"},{"2"},{"3"}}, "DEADBEEF" };
 
     for (int i = 0; i < 60; ++i)
         T[i] = i;
-
-    struct SAS sa = { 0x34569872, {{"in_union"}}, {{"in_union2"}}, {"BADDCAFE"}, {{"0"},{"1"},{"2"},{"3"}}, "DEADBEEF" };
 
     FOR_ROOT_POINTER(&obM,
         FLATTEN_STRUCT(MMS, &obM);
