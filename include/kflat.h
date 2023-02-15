@@ -1273,8 +1273,5 @@ struct flatten_pointer* FUNC_NAME(struct kflat* kflat, const void* ptr, uintptr_
 #define PTRNODE(PTRV)	(interval_tree_iter_first(&kflat->FLCTRL.imap_root, (uintptr_t)(PTRV), (uintptr_t)(PTRV)))
 #define KFLAT_ACCESSOR kflat
 
-/* Include wrappers for obsolete macros to support older recipes
- */
-#include "kflat_compatibility.h"
 
 #endif /* _LINUX_KFLAT_H */
