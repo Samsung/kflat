@@ -1234,6 +1234,7 @@ struct flatten_pointer* FUNC_NAME(struct kflat* kflat, const void* ptr, uintptr_
 			(rv)?(__end-__ptr+1):(__default_size);	\
 		})
 
+/* The following default macro argument implementation was based on https://stackoverflow.com/a/3048361 */
 #define __GET_MACRO_3RD_ARG(a0, a1, a2, ...) a2
 #define __GET_MACRO_4TH_ARG(a0, a1, a2, a3, ...) a3
 

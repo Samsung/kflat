@@ -32,3 +32,6 @@ the ‘__check_heap_object` function from the Linux kernel source tree
 and therefore might be distributed under GNU General Public License v.2
 or any later version.
 Please see core/kflat_impl.c file for details.
+
+The implementation of default macro arguments was based on Derek Ledbetter snippet.
+Please see include/kflat.h file for details.
