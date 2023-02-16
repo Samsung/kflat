@@ -1759,6 +1759,21 @@ static void* kasan_reset_tag(void* addr) {
 }
 #endif
 
+bool check_kfence_address(void* ptr, void** start, void** end) {
+#if LINUX_VERSION_CODE < KERNEL_VERSION(5, 12, 0)
+	// KFENCE support has been added in Linux kernel 5.12.0
+	return false;
+#else
+	if(!is_kfence_address(ptr))
+		return false;
+	
+	// KFENCE always allocates full kernel page
+	*start = (void*) ((uint64_t)ptr & PAGE_MASK);
+	*end = (void*)((uint64_t) *start + PAGE_SIZE);
+	return true;
+#endif
+}
+
 /*
  * Original implementation of kmem_cache_debug_flags can be 
  * 	found in mm/slab.h
@@ -1783,9 +1798,8 @@ static bool _flatten_get_heap_obj(struct page* page, void* ptr, void** start, vo
 	if(ptr < page_address(page))
 		return false;
 
-	if(is_kfence_address(ptr))
-		// We're unable to handle KFENCE structures/data from module code
-		return false;
+	if(check_kfence_address(ptr, start, end))
+		return true;
 
 	/*
 	* Calculate the offset between ptr and the start of the object.
@@ -1846,6 +1860,9 @@ static bool _flatten_get_heap_obj(struct slab* slab, void* ptr,
 	ptr = kasan_reset_tag(ptr);
 	if(ptr < slab_address(slab))
 		return false;
+
+	if(check_kfence_address(ptr, start, end))
+		return true;
 
 	/*
 	 * Calculate the offset between ptr and the start of the object.

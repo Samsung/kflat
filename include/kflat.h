@@ -751,7 +751,7 @@ struct flatten_pointer* FUNC_NAME(struct kflat* kflat, const void* ptr, uintptr_
 		if(!rv)								\
 			break;							\
 											\
-		el_cnt = (long)(end - start - OFF) / FLSIZE;	\
+		el_cnt = (long)(end - (void*)_ptr - OFF) / FLSIZE;	\
 		if(el_cnt <= 0)						\
 			break;							\
 		AGGREGATE_FLATTEN_GENERIC_STORAGE(FULL_TYPE, TARGET, OFF, el_cnt, CUSTOM_VAL);	\
@@ -767,7 +767,7 @@ struct flatten_pointer* FUNC_NAME(struct kflat* kflat, const void* ptr, uintptr_
 		if(!rv)								\
 			break;							\
 											\
-		el_cnt = (long)(end - start - OFF) / SIZE;	\
+		el_cnt = (long)(end - (void*)_ptr - OFF) / SIZE;	\
 		if(el_cnt <= 0)						\
 			break;							\
 		__p = (const T*)((unsigned char*)(_ptr)+OFF);	\
