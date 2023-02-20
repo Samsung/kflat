@@ -463,7 +463,11 @@ static inline size_t strmemlen(const char* s) {
 
 
 #define ATTR(f)	((_ptr)->f)
-#define OFFATTR(T,_off)	(*((T*)((unsigned char*)(_ptr)+_off)))
+/* Instead of calling 'p->member' you can access the member by its offset:
+   MOFFATTR(p,typeof(member),offsetof(typeof(*p),member))
+ */
+#define MOFFATTR(p,T,offset)	(*((T*)((unsigned char*)(p)+offset)))
+#define OFFATTR(T,_off)	MOFFATTR(_ptr,T,_off)
 #define OFFATTRN(_off,_shift) (({	\
 	void* p=*((void**)((unsigned char*)(_ptr)+_off));	\
 	void* q = 0;	\
