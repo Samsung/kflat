@@ -1,36 +1,38 @@
 /**
  * @file client_app.c
- * @author your name (you@domain.com)
- * @brief 
- * @version 0.1
- * @date 2023-02-02
- * 
- * @copyright Copyright (c) 2023
- * 
+ * @author Pawel Wieczorek (p.wieczorek@samsung.com)
+ * @brief User application presenting the content of memory dump performed
+ *      by mem_map_recipe.ko module
  */
-#include <errno.h>
+#include <cerrno>
+#include <cstdio>
+#include <cstddef>
+#include <cstdint>
+#include <cstdlib>
+#include <cstring>
+
 #include <fcntl.h>
-#include <stdio.h>
-#include <stddef.h>
-#include <stdint.h>
-#include <stdlib.h>
-#include <string.h>
 #include <unistd.h>
 #include <sys/ioctl.h>
 #include <sys/mman.h>
 
-#include <kflat_uapi.h>
 #include <unflatten.hpp>
-
-#define KFLAT_NODE "/sys/kernel/debug/kflat"
-
+#include <unordered_set>
 
 #define container_of(ptr, type, member) ({			\
   	const typeof( ((type *)0)->member ) *__mptr = (ptr);	\
   	(type *)( (char *)__mptr - offsetof(type,member) );})
 
+extern "C" {
+#include <kflat_uapi.h>
 #include "interval_tree_generic.h"
+}
 
+
+/*
+ * Data types and global constants
+ */
+const char* KFLAT_NODE = "/sys/kernel/debug/kflat";
 
 struct kdump_memory_node {
     struct rb_node rb;
@@ -50,9 +52,10 @@ struct kdump_memory_map {
 
 INTERVAL_TREE_DEFINE(struct kdump_memory_node, rb,
 		     uint64_t, __subtree_last,
-		     START, LAST, __attribute__((used)), interval_tree)
+		     START, LAST, __attribute__((used)), intervals)
 
 /*
+ * Intializes KFLAT, invokes target function and saves memory dump
  */
 void perform_dump() {
     int fd;
@@ -115,8 +118,38 @@ void perform_dump() {
     close(fd);
 }
 
+/*
+ * Set of functions extracting useful data from memory dump
+ */
 void print_kallsyms_info(struct kdump_memory_map* mem, const char* symbol) {
-    printf("\t [%s]: 0x%lx\n", symbol, 0UL);
+    uint64_t addr, phys_addr = 0;
+    char name[256], mod[256];
+    struct kdump_memory_node* node;
+
+    FILE* file = fopen("/proc/kallsyms", "rb");
+    if(file == NULL) {
+        printf("Failed to open /proc/kallsyms\n");
+        exit(1);
+    }
+
+    int ret;
+    do {
+        ret = fscanf(file, "%lx %*c %256s\t[%256s]\n", &addr, name, mod);
+        if(ret >= 2 && !strcmp(name, symbol))
+            break;
+        addr = -1;
+    } while(ret > 0);
+
+    if(addr == -1) {
+        printf("Failed to locate symbol `%s` in kallsyms\n", symbol);
+        exit(1);
+    }
+
+    node = intervals_iter_first(&mem->imap_root, addr, addr + 1);
+    if(node) {
+        phys_addr = node->phys_addr + (addr - node->start);
+    }
+    printf("\t [%s]: 0x%lx ==> 0x%lx\n", symbol, addr, phys_addr);
 }
 
 size_t calc_size_of_va_mem(struct kdump_memory_map* mem) {
@@ -137,41 +170,35 @@ size_t calc_size_of_phys_mem(struct kdump_memory_map* mem) {
     //  ignore repeating phys_addr nodes
     size_t size = 0;
     struct kdump_memory_node* node;
+    std::unordered_set<uint64_t> phys_addresses;
 
     struct rb_root* root = &mem->imap_root.rb_root;
     for(struct rb_node* p = rb_first_postorder(root); p != NULL; p = rb_next_postorder(p)) {
         node = (struct kdump_memory_node*) p;
-        if(node->phys_addr)     // TODO: ME
+        if(phys_addresses.end() == phys_addresses.find(node->phys_addr)) {
             size += node->end - node->start;
+            phys_addresses.emplace(node->phys_addr);
+        }
 	}
 
     return size;
 }
 
+/*
+ * Present human-friendly content to user
+ */
 void process_dump() {
     int ret;
-
-    CFlatten flatten = flatten_init(0);
-    if(flatten == NULL) {
-        fprintf(stderr, "Failed to initialize flatten library\n");
-        exit(1);
-    }
+    Flatten flatten;
 
     FILE* f = fopen("mem_map.bin", "r");
-    ret = flatten_load(flatten, f, NULL);
-    if(ret) {
-        fprintf(stderr, "Failed to load flattne library");
-        exit(1);
-    }
+    flatten.load(f, NULL);
 
     // Process loaded image
     struct kdump_memory_node* node;
-    struct kdump_memory_map* mem = flatten_root_pointer_named(flatten, "memory_map", NULL);
-    if(mem == NULL) {
-        fprintf(stderr, "Failed to extract root pointer from kflat image\n");
-        exit(1);
-    }
+    struct kdump_memory_map* mem = (struct kdump_memory_map*) flatten.get_named_root("memory_map", NULL);
 
+    // Print a few kernel pages
     printf("First few Kernel pages: \n");
     int i = 0;
     struct rb_root* root = &mem->imap_root.rb_root;
@@ -180,16 +207,18 @@ void process_dump() {
         printf("\t(0x%lx-0x%lx) => 0x%lx\n", node->start, node->end, node->phys_addr);
 	}
 
+    // Resolve example kallsyms symbols
     printf("\nLooking up physical address of common kernel functions:\n");
     print_kallsyms_info(mem, "__kmalloc");
     print_kallsyms_info(mem, "__memcpy");
-    print_kallsyms_info(mem, "__strcpy");
+    print_kallsyms_info(mem, "flatten_write");
 
+    // Print amount of system memory
     printf("\nTotal amount of virtual memory allocated: %zuMB\n", calc_size_of_va_mem(mem) / 1024 / 1024);
     printf("Total amount of physical memory allocated: %zuMB\n", calc_size_of_phys_mem(mem) / 1024 / 1024);
 
     // Clean up
-    flatten_deinit(flatten);
+    flatten.unload();
     fclose(f);
 }
 
