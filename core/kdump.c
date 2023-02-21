@@ -494,7 +494,7 @@ void kdump_dump_vma(struct kdump_memory_map* kdump) {
     pr_info("Start kernel memory dump...");
 
 #ifdef CONFIG_ARM64
-    kdump_walk_page_range(kdump, kernel_pgd, (~0ULL) << VA_BITS, VMALLOC_END);
+    kdump_walk_page_range(kdump, kernel_pgd, (~0ULL) << VA_BITS, ~0ULL);
 #elif CONFIG_X86_64
     kdump_walk_page_range(kdump, kernel_pgd, VMALLOC_START, MODULES_END);
 #endif
