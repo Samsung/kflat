@@ -620,11 +620,9 @@ struct flatten_pointer* FUNC_NAME(struct kflat* kflat, const void* ptr, uintptr_
 	extern struct flatten_pointer* flatten_struct_##FLTYPE(struct kflat* kflat, const void*, uintptr_t __cval, unsigned long __index, struct bqueue*);	\
 	FUNCTION_DECLARE_FLATTEN_STRUCT_ARRAY(FLTYPE)
 
-
 #define FUNCTION_DEFINE_FLATTEN_STRUCT_SELF_CONTAINED(FLTYPE,FLSIZE,...)	\
 	FUNCTION_DEFINE_FLATTEN_GENERIC_BASE(flatten_struct_##FLTYPE, struct FLTYPE, FLSIZE, __VA_ARGS__) \
 	FUNCTION_DEFINE_FLATTEN_STRUCT_ARRAY_SELF_CONTAINED(FLTYPE,FLSIZE)
-
 
 #define FUNCTION_DEFINE_FLATTEN_STRUCT_TYPE(FLTYPE,...)  \
 	FUNCTION_DEFINE_FLATTEN_GENERIC_BASE(flatten_struct_type_##FLTYPE, FLTYPE, sizeof(FLTYPE), __VA_ARGS__) \
@@ -634,11 +632,9 @@ struct flatten_pointer* FUNC_NAME(struct kflat* kflat, const void* ptr, uintptr_
 	extern struct flatten_pointer* flatten_struct_type_##FLTYPE(struct kflat* kflat, const void*, uintptr_t __cval, unsigned long __index, struct bqueue*);	\
 	FUNCTION_DECLARE_FLATTEN_STRUCT_TYPE_ARRAY(FLTYPE)
 
-
 #define FUNCTION_DEFINE_FLATTEN_STRUCT_TYPE_SELF_CONTAINED(FLTYPE,FLSIZE,...)  \
 	FUNCTION_DEFINE_FLATTEN_GENERIC_BASE(flatten_struct_type_##FLTYPE, FLTYPE, FLSIZE, __VA_ARGS__)	\
 	FUNCTION_DEFINE_FLATTEN_STRUCT_TYPE_ARRAY_SELF_CONTAINED(FLTYPE,FLSIZE)
-
 
 #define FUNCTION_DEFINE_FLATTEN_UNION(FLTYPE,...)  \
 	FUNCTION_DEFINE_FLATTEN_GENERIC_BASE(flatten_union_##FLTYPE, union FLTYPE, sizeof(union FLTYPE), __VA_ARGS__)	\
@@ -648,12 +644,6 @@ struct flatten_pointer* FUNC_NAME(struct kflat* kflat, const void* ptr, uintptr_
 	extern struct flatten_pointer* flatten_union_##FLTYPE(struct kflat* kflat, const void*, uintptr_t __cval, unsigned long __index, struct bqueue*);	\
 	FUNCTION_DECLARE_FLATTEN_UNION_ARRAY(FLTYPE)
 
-
-#define FUNCTION_DEFINE_FLATTEN_STRUCT_SELF_CONTAINED_SPECIALIZE(TAG,FLTYPE,FLSIZE,...)  \
-	FUNCTION_DEFINE_FLATTEN_GENERIC_BASE(flatten_struct_##FLTYPE##_##TAG, struct FLTYPE, FLSIZE, __VA_ARGS__)	\
-	FUNCTION_DEFINE_FLATTEN_STRUCT_ARRAY_SELF_CONTAINED_SPECIALIZE(TAG,FLTYPE,FLSIZE)
-
-
 #define FUNCTION_DEFINE_FLATTEN_UNION_SELF_CONTAINED(FLTYPE,FLSIZE,...)  \
 	FUNCTION_DEFINE_FLATTEN_GENERIC_BASE(flatten_union_##FLTYPE, union FLTYPE, FLSIZE, __VA_ARGS__)	\
 	FUNCTION_DEFINE_FLATTEN_UNION_ARRAY_SELF_CONTAINED(FLTYPE,FLSIZE)
@@ -662,6 +652,16 @@ struct flatten_pointer* FUNC_NAME(struct kflat* kflat, const void* ptr, uintptr_
 	FUNCTION_DEFINE_FLATTEN_GENERIC_BASE(flatten_struct_##FLTYPE##_##TAG, struct FLTYPE, sizeof(struct FLTYPE), __VA_ARGS__)	\
 	FUNCTION_DEFINE_FLATTEN_STRUCT_ARRAY_SPECIALIZE(TAG,FLTYPE)
 
+#define FUNCTION_DECLARE_FLATTEN_STRUCT_SPECIALIZE(TAG,FLTYPE)	\
+	extern struct flatten_pointer* flatten_struct_##FLTYPE##_##TAG(struct kflat* kflat, const void*, uintptr_t __cval, unsigned long __index, struct bqueue*);	\
+	FUNCTION_DECLARE_FLATTEN_STRUCT_ARRAY_SPECIALIZE(TAG,FLTYPE)
+
+#define FUNCTION_DEFINE_FLATTEN_STRUCT_SELF_CONTAINED_SPECIALIZE(TAG,FLTYPE,FLSIZE,...)  \
+	FUNCTION_DEFINE_FLATTEN_GENERIC_BASE(flatten_struct_##FLTYPE##_##TAG, struct FLTYPE, FLSIZE, __VA_ARGS__)	\
+	FUNCTION_DEFINE_FLATTEN_STRUCT_ARRAY_SELF_CONTAINED_SPECIALIZE(TAG,FLTYPE,FLSIZE)
+
+#define FUNCTION_DECLARE_FLATTEN_STRUCT_SELF_CONTAINED_SPECIALIZE(TAG,FLTYPE,FLSIZE)	\
+	FUNCTION_DECLARE_FLATTEN_STRUCT_SPECIALIZE(TAG,FLTYPE)
 
 /*******************************
  * FLATTEN macros
@@ -694,8 +694,15 @@ struct flatten_pointer* FUNC_NAME(struct kflat* kflat, const void* ptr, uintptr_
 	DBGM4(FLATTEN_STRUCT_ARRAY_SELF_CONTAINED,T,N,p,n);	\
 	FLATTEN_GENERIC(p, N, n, 0, flatten_struct_array_##T)
 
+#define FLATTEN_STRUCT_ARRAY_SELF_CONTAINED_SPECIALIZE(TAG,T,N,p,n)	\
+	DBGM5(FLATTEN_STRUCT_ARRAY_SELF_CONTAINED_SPECIALIZE,TAG,T,N,p,n);	\
+	FLATTEN_GENERIC(p, N, n, 0, flatten_struct_array_##T##_##TAG)
+
 #define FLATTEN_STRUCT_SELF_CONTAINED(T,N,p)	\
 	FLATTEN_STRUCT_ARRAY_SELF_CONTAINED(T,N,p,1)
+
+#define FLATTEN_STRUCT_SELF_CONTAINED_SPECIALIZE(TAG,T,N,p)	\
+	FLATTEN_STRUCT_ARRAY_SELF_CONTAINED_SPECIALIZE(TAG,T,N,p,1)
 
 #define FLATTEN_UNION_ARRAY_SELF_CONTAINED(T,N,p,n)	\
 	DBGM4(FLATTEN_UNION_ARRAY_SELF_CONTAINED,T,N,p,n);	\
