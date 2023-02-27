@@ -5,6 +5,7 @@
 #include "kflat_uapi.h"
 #include "kdump.h"
 
+#include <linux/kprobes.h>
 #include <linux/mm.h>
 #include <linux/random.h>
 #include <linux/slab.h>
@@ -125,14 +126,16 @@ struct probe_regs {
     	uint64_t r[30];
 		struct {
 			// Procedure Call Standard for the ARMv8-A
-			uint64_t arg1;		// X0
-			uint64_t arg2;		// X1
-			uint64_t arg3;		// X2
-			uint64_t arg4;		// X3
-			uint64_t arg5;		// X4
-			uint64_t arg6;		// X5
-			uint64_t arg7;		// X6
-			uint64_t arg8;		// X7
+			uint64_t arg1;			// X0
+			uint64_t arg2;			// X1
+			uint64_t arg3;			// X2
+			uint64_t arg4;			// X3
+			uint64_t arg5;			// X4
+			uint64_t arg6;			// X5
+			uint64_t arg7;			// X6
+			uint64_t arg8;			// X7
+			uint64_t _unused[8];	// X8..x15
+			uint64_t kflat_ptr;		// X16 (stores pointer to KFLAT structure)
 		} __packed;
 	};
     uint64_t NZCV;
@@ -148,7 +151,8 @@ struct probe_regs {
         }  __packed;
         struct {
 			// SystemV AMD64 ABI
-            uint64_t _unused[2];	// RAX, RBX
+			uint64_t kflat_ptr;		// RAX (stores pointer to KFLAT structure)
+            uint64_t _unused;		// RBX
 			uint64_t arg4;			// RCX
             uint64_t arg3;      	// RDX
             uint64_t arg1;      	// RDI
@@ -163,10 +167,13 @@ struct probe_regs {
 #endif
 
 struct probe {
+	struct kprobe 		kprobe;
 	struct mutex		lock;
-	int 				triggered;
+
+	bool				is_armed;
+	bool 				triggered;
 	uint64_t 			return_ip;
-	struct kprobe* 		kprobe;
+	pid_t				callee_filter;
 };
 
 struct kflat_recipe {
@@ -183,20 +190,15 @@ enum kflat_mode {
 };
 
 struct kflat {
-	/*
-	 * Reference counter. We keep one for:
-	 *  - opened file descriptor
-	 *  - task with enabled coverage (we can't unwire it from another task)
-	 */
 	atomic_t			refcount;
-	/* The lock protects mode, size, area and t. */
 	struct mutex		lock;
 	enum kflat_mode		mode;
-	/* Size of arena (in bytes for KFLAT_MODE_ENABLED). */
+
+	/* Size of arena */
 	unsigned long		size;
 	/* Coverage buffer shared with user space. */
 	void				*area;
-	/* Task for which we collect coverage, or NULL. */
+
 	struct FLCONTROL 	FLCTRL;
 	struct rb_root		root_addr_set;
 	int 				errno;
@@ -269,6 +271,9 @@ int kflat_recipe_register(struct kflat_recipe* recipe);
 int kflat_recipe_unregister(struct kflat_recipe* recipe);
 struct kflat_recipe* kflat_recipe_get(char* name);
 void kflat_recipe_put(struct kflat_recipe* recipe);
+
+void kflat_get(struct kflat *kflat);
+void kflat_put(struct kflat *kflat);
 
 
 static inline void kflat_bqueue_free(const void* p) {

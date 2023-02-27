@@ -30,11 +30,11 @@ int kflat_ioctl_test(struct kflat *kflat, unsigned int cmd, unsigned long arg);
 /*******************************************************
  * REFCOUNTS
  *******************************************************/
-static void kflat_get(struct kflat *kflat) {
+void kflat_get(struct kflat *kflat) {
 	atomic_inc(&kflat->refcount);
 }
 
-static void kflat_put(struct kflat *kflat) {
+void kflat_put(struct kflat *kflat) {
 	if (atomic_dec_and_test(&kflat->refcount)) {
 		kflat_recipe_put(kflat->recipe);
 		kflat->recipe = NULL;
@@ -136,104 +136,6 @@ exit:
 EXPORT_SYMBOL_GPL(kflat_dbg_printf);
 
 /*******************************************************
- * CLIENTS REGISTRY
- *  The simple data structure for storing per user
- *  information
- *******************************************************/
-LIST_HEAD(kflat_clients_registry);
-DEFINE_SPINLOCK(kflat_clients_registry_lock);
-
-struct kflat_client {
-	struct list_head list;
-	struct kflat* kflat;
-};
-
-static int kflat_register(struct kflat* kflat) {
-	int ret = 0;
-	struct kflat_client* entry, *new_entry;
-	unsigned long flags;
-
-	new_entry = kmalloc(sizeof *new_entry, GFP_KERNEL);
-	if(new_entry == NULL)
-		return -ENOMEM;
-	
-	spin_lock_irqsave(&kflat_clients_registry_lock, flags);
-
-	// Check for PID duplicates
-	list_for_each_entry(entry, &kflat_clients_registry, list) {
-		if(entry->kflat->pid == kflat->pid) {
-			pr_err("cannot register the same PID twice");
-			ret = -EBUSY;
-			goto exit;
-		}
-	}
-
-	new_entry->kflat = kflat;
-	list_add(&new_entry->list, &kflat_clients_registry);
-
-exit:
-	spin_unlock_irqrestore(&kflat_clients_registry_lock, flags);
-	if(ret != 0)
-		// If an error occurred, `entry` buffer hasn't been used
-		kfree(new_entry);
-	return ret;
-}
-
-static int kflat_unregister(struct kflat* kflat) {
-	int ret = 0;
-	struct kflat_client* entry = NULL;
-	unsigned long flags;
-	
-	spin_lock_irqsave(&kflat_clients_registry_lock, flags);
-	list_for_each_entry(entry, &kflat_clients_registry, list) {
-		if(entry->kflat == kflat) {
-			list_del(&entry->list);
-			goto exit;
-		}
-	}
-	ret = -EINVAL;
-	entry = NULL;
-
-exit:
-	spin_unlock_irqrestore(&kflat_clients_registry_lock, flags);
-	if(entry != NULL)
-		kfree(entry);
-	return ret;
-}
-
-struct kflat* _kflat_access_current(void) {
-	pid_t current_pid;
-	struct kflat_client* entry;
-	unsigned long flags;
-
-	current_pid = get_current()->pid;
-	spin_lock_irqsave(&kflat_clients_registry_lock, flags);
-	list_for_each_entry(entry, &kflat_clients_registry, list) {
-		if(entry->kflat->pid == current_pid) {
-			goto exit;
-		}
-	}
-	entry = NULL;
-
-exit:
-	spin_unlock_irqrestore(&kflat_clients_registry_lock, flags);
-	return entry != NULL ? entry->kflat : NULL;
-}
-
-struct kflat* kflat_get_current(void) {
-	struct kflat* kflat = _kflat_access_current();
-	if(kflat != NULL)
-		kflat_get(kflat);
-	return kflat;
-}
-
-void kflat_put_current(struct kflat* kflat) {
-	if(kflat != NULL)
-		kflat_put(kflat);
-}
-
-
-/*******************************************************
  * STOP_MACHINE SUPPORT
  *  Some structures that user wishes to dump with kflat
  *  may be heavily used by kernel. In such cases, there's
@@ -295,18 +197,21 @@ asmlinkage __used uint64_t probing_delegate(struct probe_regs* regs) {
 	int err;
 	uint64_t return_addr;
 	struct kflat* kflat;
-	struct probe* probe_priv;
 
 	pr_info("flatten started");
 
-	// Use _kflat_access_current, because refcount was already incremented
-	//  in probing_pre_handler function.
-	kflat = _kflat_access_current();
+	// Extract pointer to KFLAT structure provided by `probing_pre_handler`
+	kflat = (struct kflat*) regs->kflat_ptr;
 	if(kflat == NULL)
 		BUG();
-	
-	probe_priv = &kflat->probing;
-	probe_priv->triggered = 1;
+
+	// Make sure this isn't atomic context. Kprobe might have been attached to 
+	//  interrupt function
+	if(in_atomic()) {
+		pr_err("This is still an atomic context. Attaching to a non-preemtible code is not supported");
+		kflat->errno = EFAULT;
+		goto probing_exit;
+	}
 
 	flatten_init(kflat);
 
@@ -327,12 +232,12 @@ asmlinkage __used uint64_t probing_delegate(struct probe_regs* regs) {
 	}
 	flatten_fini(kflat);
 
+probing_exit:
 	// Prepare for return
-	probing_disarm(probe_priv);
-	return_addr = READ_ONCE(probe_priv->return_ip);
+	probing_disarm(kflat);
+	return_addr = READ_ONCE(kflat->probing.return_ip);
 
-	kflat_put_current(kflat);
-	probe_priv = NULL;
+	kflat_put(kflat);
 
 	if(kflat->skip_function_body) {
 		pr_info("flatten finished - returning to PARENT function");
@@ -398,7 +303,7 @@ static int kflat_open(struct inode *inode, struct file *filep) {
 	atomic_set(&kflat->refcount, 1);
 
 	mutex_init(&kflat->lock);
-	probing_init(&kflat->probing);
+	probing_init(kflat);
 	kflat->FLCTRL.fixup_set_root = RB_ROOT_CACHED;
 	kflat->FLCTRL.imap_root = RB_ROOT_CACHED;
 	filep->private_data = kflat;
@@ -451,16 +356,8 @@ static int kflat_ioctl_locked(struct kflat *kflat, unsigned int cmd,
 			kflat_recipe_put(kflat->recipe);
 		kflat->recipe = recipe;
 
-		ret = probing_arm(&kflat->probing, kflat->recipe->symbol, kflat->pid);
+		ret = probing_arm(kflat, kflat->recipe->symbol, kflat->pid);
 		if(ret) {
-			kflat_recipe_put(kflat->recipe);
-			kflat->recipe = NULL;
-			return ret;
-		}
-
-		ret = kflat_register(kflat);
-		if(ret) {
-			probing_disarm(&kflat->probing);
 			kflat_recipe_put(kflat->recipe);
 			kflat->recipe = NULL;
 			return ret;
@@ -474,8 +371,7 @@ static int kflat_ioctl_locked(struct kflat *kflat, unsigned int cmd,
 			return -EINVAL;
 		kflat->mode = KFLAT_MODE_DISABLED;
 		
-		probing_disarm(&kflat->probing);
-		kflat_unregister(kflat);
+		probing_disarm(kflat);
 
 		args.disable.size = *(size_t*)kflat->area  + sizeof(size_t);
 		args.disable.invoked = args.disable.size > sizeof(size_t);
@@ -597,10 +493,8 @@ static int kflat_mmap(struct file* filep, struct vm_area_struct* vma) {
 static int kflat_close(struct inode *inode, struct file *filep) {
 	struct kflat* kflat = filep->private_data;
 
-	if(kflat->mode != KFLAT_MODE_DISABLED) {
-		probing_disarm(&kflat->probing);
-		kflat_unregister(kflat);
-	}
+	if(kflat->mode != KFLAT_MODE_DISABLED)
+		probing_disarm(kflat);
 	kflat_put(kflat);
 	return 0;
 }

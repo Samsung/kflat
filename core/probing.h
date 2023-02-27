@@ -5,6 +5,9 @@
  * Interface for instrumenting Linux kernel with Kprobe subsystem
  */
 
+#ifndef _LINUX_PROBING_H
+#define _LINUX_PROBING_H
+
 #include <linux/mutex.h>
 #include <linux/kprobes.h>
 
@@ -18,7 +21,9 @@
 /*
  * Exported functions
  */
-void probing_init(struct probe* probing);
-int probing_arm(struct probe* probing, const char* symbol, pid_t callee);
-void probing_disarm(struct probe* probing);
+void probing_init(struct kflat* kflat);
+int probing_arm(struct kflat* kflat, const char* symbol, pid_t callee);
+void probing_disarm(struct kflat* kflat);
 void* probing_get_kallsyms(void);
+
+#endif

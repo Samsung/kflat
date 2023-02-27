@@ -35,14 +35,26 @@ extern struct kflat* kflat_get_current(void);       // FIXME
  *******************************************************/
 static int probing_pre_handler(struct kprobe *p, struct pt_regs *regs) {
     struct kflat* kflat;
+    struct probe* probe;
 
     PROBING_DEBUG("kprobe entry");
 
-    kflat = kflat_get_current();
-    if(kflat == NULL)
+    kflat = container_of(p, struct kflat, probing.kprobe);
+    probe = &kflat->probing;
+    if(probe->triggered) {
+        PROBING_DEBUG("probe has been already triggered");
         return 0;
+    }
+    probe->triggered = true;
 
-    PROBING_DEBUG("callee pid match - deploying delegate");
+    if(probe->callee_filter > 0) {
+        if(get_current()->pid != probe->callee_filter)
+            return 0;
+        PROBING_DEBUG("callee pid match - deploying delegate");
+    } else
+        PROBING_DEBUG("ignoring pid");
+
+    kflat_get(kflat);
 
 #ifdef CONFIG_X86_64
     /* Kinda hacky. Kprobes in Linux kernel works by overwriting the code
@@ -56,6 +68,12 @@ static int probing_pre_handler(struct kprobe *p, struct pt_regs *regs) {
      */
     kflat->probing.return_ip = regs->ip - 1;
     regs->ip = (u64) raw_probing_delegate;
+
+    /* We're saving pointer to KFLAT structure associated with this Kprobe into 
+     *  temporary register RAX, that is later also used in probing_x86.s to return
+     *  to intercepted function code.
+     */
+    regs->rax = kflat;
 #endif
 
 #ifdef CONFIG_ARM64
@@ -69,6 +87,10 @@ static int probing_pre_handler(struct kprobe *p, struct pt_regs *regs) {
      */
     kflat->probing.return_ip = regs->pc;
     regs->pc = (u64) raw_probing_delegate;
+
+    /* Similarly to x86 variant, except in here we're using temporary register X16
+     */
+    regs->regs[16] = (u64) kflat;
 #endif
 
     return 1;
@@ -83,27 +105,24 @@ static void probing_post_handler(struct kprobe* p, struct pt_regs* regs, unsigne
     return;
 }
 
-void probing_init(struct probe* probing) {
+void probing_init(struct kflat* kflat) {
+    struct probe* probing = &kflat->probing;
     memset(probing, 0, sizeof(*probing));
     mutex_init(&probing->lock);
 }
 
-int probing_arm(struct probe* probing, const char* symbol, pid_t callee) {
+int probing_arm(struct kflat* kflat, const char* symbol, pid_t callee) {
     int ret = 0;
-    struct kprobe* kprobe;
+    struct probe* probing = &kflat->probing;
+    struct kprobe* kprobe = &kflat->probing.kprobe;
 
     mutex_lock(&probing->lock);
-    if(probing->kprobe != NULL) {
+    if(probing->is_armed) {
         pr_err("failed to arm new kprobe - already armed");
         ret = -EAGAIN;
         goto exit;
     }
-
-    kprobe = kmalloc(sizeof(*kprobe), GFP_KERNEL);
-    if(kprobe == NULL) {
-        ret = -ENOMEM;
-        goto exit;
-    }
+    probing->callee_filter = callee;
 
     memset(kprobe, 0, sizeof(*kprobe));
     kprobe->symbol_name = symbol;
@@ -117,8 +136,8 @@ int probing_arm(struct probe* probing, const char* symbol, pid_t callee) {
         goto exit;
     }
 
-    probing->kprobe = kprobe;
     probing->triggered = 0;
+    probing->is_armed = true;
     
 exit:
     mutex_unlock(&probing->lock);
@@ -126,16 +145,16 @@ exit:
 }
 NOKPROBE_SYMBOL(probing_arm);
 
-void probing_disarm(struct probe* probing) {
+void probing_disarm(struct kflat* kflat) {
+    struct probe* probing = &kflat->probing;
     mutex_lock(&probing->lock);
 
-    if(probing->kprobe == NULL)
+    if(!probing->is_armed)
         goto exit;
     
     probing->triggered = 0;
-    unregister_kprobe(probing->kprobe);
-    kfree(probing->kprobe);
-    probing->kprobe = NULL;
+    unregister_kprobe(&probing->kprobe);
+    probing->is_armed = false;
 
 exit:
     mutex_unlock(&probing->lock);
