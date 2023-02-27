@@ -477,14 +477,16 @@ static void kdump_walk_page_range(struct kdump_memory_map* kdump, pgd_t* swapper
 
     while(start < end) {
         size = walk_addr(swapper_pgd, start, &page);
-        if(page == NULL || !kdump_is_phys_in_ram(page_to_phys(page))) {
-            start += size;
-            continue;
+        
+        if(page != NULL && kdump_is_phys_in_ram(page_to_phys(page))) {
+            ret = kdump_tree_add_range(kdump, start, start + size - 1, page_to_phys(page));
+            if(ret)
+                WARN_ONCE(1, "Kflat: kdump_tree_add_range managed to fail somehow");
         }
 
-        ret = kdump_tree_add_range(kdump, start, start + size - 1, page_to_phys(page));
-        if(ret)
-            WARN_ONCE(1, "Kflat: kdump_tree_add_range managed to fail somehow");
+        // Catch pointer overflow
+        if(start + size < start)
+            break;
         start += size;
     }
 }
