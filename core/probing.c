@@ -16,8 +16,8 @@
 /*******************************************************
  * DEBUG MACROS
  *******************************************************/
-#ifdef PROBING_ENABLE_DEBUG
-#define PROBING_DEBUG(MSG, ...)      printk(KERN_DEBUG "kflat-probing: " MSG, ##__VA_ARGS__)
+#if PROBING_ENABLE_DEBUG
+#define PROBING_DEBUG(MSG, ...)      printk(KERN_DEBUG "kflat-probing[%d]: " MSG, current->pid, ##__VA_ARGS__)
 #else
 #define PROBING_DEBUG(MSG, ...)
 #endif
@@ -40,21 +40,26 @@ static int probing_pre_handler(struct kprobe *p, struct pt_regs *regs) {
     PROBING_DEBUG("kprobe entry");
 
     kflat = container_of(p, struct kflat, probing.kprobe);
+    kflat_get(kflat);
     probe = &kflat->probing;
-    if(probe->triggered) {
-        PROBING_DEBUG("probe has been already triggered");
-        return 0;
-    }
-    probe->triggered = true;
 
+    // Apply PID filter
     if(probe->callee_filter > 0) {
-        if(get_current()->pid != probe->callee_filter)
+        if(get_current()->pid != probe->callee_filter) {
+            kflat_put(kflat);
             return 0;
+        }
         PROBING_DEBUG("callee pid match - deploying delegate");
     } else
         PROBING_DEBUG("ignoring pid");
 
-    kflat_get(kflat);
+    // TODO: Switch to atomic here
+    if(probe->triggered) {
+        PROBING_DEBUG("probe has been already triggered");
+        kflat_put(kflat);
+        return 0;
+    }
+    probe->triggered = true;
 
 #ifdef CONFIG_X86_64
     /* Kinda hacky. Kprobes in Linux kernel works by overwriting the code
