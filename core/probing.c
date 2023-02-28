@@ -27,7 +27,6 @@
  * EXTERNAL FUNCTIONS
  *******************************************************/
 extern void raw_probing_delegate(void);
-extern struct kflat* kflat_get_current(void);       // FIXME
 
 
 /*******************************************************
@@ -76,7 +75,7 @@ static int probing_pre_handler(struct kprobe *p, struct pt_regs *regs) {
      *  temporary register RAX, that is later also used in probing_x86.s to return
      *  to intercepted function code.
      */
-    regs->rax = kflat;
+    regs->ax = (unsigned long) kflat;
 #endif
 
 #ifdef CONFIG_ARM64
