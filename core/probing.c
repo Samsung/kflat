@@ -53,13 +53,11 @@ static int probing_pre_handler(struct kprobe *p, struct pt_regs *regs) {
     } else
         PROBING_DEBUG("ignoring pid");
 
-    // TODO: Switch to atomic here
-    if(probe->triggered) {
+    if(atomic_cmpxchg(&probe->triggered, 0, 1) == 1) {
         PROBING_DEBUG("probe has been already triggered");
         kflat_put(kflat);
         return 0;
     }
-    probe->triggered = true;
 
 #ifdef CONFIG_X86_64
     /* Kinda hacky. Kprobes in Linux kernel works by overwriting the code
@@ -141,7 +139,7 @@ int probing_arm(struct kflat* kflat, const char* symbol, pid_t callee) {
         goto exit;
     }
 
-    probing->triggered = 0;
+    atomic_set(&probing->triggered, 0);
     probing->is_armed = true;
     
 exit:
@@ -157,7 +155,7 @@ void probing_disarm(struct kflat* kflat) {
     if(!probing->is_armed)
         goto exit;
     
-    probing->triggered = 0;
+    atomic_set(&probing->triggered, 0);
     unregister_kprobe(&probing->kprobe);
     probing->is_armed = false;
 

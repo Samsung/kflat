@@ -170,8 +170,8 @@ struct probe {
 	struct kprobe 		kprobe;
 	struct mutex		lock;
 
+	atomic_t			triggered;
 	bool				is_armed;
-	bool 				triggered;
 	uint64_t 			return_ip;
 	pid_t				callee_filter;
 };
