@@ -7,6 +7,7 @@
 #include "common.h"
 
 struct mere_pointers {
+	int detect_obj_supported;
 	void* a;
 	void* b;
 	void* c;
@@ -31,6 +32,12 @@ static int kflat_flatten_detect_objsize_unit_test(struct kflat *kflat) {
 	struct mere_pointers ptrs = {};
 	unsigned long stack_long = 0xD0D0CACA;
 
+#ifndef KFLAT_GET_OBJ_SUPPORT
+	ptrs.detect_obj_supported = false;
+#else
+	ptrs.detect_obj_supported = true;
+#endif
+
 	ptrs.a = kmalloc(40, GFP_KERNEL);
 	for (int i=0; i<40; ++i) {
 		((unsigned char*)ptrs.a)[i] = 3*i;
@@ -50,6 +57,9 @@ static int kflat_flatten_detect_objsize_unit_test(struct kflat *kflat) {
 static int kflat_flatten_detect_objsize_unit_validate(void *memory, size_t size, CFlatten flatten) {
 	
 	struct mere_pointers *ptrs = (struct mere_pointers *)flatten_root_pointer_seq(flatten, 0);
+
+	if(!ptrs->detect_obj_supported)
+		return KFLAT_TEST_UNSUPPORTED;
 
 	for (int i=0; i<40; ++i) {
 		ASSERT_EQ(((unsigned char*)ptrs->a)[i],3*i);
