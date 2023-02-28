@@ -67,33 +67,7 @@ struct blstream* binary_stream_append(struct kflat* kflat, const void* data, siz
 EXPORT_SYMBOL_GPL(binary_stream_append);
 
 
-struct blstream* binary_stream_append_reserve(struct kflat* kflat, size_t size) {
-	struct blstream* v = kflat_zalloc(kflat,sizeof(struct blstream),1);
-	if (v==0) return 0;
-	v->data = 0;
-	v->size = size;
-	if (!kflat->FLCTRL.bhead) {
-		kflat->FLCTRL.bhead = v;
-		kflat->FLCTRL.btail = v;
-    }
-    else {
-        v->prev = kflat->FLCTRL.btail;
-        kflat->FLCTRL.btail->next = v;
-        kflat->FLCTRL.btail = kflat->FLCTRL.btail->next;
-    }
-    return v;
-}
-
-struct blstream* binary_stream_update(struct kflat* kflat, const void* data, size_t size, struct blstream* where) {
-	void* m = kflat_zalloc(kflat,size,1);
-	if (m==0) return 0;
-	where->data = m;
-	memcpy(where->data,data,size);
-	return where;
-}
-
-
-struct blstream* binary_stream_insert_front(struct kflat* kflat, const void* data, size_t size, struct blstream* where) {
+static struct blstream* binary_stream_insert_front(struct kflat* kflat, const void* data, size_t size, struct blstream* where) {
 	struct blstream* v = create_binary_stream_element(kflat,size);
 	if (v==0) return 0;
 	memcpy(v->data,data,size);
@@ -108,26 +82,9 @@ struct blstream* binary_stream_insert_front(struct kflat* kflat, const void* dat
 	where->prev = v;
 	return v;
 }
-EXPORT_SYMBOL_GPL(binary_stream_insert_front);
 
-struct blstream* binary_stream_insert_front_reserve(struct kflat* kflat, size_t size, struct blstream* where) {
-	struct blstream* v = kflat_zalloc(kflat,sizeof(struct blstream),1);
-	if (v==0) return 0;
-	v->data = 0;
-	v->size = size;
-	v->next = where;
-	v->prev = where->prev;
-	if (where->prev) {
-		where->prev->next = v;
-	}
-	else {
-		kflat->FLCTRL.bhead = v;
-	}
-	where->prev = v;
-	return v;
-}
 
-struct blstream* binary_stream_insert_back(struct kflat* kflat, const void* data, size_t size, struct blstream* where) {
+static struct blstream* binary_stream_insert_back(struct kflat* kflat, const void* data, size_t size, struct blstream* where) {
 	struct blstream* v = create_binary_stream_element(kflat,size);
 	if (v==0) return 0;
 	memcpy(v->data,data,size);
@@ -142,26 +99,9 @@ struct blstream* binary_stream_insert_back(struct kflat* kflat, const void* data
 	where->next = v;
 	return v;
 }
-EXPORT_SYMBOL_GPL(binary_stream_insert_back);
 
-struct blstream* binary_stream_insert_back_reserve(struct kflat* kflat, size_t size, struct blstream* where) {
-	struct blstream* v = kflat_zalloc(kflat,sizeof(struct blstream),1);
-	if (v==0) return 0;
-	v->data = 0;
-	v->size = size;
-	v->next = where->next;
-	v->prev = where;
-	if (where->next) {
-		where->next->prev = v;
-	}
-	else {
-		kflat->FLCTRL.btail = v;
-	}
-	where->next = v;
-	return v;
-}
 
-int binary_stream_calculate_index(struct kflat* kflat) {
+static int binary_stream_calculate_index(struct kflat* kflat) {
 	struct blstream* p = kflat->FLCTRL.bhead;
 	size_t index=0;
     while(p) {
@@ -193,7 +133,7 @@ int binary_stream_calculate_index(struct kflat* kflat) {
     return 0;
 }
 
-void binary_stream_destroy(struct kflat* kflat) {
+static void binary_stream_destroy(struct kflat* kflat) {
 	kflat->FLCTRL.btail = kflat->FLCTRL.bhead;
     while(kflat->FLCTRL.btail) {
     	struct blstream* p = kflat->FLCTRL.btail;
@@ -203,26 +143,13 @@ void binary_stream_destroy(struct kflat* kflat) {
     }
 }
 
-static void binary_stream_element_print(struct blstream* p) {
-	kflat_dbg_printf("(%zu)(%zu)[%zu]{%lx}[...]\n",p->index,p->alignment,p->size,(unsigned long)p);
-}
-
-void binary_stream_element_print_data(struct blstream* p) {
-	size_t i;
-	flat_infos("(%zu)(%zu)[%zu]{%lx}[ ",p->index,p->alignment,p->size,(unsigned long)p);
-	for (i=0; i<p->size; ++i) {
-		flat_infos("%02x ",((unsigned char*)(p->data))[i]);
-	}
-	flat_infos("]\n");
-}
-
 static int binary_stream_element_write(struct kflat* kflat, struct blstream* p, size_t* wcounter_p) {
 
 	FLATTEN_WRITE_ONCE((unsigned char*)(p->data),p->size,wcounter_p);
 	return 0;
 }
 
-void binary_stream_print(struct kflat* kflat) {
+static void binary_stream_print(struct kflat* kflat) {
 	struct blstream* cp;
 	size_t total_size = 0;
 
@@ -231,13 +158,14 @@ void binary_stream_print(struct kflat* kflat) {
     while(cp) {
     	struct blstream* p = cp;
     	cp = cp->next;
-    	binary_stream_element_print(p);
+    	
+		kflat_dbg_printf("(%zu)(%zu)[%zu]{%lx}[...]\n",p->index,p->alignment,p->size,(unsigned long)p);
     	total_size+=p->size;
     }
     kflat_dbg_printf("Total size: %zu\n\n",total_size);
 }
 
-size_t binary_stream_write(struct kflat* kflat, size_t* wcounter_p) {
+static size_t binary_stream_write(struct kflat* kflat, size_t* wcounter_p) {
 	int err;
 	struct blstream* cp = kflat->FLCTRL.bhead;
     while(cp) {
@@ -250,7 +178,7 @@ size_t binary_stream_write(struct kflat* kflat, size_t* wcounter_p) {
     return 0;
 }
 
-size_t binary_stream_size(struct kflat* kflat) {
+static size_t binary_stream_size(struct kflat* kflat) {
 
 	struct blstream* cp = kflat->FLCTRL.bhead;
 	size_t total_size = 0;
@@ -262,7 +190,7 @@ size_t binary_stream_size(struct kflat* kflat) {
     return total_size;
 }
 
-void binary_stream_update_pointers(struct kflat* kflat) {
+static void binary_stream_update_pointers(struct kflat* kflat) {
 	int count = 0;
 	size_t size_to_cpy, __ptr_offset;
 	struct blstream* __storage;
@@ -326,23 +254,11 @@ void bqueue_destroy(struct bqueue* q) {
 }
 EXPORT_SYMBOL_GPL(bqueue_destroy);
 
-int bqueue_empty(struct bqueue* q) {
+static int bqueue_empty(struct bqueue* q) { return q->size == 0; }
 
-    return q->size == 0;
-}
-EXPORT_SYMBOL_GPL(bqueue_empty);
+static size_t bqueue_size(struct bqueue* q) { return q->size; }
 
-size_t bqueue_size(struct bqueue* q) {
-
-    return q->size;
-}
-EXPORT_SYMBOL_GPL(bqueue_size);
-
-unsigned long bqueue_el_count(struct bqueue* q) {
-
-	return q->el_count;
-}
-EXPORT_SYMBOL_GPL(bqueue_el_count);
+static unsigned long bqueue_el_count(struct bqueue* q) { return q->el_count; }
 
 int bqueue_push_back(struct kflat* kflat, struct bqueue* q, const void* m, size_t s) {
 
@@ -372,7 +288,7 @@ int bqueue_push_back(struct kflat* kflat, struct bqueue* q, const void* m, size_
 }
 EXPORT_SYMBOL_GPL(bqueue_push_back);
 
-int bqueue_pop_front(struct bqueue* q, void* m, size_t s) {
+static int bqueue_pop_front(struct bqueue* q, void* m, size_t s) {
 
 	size_t copied = 0;
 
@@ -401,8 +317,11 @@ int bqueue_pop_front(struct bqueue* q, void* m, size_t s) {
 
     return 0;
 }
-EXPORT_SYMBOL_GPL(bqueue_pop_front);
 
+
+/*******************************************************
+ * FIXUP set
+ ******************************************************/
 #define ADDR_KEY(p)	((((p)->inode)?((p)->inode->start):0) + (p)->offset)
 
 static struct fixup_set_node* create_fixup_set_node_element(struct kflat* kflat, struct flat_node* node, size_t offset, struct flatten_pointer* ptr) {
@@ -843,7 +762,7 @@ int fixup_set_insert_fptr_force_update(struct kflat* kflat, struct flat_node* no
 }
 EXPORT_SYMBOL_GPL(fixup_set_insert_fptr_force_update);
 
-void fixup_set_print(struct kflat* kflat) {
+static void fixup_set_print(struct kflat* kflat) {
 	struct rb_node * p = rb_first(&kflat->FLCTRL.fixup_set_root.rb_root);
 	kflat_dbg_printf("# Fixup set\n");
 	kflat_dbg_printf("[\n");
@@ -885,7 +804,7 @@ void fixup_set_print(struct kflat* kflat) {
 	kflat_dbg_printf("]\n\n");
 }
 
-int fixup_set_write(struct kflat* kflat, size_t* wcounter_p) {
+static int fixup_set_write(struct kflat* kflat, size_t* wcounter_p) {
 	struct rb_node * p = rb_first(&kflat->FLCTRL.fixup_set_root.rb_root);
 	while(p) {
     	struct fixup_set_node* node = (struct fixup_set_node*)p;
@@ -898,7 +817,7 @@ int fixup_set_write(struct kflat* kflat, size_t* wcounter_p) {
     return 0;
 }
 
-int fixup_set_fptr_write(struct kflat* kflat, size_t* wcounter_p) {
+static int fixup_set_fptr_write(struct kflat* kflat, size_t* wcounter_p) {
 	struct rb_node * p = rb_first(&kflat->FLCTRL.fixup_set_root.rb_root);
 	while(p) {
     	struct fixup_set_node* node = (struct fixup_set_node*)p;
@@ -911,7 +830,7 @@ int fixup_set_fptr_write(struct kflat* kflat, size_t* wcounter_p) {
     return 0;
 }
 
-size_t fixup_fptr_info_count(struct kflat* kflat) {
+static size_t fixup_fptr_info_count(struct kflat* kflat) {
 	char func_symbol[128];
 	size_t symbol_len, func_ptr, count = sizeof(size_t);
 
@@ -929,7 +848,7 @@ size_t fixup_fptr_info_count(struct kflat* kflat) {
 	return count;
 }
 
-int fixup_set_fptr_info_write(struct kflat* kflat, size_t* wcounter_p) {
+static int fixup_set_fptr_info_write(struct kflat* kflat, size_t* wcounter_p) {
 	char func_symbol[128];
 	size_t symbol_len, func_ptr, orig_ptr;
 	struct rb_node* p;
@@ -953,7 +872,7 @@ int fixup_set_fptr_info_write(struct kflat* kflat, size_t* wcounter_p) {
 	return 0;
 }
 
-size_t mem_fragment_index_count(struct kflat* kflat) {
+static size_t mem_fragment_index_count(struct kflat* kflat) {
 
 	struct rb_node * p = rb_first(&kflat->FLCTRL.imap_root.rb_root);
 	size_t mcount = 0;
@@ -968,7 +887,7 @@ size_t mem_fragment_index_count(struct kflat* kflat) {
 	return mcount;
 }
 
-int mem_fragment_index_write(struct kflat* kflat, size_t* wcounter_p) {
+static int mem_fragment_index_write(struct kflat* kflat, size_t* wcounter_p) {
 
 	struct rb_node * p = rb_first(&kflat->FLCTRL.imap_root.rb_root);
 	size_t index = 0;
@@ -999,7 +918,7 @@ int mem_fragment_index_write(struct kflat* kflat, size_t* wcounter_p) {
 	return 0;
 }
 
-int mem_fragment_index_debug_print(struct kflat* kflat) {
+static int mem_fragment_index_debug_print(struct kflat* kflat) {
 
 	struct rb_node * p = rb_first(&kflat->FLCTRL.imap_root.rb_root);
 	size_t index = 0;
@@ -1027,7 +946,7 @@ int mem_fragment_index_debug_print(struct kflat* kflat) {
 	return 0;
 }
 
-size_t fixup_set_count(struct kflat* kflat) {
+static size_t fixup_set_count(struct kflat* kflat) {
 	struct rb_node * p = rb_first(&kflat->FLCTRL.fixup_set_root.rb_root);
 	size_t count=0;
 	while(p) {
@@ -1040,7 +959,7 @@ size_t fixup_set_count(struct kflat* kflat) {
     return count;
 }
 
-size_t fixup_set_fptr_count(struct kflat* kflat) {
+static size_t fixup_set_fptr_count(struct kflat* kflat) {
 	struct rb_node * p = rb_first(&kflat->FLCTRL.fixup_set_root.rb_root);
 	size_t count=0;
 	while(p) {
@@ -1053,7 +972,7 @@ size_t fixup_set_fptr_count(struct kflat* kflat) {
     return count;
 }
 
-void fixup_set_destroy(struct kflat* kflat) {
+static void fixup_set_destroy(struct kflat* kflat) {
 	struct rb_node * p = rb_first(&kflat->FLCTRL.fixup_set_root.rb_root);
 	while(p) {
 		struct fixup_set_node* node = (struct fixup_set_node*)p;
@@ -1064,6 +983,61 @@ void fixup_set_destroy(struct kflat* kflat) {
 		}
 		kflat_free(node);
 	};
+}
+
+/*******************************************************
+ * Root Addr set
+ ******************************************************/
+static struct root_addr_set_node* root_addr_set_search(struct kflat* kflat, const char* name) {
+
+	struct rb_node *node = kflat->root_addr_set.rb_node;
+
+	while (node) {
+		struct root_addr_set_node* data = container_of(node, struct root_addr_set_node, node);
+
+		if (strcmp(name,data->name)<0) {
+			node = node->rb_left;
+		}
+		else if (strcmp(name,data->name)>0) {
+			node = node->rb_right;
+		}
+		else
+			return data;
+	}
+
+	return 0;
+}
+
+static int root_addr_set_insert(struct kflat* kflat, const char* name, uintptr_t v) {
+
+	struct root_addr_set_node* data = kflat_zalloc(kflat, 1, sizeof(struct root_addr_set_node));
+	struct rb_node **new, *parent = 0;
+	data->name = kflat_zalloc(kflat, 1, strlen(name)+1);
+	strcpy(data->name,name);
+	data->root_addr = v;
+	new = &(kflat->root_addr_set.rb_node);
+
+	/* Figure out where to put new node */
+	while (*new) {
+		struct root_addr_set_node* this = container_of(*new, struct root_addr_set_node, node);
+
+		parent = *new;
+		if (strcmp(data->name,this->name)<0)
+			new = &((*new)->rb_left);
+		else if (strcmp(data->name,this->name)>0)
+			new = &((*new)->rb_right);
+		else {
+			kflat_free((void*)data->name);
+		    kflat_free(data);
+		    return 0;
+		}
+	}
+
+	/* Add new node and rebalance tree. */
+	rb_link_node(&data->node, parent, new);
+	rb_insert_color(&data->node, &kflat->root_addr_set);
+
+	return 1;
 }
 
 int root_addr_append(struct kflat* kflat, uintptr_t root_addr) {
@@ -1116,7 +1090,7 @@ int root_addr_append_extended(struct kflat* kflat, size_t root_addr, const char*
 }
 EXPORT_SYMBOL_GPL(root_addr_append_extended);
 
-size_t root_addr_count(struct kflat* kflat) {
+static size_t root_addr_count(struct kflat* kflat) {
 	struct root_addrnode* p = kflat->FLCTRL.rhead;
 	size_t count = 0;
     while(p) {
@@ -1150,72 +1124,7 @@ size_t root_addr_extended_size(struct kflat* kflat) {
     return size;
 }
 
-struct root_addr_set_node* root_addr_set_search(struct kflat* kflat, const char* name) {
-
-	struct rb_node *node = kflat->root_addr_set.rb_node;
-
-	while (node) {
-		struct root_addr_set_node* data = container_of(node, struct root_addr_set_node, node);
-
-		if (strcmp(name,data->name)<0) {
-			node = node->rb_left;
-		}
-		else if (strcmp(name,data->name)>0) {
-			node = node->rb_right;
-		}
-		else
-			return data;
-	}
-
-	return 0;
-}
-EXPORT_SYMBOL_GPL(root_addr_set_search);
-
-int root_addr_set_insert(struct kflat* kflat, const char* name, uintptr_t v) {
-
-	struct root_addr_set_node* data = kflat_zalloc(kflat, 1, sizeof(struct root_addr_set_node));
-	struct rb_node **new, *parent = 0;
-	data->name = kflat_zalloc(kflat, 1, strlen(name)+1);
-	strcpy(data->name,name);
-	data->root_addr = v;
-	new = &(kflat->root_addr_set.rb_node);
-
-	/* Figure out where to put new node */
-	while (*new) {
-		struct root_addr_set_node* this = container_of(*new, struct root_addr_set_node, node);
-
-		parent = *new;
-		if (strcmp(data->name,this->name)<0)
-			new = &((*new)->rb_left);
-		else if (strcmp(data->name,this->name)>0)
-			new = &((*new)->rb_right);
-		else {
-			kflat_free((void*)data->name);
-		    kflat_free(data);
-		    return 0;
-		}
-	}
-
-	/* Add new node and rebalance tree. */
-	rb_link_node(&data->node, parent, new);
-	rb_insert_color(&data->node, &kflat->root_addr_set);
-
-	return 1;
-}
-EXPORT_SYMBOL_GPL(root_addr_set_insert);
-
-int root_addr_set_delete(struct kflat* kflat, const char* name) {
-
-	struct root_addr_set_node* node = root_addr_set_search(kflat,name);
-	if (node) {
-		rb_erase(&node->node, &kflat->root_addr_set);
-		return 1;
-	}
-	return 0;
-}
-EXPORT_SYMBOL_GPL(root_addr_set_delete);
-
-void root_addr_set_destroy(struct kflat* kflat) {
+static void root_addr_set_destroy(struct kflat* kflat) {
 
 	struct rb_root* root = &kflat->root_addr_set;
 	struct rb_node * p = rb_first(root);
@@ -1227,20 +1136,6 @@ void root_addr_set_destroy(struct kflat* kflat) {
         kflat_free(data);
     }
 }
-EXPORT_SYMBOL_GPL(root_addr_set_destroy);
-
-size_t root_addr_set_count(struct kflat* kflat) {
-
-	struct rb_root* root = &kflat->root_addr_set;
-	struct rb_node * p = rb_first(root);
-	size_t count = 0;
-	while(p) {
-		count++;
-		p = rb_next(p);
-	}
-	return count;
-}
-EXPORT_SYMBOL_GPL(root_addr_set_count);
 
 void interval_tree_print(struct rb_root *root) {
 
@@ -1316,6 +1211,10 @@ int kflat_linear_memory_realloc(struct kflat* kflat, size_t nsize) {
 	return 0;
 }
 
+
+/*******************************************************
+ * FLATTEN engine
+ ******************************************************/
 void flatten_init(struct kflat* kflat) {
 	memset(&kflat->FLCTRL,0,sizeof(struct FLCONTROL));
 	kflat->FLCTRL.debug_flag = kflat->debug_flag;
@@ -1346,48 +1245,20 @@ void flatten_init(struct kflat* kflat) {
 
 	kflat_dbg_buf_clear();
 }
-EXPORT_SYMBOL_GPL(flatten_init);
 
-void flatten_debug_info(struct kflat* kflat) {
+static void flatten_debug_info(struct kflat* kflat) {
 	binary_stream_print(kflat);
     interval_tree_print(&kflat->FLCTRL.imap_root.rb_root);
     fixup_set_print(kflat);
     mem_fragment_index_debug_print(kflat);
 }
 
-int flatten_write(struct kflat* kflat) {
-
-	size_t written = sizeof(size_t);
-	int err;
-
-	if ((err=flatten_write_internal(kflat,&written))==0) {
-		flat_infos("OK. Flatten size: %lu, %lu pointers, %zu root pointers, %lu function pointers, %lu continuous memory fragments, "
-				"%zu bytes written, memory used: %zu, memory avail: %zu\n",
-			kflat->FLCTRL.HDR.memory_size,kflat->FLCTRL.HDR.ptr_count,kflat->FLCTRL.HDR.root_addr_count,kflat->FLCTRL.HDR.fptr_count,
-			kflat->FLCTRL.HDR.mcount,written-sizeof(size_t),kflat->mptrindex,kflat->msize);
-	}
-	else {
-		flat_errs("ERROR %d: Could not write flatten image. Flatten size: %lu, %lu pointers, %zu root pointers, %lu function pointers,"
-				"%lu continuous memory fragments, %zu bytes written\n",kflat->errno,kflat->FLCTRL.HDR.memory_size,
-				kflat->FLCTRL.HDR.ptr_count,kflat->FLCTRL.HDR.root_addr_count,kflat->FLCTRL.HDR.fptr_count,kflat->FLCTRL.HDR.mcount,written-sizeof(size_t));
-	}
-
-	*((size_t*)(kflat->area)) = written-sizeof(size_t);
-
-	return err;
-}
-EXPORT_SYMBOL_GPL(flatten_write);
-
 volatile int vi;
 int flatten_base_function_address(void) {
 	return vi;
 }
-EXPORT_SYMBOL_GPL(flatten_base_function_address);
 
-int flatten_base_global_address;
-EXPORT_SYMBOL_GPL(flatten_base_global_address);
-
-int flatten_write_internal(struct kflat* kflat, size_t* wcounter_p) {
+static int flatten_write_internal(struct kflat* kflat, size_t* wcounter_p) {
 
 	int err = 0;
 	struct root_addrnode* p;
@@ -1453,6 +1324,28 @@ int flatten_write_internal(struct kflat* kflat, size_t* wcounter_p) {
     return 0;
 }
 
+int flatten_write(struct kflat* kflat) {
+
+	size_t written = sizeof(size_t);
+	int err;
+
+	if ((err=flatten_write_internal(kflat,&written))==0) {
+		flat_infos("OK. Flatten size: %lu, %lu pointers, %zu root pointers, %lu function pointers, %lu continuous memory fragments, "
+				"%zu bytes written, memory used: %zu, memory avail: %zu\n",
+			kflat->FLCTRL.HDR.memory_size,kflat->FLCTRL.HDR.ptr_count,kflat->FLCTRL.HDR.root_addr_count,kflat->FLCTRL.HDR.fptr_count,
+			kflat->FLCTRL.HDR.mcount,written-sizeof(size_t),kflat->mptrindex,kflat->msize);
+	}
+	else {
+		flat_errs("ERROR %d: Could not write flatten image. Flatten size: %lu, %lu pointers, %zu root pointers, %lu function pointers,"
+				"%lu continuous memory fragments, %zu bytes written\n",kflat->errno,kflat->FLCTRL.HDR.memory_size,
+				kflat->FLCTRL.HDR.ptr_count,kflat->FLCTRL.HDR.root_addr_count,kflat->FLCTRL.HDR.fptr_count,kflat->FLCTRL.HDR.mcount,written-sizeof(size_t));
+	}
+
+	*((size_t*)(kflat->area)) = written-sizeof(size_t);
+
+	return err;
+}
+
 int flatten_fini(struct kflat* kflat) {
 	binary_stream_destroy(kflat);
     fixup_set_destroy(kflat);
@@ -1474,7 +1367,6 @@ int flatten_fini(struct kflat* kflat) {
 #endif
     return 0;
 }
-EXPORT_SYMBOL_GPL(flatten_fini);
 
 void flatten_set_option(struct kflat* kflat, int option) {
 	kflat->FLCTRL.option |= option;
@@ -1711,11 +1603,6 @@ void flatten_run_iter_harness(struct kflat* kflat, struct bqueue* bq) {
 			}
 			flat_infos("Still working! done %lu recipes in total time %lld [ms], memory used: %zu, memory avail: %zu \n",
 				n, total_time / NSEC_PER_MSEC, kflat->mptrindex, kflat->msize);
-#if LINUX_VERSION_CODE < KERNEL_VERSION(5, 3, 0)
-			flat_infos("CPU Freq - %lu [kHz]; core no. %d\n", cpufreq_quick_get(raw_smp_processor_id()), raw_smp_processor_id());
-#else
-			flat_infos("CPU Freq - %lu [kHz]; core no. %d\n", cpufreq_quick_get(__smp_processor_id()), __smp_processor_id());
-#endif
 			init_time = ktime_get();
 		}
 	}

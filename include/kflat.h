@@ -298,7 +298,6 @@ int unflatten_read(void* f);
 void unflatten_fini(void);
 int kflat_linear_memory_realloc(struct kflat* kflat, size_t nsize);
 
-int flatten_write_internal(struct kflat* kflat, size_t* wcounter_p);
 struct flatten_pointer* flatten_plain_type(struct kflat* kflat, const void* _ptr, size_t _sz);
 int fixup_set_insert(struct kflat* kflat, struct flat_node* node, size_t offset, struct flatten_pointer* ptr);
 int fixup_set_insert_force_update(struct kflat* kflat, struct flat_node* node, size_t offset, struct flatten_pointer* ptr);
@@ -311,33 +310,14 @@ int root_addr_append(struct kflat* kflat, size_t root_addr);
 int root_addr_append_extended(struct kflat* kflat, size_t root_addr, const char* name, size_t size);
 void* root_pointer_next(void);
 void* root_pointer_seq(size_t index);
-struct blstream* binary_stream_insert_back(struct kflat* kflat, const void* data, size_t size, struct blstream* where);
-struct blstream* binary_stream_insert_front(struct kflat* kflat, const void* data, size_t size, struct blstream* where);
 struct blstream* binary_stream_append(struct kflat* kflat, const void* data, size_t size);
 struct rb_node *rb_next(const struct rb_node *node);
 struct rb_node *rb_prev(const struct rb_node *node);
 struct fixup_set_node* fixup_set_search(struct kflat* kflat, uintptr_t v);
-void fixup_set_print(struct kflat* kflat);
-size_t fixup_set_count(struct kflat* kflat);
-size_t fixup_set_fptr_count(struct kflat* kflat);
-void fixup_set_destroy(struct kflat* kflat);
-int fixup_set_write(struct kflat* kflat, size_t* wcounter_p);
-int fixup_set_fptr_write(struct kflat* kflat, size_t* wcounter_p);
-
-size_t root_addr_count(struct kflat* kflat);
-struct root_addr_set_node* root_addr_set_search(struct kflat* kflat, const char* name);
-int root_addr_set_insert(struct kflat* kflat, const char* name, uintptr_t v);
-int root_addr_set_delete(struct kflat* kflat, const char* name);
-void root_addr_set_destroy(struct kflat* kflat);
-size_t root_addr_set_count(struct kflat* kflat);
 
 int bqueue_init(struct kflat* kflat, struct bqueue* q, size_t block_size);
 void bqueue_destroy(struct bqueue* q);
-int bqueue_empty(struct bqueue* q);
-size_t bqueue_size(struct bqueue* q);
-unsigned long bqueue_el_count(struct bqueue* q);
 int bqueue_push_back(struct kflat* kflat, struct bqueue* q, const void* m, size_t s);
-int bqueue_pop_front(struct bqueue* q, void* m, size_t s);
 
 void flatten_set_option(struct kflat* kflat, int option);
 void flatten_clear_option(struct kflat* kflat, int option);
