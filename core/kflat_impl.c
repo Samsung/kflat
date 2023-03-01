@@ -556,7 +556,6 @@ int fixup_set_insert(struct kflat* kflat, struct flat_node* node, size_t offset,
 
 	return 0;
 }
-EXPORT_SYMBOL_GPL(fixup_set_insert);
 
 int fixup_set_insert_force_update(struct kflat* kflat, struct flat_node* node, size_t offset, struct flatten_pointer* ptr) {
 
@@ -697,7 +696,6 @@ int fixup_set_insert_fptr(struct kflat* kflat, struct flat_node* node, size_t of
 
 	return 0;
 }
-EXPORT_SYMBOL_GPL(fixup_set_insert_fptr);
 
 int fixup_set_insert_fptr_force_update(struct kflat* kflat, struct flat_node* node, size_t offset, unsigned long fptr) {
 
@@ -1527,6 +1525,97 @@ void flatten_generic(struct kflat* kflat, void* q, struct flatten_pointer* fptr,
 	}
 }
 EXPORT_SYMBOL_GPL(flatten_generic);
+
+void flatten_aggregate_generic(struct kflat* kflat, void* q, const void* _ptr, 
+		size_t el_size, size_t count, uintptr_t custom_val, ssize_t _off, ssize_t _shift,
+		flatten_struct_t func_ptr, flatten_struct_embedded_extract_t pre_f, flatten_struct_embedded_convert_t post_f) {
+	int err;
+	struct flat_node* __ptr_node, *__node;
+	void* _p;
+	const void* _fp = 0;
+	struct flatten_pointer* __shifted;
+	struct fixup_set_node* __struct_inode;
+	size_t _i;
+	
+	_p = (void*)OFFATTR(const void*,_off);
+	if (pre_f)
+		_p = pre_f(_p);
+	if (_p)
+		_fp = (const void*) ( _p+_shift);
+	DBGTNFOMF(AGGREGATE_FLATTEN_GENERIC,"", el_size,f,"%lx:%zu",_fp,(size_t)_off,pre_f,post_f);
+
+	if (kflat->errno || !ADDR_RANGE_VALID(_fp, el_size * count)) {
+		DBGS("AGGREGATE_FLATTEN_GENERIC: errno(%d), ADDR(%lx)\n", kflat->errno, (uintptr_t)OFFATTR(void**,_off));
+		return;
+	}
+	__node = interval_tree_iter_first(
+			&kflat->FLCTRL.imap_root, 
+			(uint64_t)_ptr + _off,
+			(uint64_t)_ptr + _off + sizeof(void*) - 1);
+	if (__node == NULL) {
+		kflat->errno = EFAULT;
+		return;
+	}
+
+	__shifted = flatten_plain_type(kflat, _fp, el_size * count);
+	if(__shifted == NULL) {
+		DBGS("AGGREGATE_FLATTEN_GENERIC:flatten_plain_type(): NULL");
+		kflat->errno = EFAULT;
+		return;
+	}
+	if (_shift != 0) {
+		__ptr_node = interval_tree_iter_first(
+				&kflat->FLCTRL.imap_root, 
+				(uintptr_t)_fp - _shift,
+				(uintptr_t)_fp - _shift + 1);
+		__shifted->node = __ptr_node;
+		__shifted->offset = (uintptr_t)_fp - _shift - __ptr_node->start;
+	}
+
+	if (post_f)
+		__shifted = post_f(__shifted, OFFATTR(const struct flatten_base*, _off));
+
+	err = fixup_set_insert_force_update(kflat, __node, (uint64_t)_ptr - __node->start + _off, __shifted);
+	if (err && err != EEXIST && err != EAGAIN) {
+		DBGS("AGGREGATE_FLATTEN_GENERIC:fixup_set_insert_force_update(): err(%d)\n",err);
+		kflat->errno = err;
+		return;
+	}
+	if(err == EEXIST) return;
+
+	err = 0;
+	for (_i = 0; _i < count; ++_i) {
+		struct flat_node *__struct_node = interval_tree_iter_first(
+				&kflat->FLCTRL.imap_root,
+				(uint64_t)((void*)_fp + _i * el_size),
+				(uint64_t)((void*)_fp + (_i + 1) * el_size - 1));
+		if (__struct_node == NULL) {
+			err = EFAULT;
+			break;
+		}
+
+		__struct_inode = fixup_set_search(kflat,(uint64_t)((void*)_fp + _i * el_size));
+		if (!__struct_inode) {
+			struct flatten_job __job;
+			int err = fixup_set_reserve_address(kflat,(uint64_t)((void*)_fp + _i * el_size));
+			if (err) break;
+			__job.node = 0;
+			__job.offset = 0;
+			__job.size = 1;
+			__job.custom_val = (uintptr_t)custom_val;
+			__job.index = _i;
+			__job.ptr = (struct flatten_base*)((void*)_fp + _i * el_size);
+			__job.fun = func_ptr;
+			__job.fp = 0;
+			__job.convert = 0;
+			err = bqueue_push_back(kflat, q, &__job, sizeof(struct flatten_job));
+			if (err) break;
+		}
+	}
+	if (err && (err != EEXIST))
+		kflat->errno = err;
+}
+EXPORT_SYMBOL_GPL(flatten_aggregate_generic);
 
 struct flatten_pointer* flatten_plain_type(struct kflat* kflat, const void* _ptr, size_t _sz) {
 

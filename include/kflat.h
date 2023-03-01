@@ -325,6 +325,9 @@ void flatten_clear_option(struct kflat* kflat, int option);
 void flatten_run_iter_harness(struct kflat* kflat, struct bqueue* bq);
 void flatten_generic(struct kflat* kflat, void* q, struct flatten_pointer* fptr, const void* p, size_t el_size, size_t count, uintptr_t custom_val, flatten_struct_t func_ptr);
 struct flat_node* flatten_acquire_node_for_ptr(struct kflat* kflat, const void* _ptr, size_t size);
+void flatten_aggregate_generic(struct kflat* kflat, void* q, const void* _ptr, 
+		size_t el_size, size_t count, uintptr_t custom_val, ssize_t _off, ssize_t _shift,
+		flatten_struct_t func_ptr, flatten_struct_embedded_extract_t pre_f, flatten_struct_embedded_convert_t post_f);
 
 extern unsigned long (*kflat_lookup_kallsyms_name)(const char* name);
 bool flatten_get_object(void* ptr, void** start, void** end);
@@ -342,20 +345,11 @@ void* flatten_global_address_by_name(const char* name);
 
 #define DBGS(M, ...)						flat_dbg(M, ##__VA_ARGS__)
 #define DBGM1(name,a1)						flat_dbg(#name "(" #a1 ")\n")
-#define DBGF(name,F,FMT,...)				flat_dbg(#name "(" #F "[" FMT "])\n", ##__VA_ARGS__)
 #define DBGOF(name,F,FMT,P,Q)				flat_dbg(#name "(" #F "[" FMT "])\n",P,Q)
-#define DBGM2(name,a1,a2)					flat_dbg(#name "(" #a1 "," #a2 ")\n")
-#define DBGTF(name,T,F,FMT,...)				flat_dbg(#name "(" #T "," #F "[" FMT "])\n", ##__VA_ARGS__)
-#define DBGTNF(name,T,N,F,FMT,...)			flat_dbg(#name "(" #T "," #N "," #F "[" FMT "])\n", ##__VA_ARGS__)
-#define DBGTFMF(name,T,F,FMT,P,PF,FF)		flat_dbg(#name "(" #T "," #F "[" FMT "]," #PF "," #FF ")\n",P)
-#define DBGTFOMF(name,T,F,FMT,P,Q,PF,FF) 	flat_dbg(#name "(" #T "," #F "[" FMT "]," #PF "," #FF ")\n",P,Q)
 #define DBGTNFOMF(name,T,N,F,FMT,P,Q,PF,FF) flat_dbg(#name "(" #T "," #N "," #F "[" FMT "]," #PF "," #FF ")\n",P,Q)
-#define DBGTP(name,T,P)						flat_dbg(#name "(" #T "," #P "[%llx])\n", (uint64_t)P)
-#define DBGTNP(name,T,N,P)					flat_dbg(#name "(" #T "," #N "," #P "[%llx])\n", (uint64_t)P)
 #define DBGM3(name,a1,a2,a3)				flat_dbg(#name "(" #a1 "," #a2 "," #a3 ")\n")
 #define DBGM4(name,a1,a2,a3,a4)				flat_dbg(#name "(" #a1 "," #a2 "," #a3 "," #a4 ")\n")
 #define DBGM5(name,a1,a2,a3,a4,a5)			flat_dbg(#name "(" #a1 "," #a2 "," #a3 "," #a4 "," #a5 ")\n")
-#define DBGM6(name,a1,a2,a3,a4,a5, a6)		flat_dbg(#name "(" #a1 "," #a2 "," #a3 "," #a4 "," #a5 "," #a6 ")\n")
 
 /* Memory allocation */
 
@@ -851,81 +845,9 @@ struct flatten_pointer* FUNC_NAME(struct kflat* kflat, const void* ptr, uintptr_
 /* AGGREGATE_* */
 #define AGGREGATE_FLATTEN_GENERIC(FULL_TYPE,TARGET,N,f,_off,n,CUSTOM_VAL,pre_f,post_f,_shift)	\
 	do {	\
-		void* _p;	\
-		const FULL_TYPE* _fp = 0;	\
 		DBGM5(AGGREGATE_FLATTEN_GENERIC,FULL_TYPE,N,f,_off,n);	\
 		DBGS("FULL_TYPE [%lx:%zu -> %lx]\n",(uintptr_t)_ptr,(size_t)_off,(uintptr_t)OFFATTRN(_off,_shift));	\
-		_p = (void*)OFFATTR(const FULL_TYPE*,_off);	\
-		if (pre_f) {	\
-			_p = (*(flatten_struct_embedded_extract_t)pre_f)(_p); \
-		}	\
-		if (_p) _fp = (const FULL_TYPE*)( _p+_shift);	\
-		DBGTNFOMF(AGGREGATE_FLATTEN_GENERIC,FULL_TYPE,N,f,"%lx:%zu",_fp,(size_t)_off,pre_f,post_f);  \
-    	if ((!KFLAT_ACCESSOR->errno)&&(ADDR_RANGE_VALID(_fp,(n)*(N)))) {	\
-    		struct flat_node *__node = interval_tree_iter_first(&KFLAT_ACCESSOR->FLCTRL.imap_root, (uint64_t)_ptr+_off,\
-    				(uint64_t)_ptr+_off+sizeof(FULL_TYPE*)-1);    \
-			if (__node==0) {	\
-				KFLAT_ACCESSOR->errno = EFAULT;	\
-			} else {	\
-				int err;	\
-				struct flat_node* __ptr_node;	\
-				struct flatten_pointer* __shifted = flatten_plain_type(KFLAT_ACCESSOR,_fp,(n)*N);	\
-				if(__shifted == NULL) {	\
-					DBGS("AGGREGATE_FLATTEN_GENERIC:flatten_plain_type(): NULL");	\
-					KFLAT_ACCESSOR->errno = EFAULT;	\
-					break;	\
-				}	\
-				if (_shift!=0) {	\
-					__ptr_node = interval_tree_iter_first(&kflat->FLCTRL.imap_root, (uintptr_t)_fp-_shift,(uintptr_t)_fp-_shift+1);	\
-					__shifted->node = __ptr_node;	\
-					__shifted->offset = (uintptr_t)_fp-_shift - __ptr_node->start;	\
-				}	\
-				if (post_f) {	\
-					__shifted = (*(flatten_struct_embedded_convert_t)post_f)(__shifted,(const struct flatten_base*)OFFATTR(const FULL_TYPE*,_off));	\
-				}	\
-				err = fixup_set_insert_force_update(KFLAT_ACCESSOR,__node,(uint64_t)_ptr-__node->start+_off, __shifted);	\
-				if (err && err != EEXIST && err != EAGAIN) {	\
-					DBGS("AGGREGATE_FLATTEN_GENERIC:fixup_set_insert_force_update(): err(%d)\n",err);	\
-					KFLAT_ACCESSOR->errno = err;	\
-				}	\
-				else {	\
-					if (!err || err == EAGAIN) {	\
-						struct fixup_set_node* __struct_inode;	\
-						size_t _i;	\
-						err = 0;	\
-						for (_i=0; _i<(n); ++_i) {	\
-							struct flat_node *__struct_node = interval_tree_iter_first(&KFLAT_ACCESSOR->FLCTRL.imap_root,	\
-								(uint64_t)((void*)_fp+_i*N),(uint64_t)((void*)_fp+(_i+1)*N-1));    \
-							if (__struct_node==0) {	\
-								err = EFAULT;	\
-								break;	\
-							}	\
-							__struct_inode = fixup_set_search(KFLAT_ACCESSOR,(uint64_t)((void*)_fp+_i*N));	\
-							if (!__struct_inode) {	\
-								struct flatten_job __job;   \
-								int err = fixup_set_reserve_address(KFLAT_ACCESSOR,(uint64_t)((void*)_fp+_i*N));	\
-								if (err) break;	\
-								__job.node = 0;    \
-								__job.offset = 0; \
-								__job.size = 1;	\
-								__job.custom_val = (uintptr_t)CUSTOM_VAL;	\
-								__job.index = _i;	\
-								__job.ptr = (struct flatten_base*)((void*)_fp+_i*N);    \
-								__job.fun = TARGET;    \
-								__job.fp = 0;   \
-								__job.convert = 0;  \
-								err = bqueue_push_back(KFLAT_ACCESSOR,__q,&__job,sizeof(struct flatten_job));    \
-								if (err) break;	\
-							}	\
-						}	\
-						if ((err) && (err!=EEXIST)) {	\
-							KFLAT_ACCESSOR->errno = err;	\
-						}	\
-					}	\
-				}	\
-			}	\
-		}	\
-		else DBGS("AGGREGATE_FLATTEN_GENERIC: errno(%d), ADDR(%lx)\n",KFLAT_ACCESSOR->errno,(uintptr_t)OFFATTR(void*,_off));	\
+		flatten_aggregate_generic(KFLAT_ACCESSOR, __q, _ptr, N, n, CUSTOM_VAL, _off, _shift, TARGET, pre_f, post_f); \
 	} while(0)
 
 #define AGGREGATE_FLATTEN_STRUCT_ARRAY_SELF_CONTAINED(T,N,f,_off,n) \
