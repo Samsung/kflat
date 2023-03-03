@@ -287,9 +287,6 @@ void kflat_dbg_printf(const char* fmt, ...);
 void flatten_init(struct kflat* kflat);
 int flatten_write(struct kflat* kflat);
 int flatten_fini(struct kflat* kflat);
-void unflatten_init(void);
-int unflatten_read(void* f);
-void unflatten_fini(void);
 int kflat_linear_memory_realloc(struct kflat* kflat, size_t nsize);
 
 struct flatten_pointer* flatten_plain_type(struct kflat* kflat, const void* _ptr, size_t _sz);
