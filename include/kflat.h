@@ -68,7 +68,6 @@ struct FLCONTROL {
 	struct root_addrnode* last_accessed_root;
 	size_t root_addr_count;
 	int debug_flag;
-	unsigned long option;
 	void* mem;
 };
 
@@ -261,11 +260,6 @@ struct flatten_job {
     flatten_struct_embedded_convert_t convert;
 };
 
-enum flatten_option {
-	KFLAT_OPTION_SILENT = 0x01,
-	KFLAT_OPTION_IN_PROGRESS = 0x10,
-};
-
 /* Exported functions */
 int kflat_recipe_register(struct kflat_recipe* recipe);
 int kflat_recipe_unregister(struct kflat_recipe* recipe);
@@ -318,9 +312,6 @@ struct fixup_set_node* fixup_set_search(struct kflat* kflat, uintptr_t v);
 int bqueue_init(struct kflat* kflat, struct bqueue* q, size_t block_size);
 void bqueue_destroy(struct bqueue* q);
 int bqueue_push_back(struct kflat* kflat, struct bqueue* q, const void* m, size_t s);
-
-void flatten_set_option(struct kflat* kflat, int option);
-void flatten_clear_option(struct kflat* kflat, int option);
 
 void flatten_run_iter_harness(struct kflat* kflat, struct bqueue* bq);
 void flatten_generic(struct kflat* kflat, void* q, struct flatten_pointer* fptr, const void* p, size_t el_size, size_t count, uintptr_t custom_val, flatten_struct_t func_ptr);
@@ -1115,7 +1106,6 @@ struct flatten_pointer* FUNC_NAME(struct kflat* kflat, const void* ptr, uintptr_
 		if ((!KFLAT_ACCESSOR->errno)&&(ADDR_VALID(p))) {	\
 			struct flatten_pointer* __fptr = make_flatten_pointer(KFLAT_ACCESSOR,0,0);	\
 			const void* __root_ptr __attribute__((unused)) = (const void*) p;       \
-			flatten_set_option(KFLAT_ACCESSOR,KFLAT_OPTION_IN_PROGRESS);	\
 			if (__fptr) {	\
 				__VA_ARGS__;	\
 				kflat_free(__fptr);	\
@@ -1123,7 +1113,6 @@ struct flatten_pointer* FUNC_NAME(struct kflat* kflat, const void* ptr, uintptr_
 			else {	\
 				KFLAT_ACCESSOR->errno = ENOMEM;	\
 			}	\
-			flatten_clear_option(KFLAT_ACCESSOR,KFLAT_OPTION_IN_PROGRESS);	\
 		}	\
 		if (!KFLAT_ACCESSOR->errno) {	\
 			if(__name != NULL)	{ \

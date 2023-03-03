@@ -1366,17 +1366,6 @@ int flatten_fini(struct kflat* kflat) {
     return 0;
 }
 
-void flatten_set_option(struct kflat* kflat, int option) {
-	kflat->FLCTRL.option |= option;
-}
-EXPORT_SYMBOL_GPL(flatten_set_option);
-
-void flatten_clear_option(struct kflat* kflat, int option) {
-	kflat->FLCTRL.option &= ~option;
-}
-EXPORT_SYMBOL_GPL(flatten_clear_option);
-
-
 struct flat_node* flatten_acquire_node_for_ptr(struct kflat* kflat, const void* _ptr, size_t size) {
 	struct flat_node *node = interval_tree_iter_first(&kflat->FLCTRL.imap_root, (uint64_t)_ptr, (uint64_t)_ptr + size - 1);
 	struct flat_node* head_node = 0;
