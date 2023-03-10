@@ -360,7 +360,7 @@ static int kflat_ioctl_locked(struct kflat *kflat, unsigned int cmd,
 		if(ret) {
 			kflat_recipe_put(kflat->recipe);
 			kflat->recipe = NULL;
-			return ret;
+			return -EFAULT;
 		}
 
 		kflat->mode = KFLAT_MODE_ENABLED;
