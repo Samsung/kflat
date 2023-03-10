@@ -134,7 +134,6 @@ int probing_arm(struct kflat* kflat, const char* symbol, pid_t callee) {
     ret = register_kprobe(kprobe);
     if(ret) {
         pr_err("failed to arm new kprobe - ret(%d)", ret);
-        kfree(kprobe);
         goto exit;
     }
 
