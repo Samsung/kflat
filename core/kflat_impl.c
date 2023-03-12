@@ -1461,26 +1461,37 @@ struct flat_node* flatten_acquire_node_for_ptr(struct kflat* kflat, const void* 
 }
 EXPORT_SYMBOL_GPL(flatten_acquire_node_for_ptr);
 
-void flatten_generic(struct kflat* kflat, void* q, struct flatten_pointer* fptr, const void* p, size_t el_size, size_t count, uintptr_t custom_val, flatten_struct_t func_ptr) {
+void flatten_generic(struct kflat* kflat, void* q, struct flatten_pointer* fptr, const void* p, size_t el_size, size_t count, uintptr_t custom_val, flatten_struct_t func_ptr, unsigned long shift) {
 	int err;
 	size_t i;
-	struct flatten_pointer* flat_ptr;
+	struct flatten_pointer* __shifted;
+	struct flat_node* __ptr_node;
+	const void* _fp = (const void*)(p+shift);
 
-	DBGS("flatten_generic: ADDR(%lx)\n", (uintptr_t) p);
+	DBGS("flatten_generic: ADDR(%lx)\n", (uintptr_t) _fp);
 
-	if(kflat->errno || !ADDR_RANGE_VALID(p, count * el_size)) {
-		DBGS("flatten_generic: errno(%d), ADDR(0x%lx)", kflat->errno, (uintptr_t) p);
+	if(kflat->errno || !ADDR_RANGE_VALID(_fp, count * el_size)) {
+		DBGS("flatten_generic: errno(%d), ADDR(0x%lx)", kflat->errno, (uintptr_t) _fp);
 		return;
 	}
 
-	flat_ptr = flatten_plain_type(kflat, p, count * el_size);
-	if(flat_ptr == NULL) {
+	__shifted = flatten_plain_type(kflat, _fp, count * el_size);
+	if(__shifted == NULL) {
 		DBGS("flatten_generic: flatten_plain_type() == NULL");
 		kflat->errno = EFAULT;
 		return;
 	}
 
-	err = fixup_set_insert_force_update(kflat, fptr->node, fptr->offset, flat_ptr);
+	if (shift != 0) {
+		__ptr_node = interval_tree_iter_first(
+				&kflat->FLCTRL.imap_root, 
+				(uintptr_t)_fp - shift,
+				(uintptr_t)_fp - shift + 1);
+		__shifted->node = __ptr_node;
+		__shifted->offset = (uintptr_t)_fp - shift - __ptr_node->start;
+	}
+
+	err = fixup_set_insert_force_update(kflat, fptr->node, fptr->offset, __shifted);
 	if (err && err != EINVAL && err != EEXIST && err != EAGAIN) {
 		DBGS("flatten_generic: fixup_set_insert_force_update(): err(%d)", err);
 		kflat->errno = err;
@@ -1489,7 +1500,7 @@ void flatten_generic(struct kflat* kflat, void* q, struct flatten_pointer* fptr,
 		err = 0;
 
 		for (i = 0; i < count; ++i) {
-			const void* target = p + i * el_size;
+			const void* target = _fp + i * el_size;
 			struct_inode = fixup_set_search(kflat, (uint64_t)target);
 			if (!struct_inode) {
 				struct flatten_job job = {0, };
