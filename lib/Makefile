@@ -21,10 +21,10 @@ libunflatten_$(ARCH).a: unflatten.o rbtree.o
 # KLEE libraries
 #
 unflatten.bc: unflatten.cpp unflatten.hpp
-	clang++-9 -emit-llvm -o $@ -c -Iinclude_priv/ -std=c++11 -I${KLEE_LIBCXX_INSTALL}/include/c++/v1/ -nostdinc++ unflatten.cpp
+	clang++-11 -emit-llvm -o $@ -c -Iinclude_priv/ -std=c++11 -I${KLEE_LIBCXX_INSTALL}/include/c++/v1/ -nostdinc++ unflatten.cpp
 
 rbtree.bc: rbtree.c
-	clang++-9 -emit-llvm -o $@ -c -Iinclude_priv/ -std=c++11 -I${KLEE_LIBCXX_INSTALL}/include/c++/v1/ -nostdinc++ rbtree.c
+	clang++-11 -emit-llvm -o $@ -c -Iinclude_priv/ -std=c++11 -I${KLEE_LIBCXX_INSTALL}/include/c++/v1/ -nostdinc++ rbtree.c
 
 #
 # DFSAN targets
