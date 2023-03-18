@@ -714,12 +714,12 @@ struct flatten_pointer* FUNC_NAME(struct kflat* kflat, const void* ptr, uintptr_
  * AGGREGATE macros
  *******************************/
 /* AGGREGATE_*_STORAGE */
-#define AGGREGATE_FLATTEN_GENERIC_STORAGE(FULL_TYPE,TARGET,_off,n,CUSTOM_VAL)		\
+#define AGGREGATE_FLATTEN_GENERIC_STORAGE(FULL_TYPE,SIZE,TARGET,_off,n,CUSTOM_VAL)		\
 	do {	\
 		DBGM3(AGGREGATE_FLATTEN_GENERIC_STORAGE,FULL_TYPE,_off,n);	\
 		DBGS("FULL_TYPE [%lx:%zu -> %lx]\n",(uintptr_t)_ptr,(size_t)_off,(uintptr_t)((const FULL_TYPE*)((unsigned char*)(_ptr)+_off)));	\
 		for (int __i = 0; __i < n; ++__i) {	\
-			const FULL_TYPE* __p = ((const FULL_TYPE*)((unsigned char*)(_ptr)+_off))+__i;	\
+			const FULL_TYPE* __p = (const FULL_TYPE*)(((unsigned char*)(_ptr)+_off)+__i*(SIZE));	\
 			if (!KFLAT_ACCESSOR->errno) {	\
 				int err = 0;	\
 				struct fixup_set_node* __inode = fixup_set_search(KFLAT_ACCESSOR,(uint64_t)__p);	\
@@ -760,7 +760,7 @@ struct flatten_pointer* FUNC_NAME(struct kflat* kflat, const void* ptr, uintptr_
 		el_cnt = (long)(end - (void*)_ptr - OFF) / FLSIZE;	\
 		if(el_cnt <= 0)						\
 			break;							\
-		AGGREGATE_FLATTEN_GENERIC_STORAGE(FULL_TYPE, TARGET, OFF, el_cnt, CUSTOM_VAL);	\
+		AGGREGATE_FLATTEN_GENERIC_STORAGE(FULL_TYPE, FLSIZE, TARGET, OFF, el_cnt, CUSTOM_VAL);	\
 	} while(0)
 
 #define AGGREGATE_FLATTEN_GENERIC_COMPOUND_TYPE_STORAGE_FLEXIBLE(T,SIZE,OFF)	\
@@ -787,16 +787,16 @@ struct flatten_pointer* FUNC_NAME(struct kflat* kflat, const void* ptr, uintptr_
 	} while(0)
 
 #define AGGREGATE_FLATTEN_STRUCT_ARRAY_STORAGE(T,f,n)	\
-	AGGREGATE_FLATTEN_GENERIC_STORAGE(struct T, flatten_struct_array_##T, offsetof(_container_type,f), n, 0)
+	AGGREGATE_FLATTEN_GENERIC_STORAGE(struct T, sizeof(struct T), flatten_struct_array_##T, offsetof(_container_type,f), n, 0)
 
 #define AGGREGATE_FLATTEN_STRUCT_TYPE_ARRAY_STORAGE(T,f,n)	\
-	AGGREGATE_FLATTEN_GENERIC_STORAGE(T, flatten_struct_type_array_##T, offsetof(_container_type,f), n, 0)
+	AGGREGATE_FLATTEN_GENERIC_STORAGE(T, sizeof(T), flatten_struct_type_array_##T, offsetof(_container_type,f), n, 0)
 
 #define AGGREGATE_FLATTEN_UNION_ARRAY_STORAGE(T,f,n)	\
-	AGGREGATE_FLATTEN_GENERIC_STORAGE(union T, flatten_union_array_##T, offsetof(_container_type,f), n, 0)
+	AGGREGATE_FLATTEN_GENERIC_STORAGE(union T, sizeof(union T), flatten_union_array_##T, offsetof(_container_type,f), n, 0)
 
 #define AGGREGATE_FLATTEN_UNION_ARRAY_STORAGE_CUSTOM_INFO(T,f,n,CUSTOM_VAL)	\
-	AGGREGATE_FLATTEN_GENERIC_STORAGE(union T, flatten_union_array_##T, offsetof(_container_type,f), n, CUSTOM_VAL)
+	AGGREGATE_FLATTEN_GENERIC_STORAGE(union T, sizeof(union T), flatten_union_array_##T, offsetof(_container_type,f), n, CUSTOM_VAL)
 
 #define AGGREGATE_FLATTEN_STRUCT_STORAGE(T,f)	\
 	AGGREGATE_FLATTEN_STRUCT_ARRAY_STORAGE(T,f,1)
@@ -810,29 +810,29 @@ struct flatten_pointer* FUNC_NAME(struct kflat* kflat, const void* ptr, uintptr_
 #define AGGREGATE_FLATTEN_UNION_STORAGE_CUSTOM_INFO(T,f,CUSTOM_VAL)	\
 	AGGREGATE_FLATTEN_UNION_ARRAY_STORAGE_CUSTOM_INFO(T,f,1,CUSTOM_VAL)
 
-#define AGGREGATE_FLATTEN_STRUCT_ARRAY_STORAGE_SELF_CONTAINED(T,f,OFF,n)	\
-	AGGREGATE_FLATTEN_GENERIC_STORAGE(struct T, flatten_struct_array_##T, OFF, n, 0)
+#define AGGREGATE_FLATTEN_STRUCT_ARRAY_STORAGE_SELF_CONTAINED(T,SIZE,f,OFF,n)	\
+	AGGREGATE_FLATTEN_GENERIC_STORAGE(struct T, SIZE, flatten_struct_array_##T, OFF, n, 0)
 
-#define AGGREGATE_FLATTEN_STRUCT_TYPE_ARRAY_STORAGE_SELF_CONTAINED(T,f,OFF,n)	\
-	AGGREGATE_FLATTEN_GENERIC_STORAGE(T, flatten_struct_type_array_##T, OFF, n, 0)
+#define AGGREGATE_FLATTEN_STRUCT_TYPE_ARRAY_STORAGE_SELF_CONTAINED(T,SIZE,f,OFF,n)	\
+	AGGREGATE_FLATTEN_GENERIC_STORAGE(T, SIZE, flatten_struct_type_array_##T, OFF, n, 0)
 
-#define AGGREGATE_FLATTEN_UNION_ARRAY_STORAGE_SELF_CONTAINED(T,f,OFF,n)	\
-	AGGREGATE_FLATTEN_GENERIC_STORAGE(union T, flatten_union_array_##T, OFF, n, 0)
+#define AGGREGATE_FLATTEN_UNION_ARRAY_STORAGE_SELF_CONTAINED(T,SIZE,f,OFF,n)	\
+	AGGREGATE_FLATTEN_GENERIC_STORAGE(union T, SIZE, flatten_union_array_##T, OFF, n, 0)
 
-#define AGGREGATE_FLATTEN_UNION_ARRAY_STORAGE_CUSTOM_INFO_SELF_CONTAINED(T,f,OFF,n,CUSTOM_VAL)	\
-	AGGREGATE_FLATTEN_GENERIC_STORAGE(union T, flatten_union_array_##T, OFF, n, CUSTOM_VAL)
+#define AGGREGATE_FLATTEN_UNION_ARRAY_STORAGE_CUSTOM_INFO_SELF_CONTAINED(T,SIZE,f,OFF,n,CUSTOM_VAL)	\
+	AGGREGATE_FLATTEN_GENERIC_STORAGE(union T, SIZE, flatten_union_array_##T, OFF, n, CUSTOM_VAL)
 
-#define AGGREGATE_FLATTEN_STRUCT_STORAGE_SELF_CONTAINED(T,f,OFF)	\
-	AGGREGATE_FLATTEN_STRUCT_ARRAY_STORAGE_SELF_CONTAINED(T,f,OFF,1)
+#define AGGREGATE_FLATTEN_STRUCT_STORAGE_SELF_CONTAINED(T,SIZE,f,OFF)	\
+	AGGREGATE_FLATTEN_STRUCT_ARRAY_STORAGE_SELF_CONTAINED(T,SIZE,f,OFF,1)
 
-#define AGGREGATE_FLATTEN_STRUCT_TYPE_STORAGE_SELF_CONTAINED(T,f,OFF)	\
-	AGGREGATE_FLATTEN_STRUCT_TYPE_ARRAY_STORAGE_SELF_CONTAINED(T,f,OFF,1)
+#define AGGREGATE_FLATTEN_STRUCT_TYPE_STORAGE_SELF_CONTAINED(T,SIZE,f,OFF)	\
+	AGGREGATE_FLATTEN_STRUCT_TYPE_ARRAY_STORAGE_SELF_CONTAINED(T,SIZE,f,OFF,1)
 
-#define AGGREGATE_FLATTEN_UNION_STORAGE_SELF_CONTAINED(T,f,OFF)	\
-	AGGREGATE_FLATTEN_UNION_ARRAY_STORAGE_SELF_CONTAINED(T,f,OFF,1)
+#define AGGREGATE_FLATTEN_UNION_STORAGE_SELF_CONTAINED(T,SIZE,f,OFF)	\
+	AGGREGATE_FLATTEN_UNION_ARRAY_STORAGE_SELF_CONTAINED(T,SIZE,f,OFF,1)
 
-#define AGGREGATE_FLATTEN_UNION_STORAGE_CUSTOM_INFO_SELF_CONTAINED(T,f,OFF,CUSTOM_VAL)	\
-	AGGREGATE_FLATTEN_UNION_ARRAY_STORAGE_CUSTOM_INFO_SELF_CONTAINED(T,f,OFF,1,CUSTOM_VAL)
+#define AGGREGATE_FLATTEN_UNION_STORAGE_CUSTOM_INFO_SELF_CONTAINED(T,SIZE,f,OFF,CUSTOM_VAL)	\
+	AGGREGATE_FLATTEN_UNION_ARRAY_STORAGE_CUSTOM_INFO_SELF_CONTAINED(T,SIZE,f,OFF,1,CUSTOM_VAL)
 
 #define AGGREGATE_FLATTEN_STRUCT_FLEXIBLE(T, f) \
 	AGGREGATE_FLATTEN_GENERIC_STORAGE_FLEXIBLE(struct T, sizeof(struct T), offsetof(_container_type, f), 0, flatten_struct_array_##T)
