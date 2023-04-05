@@ -128,4 +128,4 @@ static int kflat_fptr_validate(void *memory, size_t size, CFlatten flatten) {
 #endif
 /********************************/
 
-KFLAT_REGISTER_TEST_GFA("FPOINTERS", kflat_fptr_test, kflat_fptr_validate, kflat_fptr_gfa_handler);
+KFLAT_REGISTER_TEST_GFA_FLAGS("FPOINTERS", kflat_fptr_test, kflat_fptr_validate, kflat_fptr_gfa_handler, KFLAT_TEST_ATOMIC);

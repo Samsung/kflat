@@ -73,4 +73,4 @@ static int kflat_flatten_struct_array_unit_validate(void *memory, size_t size, C
 
 #endif
 
-KFLAT_REGISTER_TEST("[UNIT] flatten_struct_array", kflat_flatten_struct_array_unit_test, kflat_flatten_struct_array_unit_validate);
+KFLAT_REGISTER_TEST_FLAGS("[UNIT] flatten_struct_array", kflat_flatten_struct_array_unit_test, kflat_flatten_struct_array_unit_validate, KFLAT_TEST_ATOMIC);

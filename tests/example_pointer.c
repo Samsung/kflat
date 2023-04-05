@@ -40,4 +40,4 @@ static int kflat_pointer_validate(void *memory, size_t size, CFlatten flatten) {
 
 #endif
 
-KFLAT_REGISTER_TEST("POINTER", kflat_pointer_test, kflat_pointer_validate);
+KFLAT_REGISTER_TEST_FLAGS("POINTER", kflat_pointer_test, kflat_pointer_validate, KFLAT_TEST_ATOMIC);

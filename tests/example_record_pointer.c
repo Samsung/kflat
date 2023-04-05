@@ -54,4 +54,4 @@ static int kflat_record_pointer_validate(void *memory, size_t size, CFlatten fla
 
 #endif
 
-KFLAT_REGISTER_TEST("RECORD_POINTER", kflat_record_pointer_test, kflat_record_pointer_validate);
+KFLAT_REGISTER_TEST_FLAGS("RECORD_POINTER", kflat_record_pointer_test, kflat_record_pointer_validate, KFLAT_TEST_ATOMIC);

@@ -81,4 +81,4 @@ static int kflat_flatten_struct_array_specialize_unit_validate(void *memory, siz
 #endif
 /********************************/
 
-KFLAT_REGISTER_TEST("[UNIT] flatten_struct_array_specialize", kflat_flatten_struct_array_specialize_unit_test, kflat_flatten_struct_array_specialize_unit_validate);
+KFLAT_REGISTER_TEST_FLAGS("[UNIT] flatten_struct_array_specialize", kflat_flatten_struct_array_specialize_unit_test, kflat_flatten_struct_array_specialize_unit_validate, KFLAT_TEST_ATOMIC);

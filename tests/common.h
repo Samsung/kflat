@@ -30,9 +30,14 @@ INTERVAL_TREE_DEFINE(struct flat_node, rb,
 
 typedef int (*kflat_test_case_handler_t)(struct kflat* kflat);
 
+enum kflat_test_flags {
+    KFLAT_TEST_ATOMIC   = 1 << 1,
+};
+
 struct kflat_test_case {
     const char* name;
     kflat_test_case_handler_t handler;
+    enum kflat_test_flags flags;
 };
 
 /********************************/
@@ -111,16 +116,23 @@ extern char _last_assert_tested[MAX_LAST_ASSERT];
 #ifdef __KERNEL__
 /********************************/
 
-#define KFLAT_REGISTER_TEST(NAME, FUNC, FUNC_USER)              \
+#define KFLAT_REGISTER_TEST_FLAGS(NAME, FUNC, FUNC_USER, FLAGS) \
     const struct kflat_test_case test_case_ ## FUNC             \
         __attribute__((used))                                   \
         = {                                                     \
             .name = NAME,                                       \
             .handler = FUNC,                                    \
+            .flags = FLAGS,                                     \
         }
+
+#define KFLAT_REGISTER_TEST(NAME, FUNC, FUNC_USER)              \
+    KFLAT_REGISTER_TEST_FLAGS(NAME, FUNC, FUNC_USER, 0)
 
 #define KFLAT_REGISTER_TEST_GFA(NAME, FUNC, FUNC_USER, GFA)     \
     KFLAT_REGISTER_TEST(NAME, FUNC, FUNC_USER)
+
+#define KFLAT_REGISTER_TEST_GFA_FLAGS(NAME, FUNC, FUNC_USER, GFA, FLAGS) \
+    KFLAT_REGISTER_TEST_FLAGS(NAME, FUNC, FUNC_USER, 0)
 
 /********************************/
 #else
@@ -137,6 +149,12 @@ extern char _last_assert_tested[MAX_LAST_ASSERT];
 
 #define KFLAT_REGISTER_TEST(NAME, FUNC, FUNC_USER)              \
     KFLAT_REGISTER_TEST_GFA(NAME, FUNC, FUNC_USER, NULL)
+
+#define KFLAT_REGISTER_TEST_GFA_FLAGS(NAME, FUNC, FUNC_USER, GFA, FLAGS)    \
+    KFLAT_REGISTER_TEST_GFA(NAME, FUNC, FUNC_USER, GFA)
+
+#define KFLAT_REGISTER_TEST_FLAGS(NAME, FUNC, FUNC_USER, FLAGS) \
+    KFLAT_REGISTER_TEST(NAME, FUNC, FUNC_USER)
 
 /********************************/
 #endif

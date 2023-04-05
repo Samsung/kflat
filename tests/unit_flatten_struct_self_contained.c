@@ -69,4 +69,4 @@ static int kflat_flatten_struct_self_contained_unit_validate(void *memory, size_
 
 #endif
 
-KFLAT_REGISTER_TEST("[UNIT] flatten_struct_self_contained", kflat_flatten_struct_self_contained_unit_test, kflat_flatten_struct_self_contained_unit_validate);
+KFLAT_REGISTER_TEST_FLAGS("[UNIT] flatten_struct_self_contained", kflat_flatten_struct_self_contained_unit_test, kflat_flatten_struct_self_contained_unit_validate, KFLAT_TEST_ATOMIC);

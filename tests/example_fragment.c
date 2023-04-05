@@ -112,4 +112,4 @@ static int kflat_fragment_validate(void* memory, size_t size, CFlatten flatten) 
 
 #endif
 
-KFLAT_REGISTER_TEST("FRAGMENT", kflat_fragment_test, kflat_fragment_validate);
+KFLAT_REGISTER_TEST_FLAGS("FRAGMENT", kflat_fragment_test, kflat_fragment_validate, KFLAT_TEST_ATOMIC);

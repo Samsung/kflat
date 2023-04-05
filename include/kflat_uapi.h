@@ -28,6 +28,7 @@ struct kflat_ioctl_disable {
 
 struct kflat_ioctl_tests {
 	int debug_flag;
+	int use_stop_machine;
 	char test_name[128];
 };
 

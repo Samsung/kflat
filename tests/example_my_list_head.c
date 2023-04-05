@@ -74,4 +74,4 @@ static int kflat_overlaplist_validate(void *memory, size_t size, CFlatten flatte
 
 #endif
 
-KFLAT_REGISTER_TEST("OVERLAP_LIST", kflat_overlaplist_test, kflat_overlaplist_validate);
+KFLAT_REGISTER_TEST_FLAGS("OVERLAP_LIST", kflat_overlaplist_test, kflat_overlaplist_validate, KFLAT_TEST_ATOMIC);

@@ -62,4 +62,4 @@ static int kflat_flatten_union_unit_validate(void *memory, size_t size, CFlatten
 
 #endif
 
-KFLAT_REGISTER_TEST("[UNIT] flatten_union", kflat_flatten_union_unit_test, kflat_flatten_union_unit_validate);
+KFLAT_REGISTER_TEST_FLAGS("[UNIT] flatten_union", kflat_flatten_union_unit_test, kflat_flatten_union_unit_validate, KFLAT_TEST_ATOMIC);

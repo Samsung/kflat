@@ -147,4 +147,4 @@ static int kflat_structarray_validate(void *memory, size_t size, CFlatten flatte
 
 #endif
 
-KFLAT_REGISTER_TEST("STRUCTARRAY", kflat_structarray_example, kflat_structarray_validate);
+KFLAT_REGISTER_TEST_FLAGS("STRUCTARRAY", kflat_structarray_example, kflat_structarray_validate, KFLAT_TEST_ATOMIC);

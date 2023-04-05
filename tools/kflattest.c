@@ -18,6 +18,7 @@
 #include <sys/ioctl.h>
 #include <sys/mman.h>
 #include <sys/stat.h>
+#include <sys/time.h>
 #include <sys/wait.h>
 #include <ucontext.h>
 #include <unistd.h>
@@ -37,11 +38,44 @@ struct args {
     bool imginfo;
     bool continuous;
     bool verbose;
+    bool stop_machine;
     const char* output_dir;
 };
 
 int enable_verbose = 0;
 static const char* current_test_name = NULL;
+
+
+/*******************************************************
+ * MISC UTILITIES
+ *******************************************************/
+struct time_elapsed {
+    struct timeval _start;
+    struct timeval _end;
+    int seconds;
+    int mseconds;
+};
+
+void mark_time_start(struct time_elapsed* time) {
+    memset(&time->_start, 0, sizeof(struct timeval));
+    if(gettimeofday(&time->_start, NULL) != 0) {
+        log_error("Failed to get time_start mark: gettimeofday failed - %s", strerror(errno));
+    }
+}
+
+void mark_time_end(struct time_elapsed* time) {
+    memset(&time->_end, 0, sizeof(struct timeval));
+    if(gettimeofday(&time->_end, NULL) != 0) {
+        log_error("Failed to get time_end mark: gettimeofday failed - %s", strerror(errno));
+        return;
+    }
+
+    time_t ms_elapsed = time->_end.tv_sec * 1000 + time->_end.tv_usec / 1000 - 
+            time->_start.tv_sec * 1000 - time->_start.tv_usec / 1000;
+
+    time->seconds = ms_elapsed / 1000;
+    time->mseconds = ms_elapsed % 1000;
+}
 
 /*******************************************************
  * SIGNAL HANDLER
@@ -172,15 +206,20 @@ int run_test(struct args* args, const char* name) {
     int test_result = KFLAT_TEST_FAIL;
     const size_t flat_size = 10 * 1024 * 1024;   // 10MB
     ssize_t output_size;
+    struct time_elapsed kernel_time, total_time;
 
     struct kflat_ioctl_tests tests = {
-        .debug_flag = args->debug
+        .debug_flag = args->debug,
+        .use_stop_machine = args->stop_machine
     };
 
     if(args->verbose)
         log_info("=> Testing %s...", name);
     current_test_name = name;
     memset(_last_assert_tested, 0, sizeof(_last_assert_tested));
+    
+    mark_time_start(&total_time);
+    mark_time_start(&kernel_time);
 
     int fd = open(KFLAT_NODE, O_RDONLY);
     if(fd < 0) {
@@ -197,10 +236,15 @@ int run_test(struct args* args, const char* name) {
     strncpy(tests.test_name, name, sizeof(tests.test_name));
 
     output_size = ioctl(fd, KFLAT_TESTS, &tests);
-    if(output_size < 0) {
+    if(args->stop_machine && output_size < 0 && errno == EINVAL) {
+        test_result = KFLAT_TEST_UNSUPPORTED;
+        goto munmap_area;
+    } else if(output_size < 0) {
         log_error("failed to execute KFLAT_TEST ioctl - %s", strerror(errno));
         goto munmap_area;
     }
+
+    mark_time_end(&kernel_time);
 
     /* Save debug log early */
     if (args->debug) {
@@ -362,13 +406,21 @@ munmap_area:
 close_fd:
     close(fd);
 exit:
+
+    mark_time_end(&total_time);
+    if(args->verbose)
+        log_info("\t=> Time spent: kernel [%d.%03ds]; total[%d.%03ds]",
+            kernel_time.seconds, kernel_time.mseconds, total_time.seconds, total_time.mseconds);
+
     if(test_result == KFLAT_TEST_SUCCESS)
-        log_info("Test %-50s - SUCCESS", name);
+        log_info("Test %-50s [%d.%03ds] - SUCCESS", name, total_time.seconds, total_time.mseconds);
     else if(test_result == KFLAT_TEST_UNSUPPORTED)
-        log_info("Test %-50s - %sUNSUPPORTED%s", name,
+        log_info("Test %-50s [%d.%03ds] - %sUNSUPPORTED%s", name,
+                total_time.seconds, total_time.mseconds,
                 OUTPUT_COLOR(LOG_WARN_COLOR), OUTPUT_COLOR(LOG_DEFAULT_COLOR));
     else
-        log_error("Test %-50s - %sFAILED%s", name, 
+        log_error("Test %-50s [%d.%03ds] - %sFAILED%s", name, 
+                 total_time.seconds, total_time.mseconds,
                 OUTPUT_COLOR(LOG_ERR_COLOR), OUTPUT_COLOR(LOG_DEFAULT_COLOR));
     return test_result == KFLAT_TEST_SUCCESS || test_result == KFLAT_TEST_UNSUPPORTED;
 }
@@ -388,6 +440,7 @@ static struct argp_option options[] = {
     {"image-info", 'i', 0, 0, "Print image information before validation"},
     {"continuous", 'c', 0, 0, "Load memory image in continuous fashion during validation"},
     {"verbose", 'v', 0, 0, "More verbose logs"},
+    {"stop-machine", 'm', 0, 0, "Run tests under stop_machine macro"},
     { 0 }
 };
 
@@ -416,6 +469,9 @@ static error_t parse_opt(int key, char* arg, struct argp_state* state) {
             break;
         case 'v':
             options->verbose = true;
+            break;
+        case 'm':
+            options->stop_machine = true;
             break;
         
         case ARGP_KEY_ARG:

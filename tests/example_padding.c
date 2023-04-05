@@ -69,4 +69,4 @@ static int kflat_padding_validate(void *memory, size_t size, CFlatten flatten) {
 
 #endif
 
-KFLAT_REGISTER_TEST("PADDING", kflat_padding_test, kflat_padding_validate);
+KFLAT_REGISTER_TEST_FLAGS("PADDING", kflat_padding_test, kflat_padding_validate, KFLAT_TEST_ATOMIC);

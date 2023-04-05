@@ -82,4 +82,4 @@ static int kflat_flatten_struct_type_validate(void *memory, size_t size, CFlatte
 
 #endif
 
-KFLAT_REGISTER_TEST("[UNIT] flatten_type", kflat_flatten_type_unit_test, kflat_flatten_struct_type_validate);
+KFLAT_REGISTER_TEST_FLAGS("[UNIT] flatten_type", kflat_flatten_type_unit_test, kflat_flatten_struct_type_validate, KFLAT_TEST_ATOMIC);

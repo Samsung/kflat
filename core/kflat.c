@@ -253,6 +253,16 @@ NOKPROBE_SYMBOL(probing_delegate);
 /*******************************************************
  * KFLAT tests runner
  *******************************************************/
+struct stopm_kflat_test {
+	struct kflat* kflat;
+	kflat_test_case_handler_t handler;
+};
+
+static int kflat_test_stop_machine(void* arg) {
+	struct stopm_kflat_test* target = (struct stopm_kflat_test*) arg;
+	return target->handler(target->kflat);
+}
+
 int kflat_run_test(struct kflat* kflat, struct kflat_ioctl_tests* test) {
 	int err;
 	size_t tests_count = sizeof(test_cases) / sizeof(test_cases[0]);
@@ -265,9 +275,33 @@ int kflat_run_test(struct kflat* kflat, struct kflat_ioctl_tests* test) {
 	for(size_t i = 0; i < tests_count; i++) {
 		if(!strcmp(test->test_name, test_cases[i]->name)) {
 			kflat->debug_flag = test->debug_flag;
+
 			flatten_init(kflat);
 
-			err = test_cases[i]->handler(kflat);
+			if(test->use_stop_machine) {
+				cpumask_t cpumask;
+				struct stopm_kflat_test arg = {
+					.kflat = kflat,
+					.handler = test_cases[i]->handler
+				};
+
+				if(!(test_cases[i]->flags & KFLAT_TEST_ATOMIC)) {
+					pr_err("Cannot execute non-atomic test '%s' under stom_machine", 
+							test_cases[i]->name);
+							flatten_fini(kflat);
+					return -EINVAL;
+				}
+
+				cpumask_clear(&cpumask);
+				cpumask_set_cpu(0, &cpumask);
+
+				flat_infos("Running kflat test under stop_machine: %s",test_cases[i]->name);
+				err = stop_machine(kflat_test_stop_machine, (void*) &arg, &cpumask);
+				if(err)
+					pr_err("@Flatten stop_machine failed: %d", err);
+			} else {
+				err = test_cases[i]->handler(kflat);
+			}
 
 			flat_infos("@Flatten done: %d\n",kflat->errno);
 			if (!kflat->errno && !err)

@@ -54,4 +54,4 @@ static int kflat_simple_validate(void *memory, size_t size, CFlatten flatten) {
 
 #endif
 
-KFLAT_REGISTER_TEST("SIMPLE", kflat_simple_test, kflat_simple_validate);
+KFLAT_REGISTER_TEST_FLAGS("SIMPLE", kflat_simple_test, kflat_simple_validate, KFLAT_TEST_ATOMIC);

@@ -64,4 +64,4 @@ static int kflat_overlapptr_test_validate(void *memory, size_t size, CFlatten fl
 
 #endif
 
-KFLAT_REGISTER_TEST("OVERLAP_PTR", kflat_overlapptr_test, kflat_overlapptr_test_validate);
+KFLAT_REGISTER_TEST_FLAGS("OVERLAP_PTR", kflat_overlapptr_test, kflat_overlapptr_test_validate, KFLAT_TEST_ATOMIC);
