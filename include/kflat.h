@@ -404,17 +404,38 @@ static inline void destroy_flatten_pointer(struct flatten_pointer* fp) {
 }
 
 static inline size_t strmemlen(const char* s) {
-	size_t str_size;
-	size_t avail_size = kdump_test_address((void*) s, INT_MAX);
+	size_t str_size, avail_size, test_size;
+	
+	// 1. Fast-path. Check whether first 256 bytes are maped
+	//  and look for null-terminator in there
+	avail_size = kdump_test_address((void*) s, 256);
 	if(avail_size == 0)
 		return 0;
 
 	str_size = strnlen(s, avail_size);
-	if(str_size >= avail_size)
-		// Missing null termiantor
-		return str_size;
+	if(str_size < avail_size)
+		// Return string length + null terminator
+		return str_size + 1;
+	
+	// 2. Slow-path. We haven't encountered null-terminator in first
+	//  256 bytes, let's look futher
+	test_size = PAGE_SIZE;
+	while(test_size < INT_MAX) {
+		size_t partial_size;
+		size_t off = avail_size;
 
-	return str_size + 1;
+		partial_size = kdump_test_address((void*)s + off, test_size);
+		if(partial_size == 0)
+			return avail_size;
+		avail_size += partial_size;
+		
+		str_size = strnlen(s+off, partial_size);
+		if(str_size < partial_size)
+			return off + str_size + 1;
+		test_size *= 2;
+	}
+
+	return avail_size;
 }
 
 #define FLATTEN_MAGIC 0x464c415454454e00ULL
