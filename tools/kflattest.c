@@ -204,7 +204,7 @@ int run_test(struct args* args, const char* name) {
     FILE* file;
     char out_name[128];
     int test_result = KFLAT_TEST_FAIL;
-    const size_t flat_size = 10 * 1024 * 1024;   // 10MB
+    const size_t flat_size = 100 * 1024 * 1024;   // 10MB
     ssize_t output_size;
     struct time_elapsed kernel_time, total_time;
 
