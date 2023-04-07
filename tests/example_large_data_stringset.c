@@ -89,14 +89,23 @@ static void stringset_destroy(struct rb_root *root) {
 static int kflat_large_data_stringset_test(struct kflat *kflat) {
 	
 	unsigned i, j;
-	static const char chars[] = "ABCDEFGHIJKLMNOPQRST";
-	unsigned char r;
+	static const char chars[] = "ABCDEFGHIJKLMNOP";
+	struct rnd_state rand_state;
+
+	prandom_seed_state(&rand_state, ktime_get_real());
 
 	for (j = 0; j < TREE_ELEMENT_COUNT; ++j) {
 		char *s = kflat_zalloc(kflat,TREE_ELEMENT_DATASIZE+1,1);
-		for (i = 0; i < TREE_ELEMENT_DATASIZE; ++i) {
-			get_random_bytes(&r, 1);
-			s[i] = chars[r%20];
+		for (i = 0; i < TREE_ELEMENT_DATASIZE/8; ++i) {
+			u32 r = prandom_u32_state(&rand_state);
+			s[i*8] = chars[(r>>0)&0xf];
+			s[i*8+1] = chars[(r>>4)&0xf];
+			s[i*8+2] = chars[(r>>8)&0xf];
+			s[i*8+3] = chars[(r>>12)&0xf];
+			s[i*8+4] = chars[(r>>16)&0xf];
+			s[i*8+5] = chars[(r>>20)&0xf];
+			s[i*8+6] = chars[(r>>24)&0xf];
+			s[i*8+7] = chars[(r>>28)&0xf];
 		}
 		stringset_insert(kflat,s);
 	}
