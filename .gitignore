@@ -11,6 +11,8 @@
 *.log
 *.o.ur-detected
 *.o.ur-safe
+*.o.d
+*.data
 
 modules.order
 Module.symvers
