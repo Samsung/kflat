@@ -1,14 +1,14 @@
 # Memory Map Example
 
 This example flattens KFLAT's interval tree storing kernel's virtual memory layout 
-consiting of around 400k elements. Once flattened, application `client_app` allows user
+consisting of around 400k elements. Once flattened, application `client_app` allows user
 to browse through this interval tree and list physicall addresses of maped VA pages.
 
 ## Build
 
 This kernel module is build alongside all other files in this repo - simply enter
 root directory of KFLAT repository and run `make` command from README.md. After that, there should
-be file `kflat_core.ko` present in this directory.
+be file `mem_map_recipe.ko` present in this directory.
 
 Building userspace test app is a bit more complicated as it has to be done manually. See
 below example commands for cross-compiling for ARM64 and for native compiling for x86_64.
@@ -17,7 +17,7 @@ below example commands for cross-compiling for ARM64 and for native compiling fo
 CFLAGS="-I../../include -I../../lib -I../../lib/include_priv --static"
 
 # Target: x86_64
-g++ $CFLAGS -o client_app client_app.cpp ../../lib/libunflatten_arm64.a -lstdc++
+g++ $CFLAGS -o client_app client_app.cpp ../../lib/libunflatten_x86_64.a -lstdc++
 
 # Target: ARM64
 aarch64-linux-gnu-g++ $CFLAGS -o client_app client_app.cpp ../../lib/libunflatten_arm64.a -lstdc++
