@@ -1685,7 +1685,7 @@ void flatten_run_iter_harness(struct kflat* kflat, struct bqueue* bq) {
 		if (now - init_time > KFLAT_PING_TIME_NS) {
 			total_time += now - init_time;
 			if (total_time > KFLAT_MAX_TIME_NS) {
-				flat_errs("Timeout! Total time %lld [ms] exceeds maximum allowed %lld [ms]\n", 
+				flat_errs("Timeout! Total time %lld [ms] exceeds maximum allowed %ld [ms]\n", 
 							total_time / NSEC_PER_MSEC, KFLAT_MAX_TIME_NS / NSEC_PER_MSEC);
 				kflat->errno = EAGAIN;
 				break;

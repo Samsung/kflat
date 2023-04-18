@@ -22,6 +22,8 @@
 #include <asm/processor.h>
 #endif
 
+#undef pr_fmt
+#define pr_fmt(fmt) "kflat: " fmt
 
 /*******************************************************
  * INTERVAL TREE
@@ -251,7 +253,7 @@ static pgd_t* kdump_get_kernel_pgd(void) {
 }
 
 #else 
-#error "Kflat module supports only x86 and ARM64 architectures
+#error "Kflat module supports only x86 and ARM64 architectures"
 #endif
 
 /*

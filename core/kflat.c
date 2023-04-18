@@ -224,7 +224,7 @@ asmlinkage __used uint64_t probing_delegate(struct probe_regs* regs) {
 	else
 		kflat->recipe->handler(kflat, regs);
 
-	pr_info("flatten done: %d\n", kflat->errno);
+	pr_info("Flatten done: error=%d\n", kflat->errno);
 	if (!kflat->errno) {
 		err = flatten_write(kflat);
 		if(err)
@@ -317,7 +317,7 @@ int kflat_run_test(struct kflat* kflat, struct kflat_ioctl_tests* test) {
 		}
 	}
 
-	pr_err("No such test named '%s' (avail %d tests)", test->test_name, tests_count);
+	pr_err("No such test named '%s' (avail %ld tests)", test->test_name, tests_count);
 	return -ENOENT;
 }
 
