@@ -27,7 +27,7 @@ aarch64-linux-gnu-gcc $CFLAGS -o drm_client drm_client.c ../../lib/libunflatten_
 
 Load `kflat_core.ko` module first. Next, load `drm_framebuffer_recipe.ko` module present in this directory.
 
-Use `tools/executor` application to invoked `drm_ioctl` handler:
+Use `tools/executor` application to invoke `drm_ioctl` handler:
 
 ```bash
 $ tools/executor -i IOCTL -o drm.bin -s -n drm_ioctl /dev/dri/card0
