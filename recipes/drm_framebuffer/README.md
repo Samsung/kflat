@@ -37,6 +37,28 @@ Finally, execute `./drm_client <output_file>` app to test flattening and display
 
 ```
 $ ./drm_client drm.bin
+=== DRM device info ===
+ Unique name:  ae00000.qcom,mdss_mdp
+ Is unplugged: 0
+ No. crtcs:    6
+ Power state:  0
+=== DRM mode config ===
+ No. connectors: 4
+ No. encoders:   6
+ No. planes:     20
+ No. fbuffers:   12
+ Min size (W/H): 0_0
+ Max size (W/H): 20480_8640
+ FB base (phyS): 0
+=== DRM framebuffer[0] ===
+ Name:           composer-servic
+ Width / Height: 1088/2320
+ Pitches[4]:     4352/0/0/0
+ Offsets[4]:     0/0/0/0
+ Format:         875708993
+ Depth:          32
+ Num. planes:    1
+ Has alpha ch:   1
 
-TODO
+...
 ```
