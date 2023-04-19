@@ -152,6 +152,15 @@ void print_kallsyms_info(struct kdump_memory_map* mem, const char* symbol) {
     printf("\t [%s]: 0x%lx ==> 0x%lx\n", symbol, addr, phys_addr);
 }
 
+size_t calc_number_of_entries(struct kdump_memory_map* mem) {
+    size_t count = 0;
+    struct rb_root* root = &mem->imap_root.rb_root;
+
+    for(struct rb_node* p = rb_first_postorder(root); p != NULL; p = rb_next_postorder(p))
+        count++;
+    return count;
+}
+
 size_t calc_size_of_va_mem(struct kdump_memory_map* mem) {
     size_t size = 0;
     struct kdump_memory_node* node;
@@ -214,7 +223,8 @@ void process_dump() {
     print_kallsyms_info(mem, "flatten_write");
 
     // Print amount of system memory
-    printf("\nTotal amount of virtual memory allocated: %zuMB\n", calc_size_of_va_mem(mem) / 1024 / 1024);
+    printf("\nNumber of allocated mappings: %zu\n", calc_number_of_entries(mem));
+    printf("Total amount of virtual memory allocated: %zuMB\n", calc_size_of_va_mem(mem) / 1024 / 1024);
     printf("Total amount of physical memory allocated: %zuMB\n", calc_size_of_phys_mem(mem) / 1024 / 1024);
 
     // Clean up
