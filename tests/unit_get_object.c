@@ -21,7 +21,10 @@ struct get_obj_result {
 
 #include <linux/vmalloc.h>
 
+#ifdef KFLAT_GET_OBJ_SUPPORT
 static int iarr[16];
+#endif
+
 
 FUNCTION_DEFINE_FLATTEN_STRUCT(get_obj_result);
 
