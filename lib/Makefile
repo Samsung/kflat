@@ -6,10 +6,10 @@ ALL_TARGET =
 # Generic targets
 #
 rbtree.o: rbtree.c
-	$(CXX) $(CFLAGS) -c -o $@ $^
+	$(CXX) $(CFLAGS) -ggdb3 -c -o $@ $^
 
 unflatten.o: unflatten.cpp unflatten.hpp
-	$(CXX) $(CFLAGS) -c -o $@ $<
+	$(CXX) $(CFLAGS) -ggdb3 -c -o $@ $<
 
 libunflatten_$(ARCH).so: unflatten.o rbtree.o
 	$(CXX) $(LDFLAGS) -o $@ $^

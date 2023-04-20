@@ -5,6 +5,10 @@ KDIR ?= $(KERNEL_DIR)
 CCDIR ?= $(CLANG_DIR)
 OPTS ?= $(KFLAT_OPTS)
 
+ifneq ($(RECIPE_DIRS),)
+  export RECIPE_DIRS
+endif
+
 .DEFAULT_GOAL := default
 
 ifeq ($(KDIR),)

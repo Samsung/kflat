@@ -567,7 +567,7 @@ struct flatten_pointer* FUNC_NAME(struct kflat* kflat, const void* ptr, size_t n
 struct flatten_pointer* FUNC_NAME(struct kflat* kflat, const void* ptr, uintptr_t __cval, unsigned long __index, struct bqueue* __q) {    \
             \
 	struct flat_node *__node;		\
-	typedef FULL_TYPE _container_type; \
+	typedef FULL_TYPE _container_type __attribute__((unused)); \
 	size_t _alignment = 0;  \
 	struct flatten_pointer* r = 0;	\
 	size_t _node_offset;	\
