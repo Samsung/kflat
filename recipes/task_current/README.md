@@ -28,7 +28,7 @@ Load modules `kflat_core.ko` and `task_current_recipe.ko`. Next, use tool `tools
 invoke `random_read` handler.
 
 ```bash
-$ tools/executor -i READ -o task_struct.bin -s -n random_read /dev/random
+$ tools/executor -i READ -o task_struct.bin -s -n read_null /dev/null
 ```
 
 Finally, execute `./task_current_client <output_file>` app to test flattening and display

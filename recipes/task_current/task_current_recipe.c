@@ -72,7 +72,7 @@ static void random_read_handler(struct kflat* kflat, struct probe_regs* regs) {
 
 // Declaration of instrumented functions
 KFLAT_RECIPE_LIST(
-    KFLAT_RECIPE("random_read", random_read_handler)
+    KFLAT_RECIPE("read_null", random_read_handler)
 );
 KFLAT_RECIPE_MODULE("Example module dumping selected set of fields from task_struct");
 
