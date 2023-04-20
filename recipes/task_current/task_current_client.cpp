@@ -3,68 +3,54 @@
  * 
  */
 #include <cstdio>
+#include <cinttypes>
 #include <set>
 
 #include <unflatten.hpp>
 
 #define OFFSET_VAR(X)   off_t off_ ## X
 struct task_struct_info {
-    OFFSET_VAR(last_wakee);
-    OFFSET_VAR(real_parent);
-    OFFSET_VAR(parent);
-    OFFSET_VAR(group_leader);
-    OFFSET_VAR(pi_top_task);
-    OFFSET_VAR(oom_reaper_list);
-
     OFFSET_VAR(pid);
     OFFSET_VAR(tgid);
     OFFSET_VAR(cpu);
     OFFSET_VAR(prio);
     OFFSET_VAR(comm);
+    OFFSET_VAR(flags);
+    OFFSET_VAR(utime);
+    OFFSET_VAR(stime);
+    OFFSET_VAR(tasks);
 };
 
 struct task_struct;
-#define TASK_STRUCT(tsk, info, field, type)   *(type*)((char*)tsk + info->off_ ## field)
+#define TASK_STRUCT(tsk, info, field, type)   (*(type*)((unsigned char*)tsk + info->off_ ## field))
 
+static void print_task_struct(struct task_struct* tsk, struct task_struct_info* info) {
 
-void walk_task_struct(struct task_struct* tsk, struct task_struct_info* info, std::set<struct task_struct*> &visited) {
-    visited.insert(tsk);
-    printf("T[%d:%d], cpu: %u, prio: %d, comm: %s\n", 
+    printf("T[%d:%d], cpu: %u, prio: %d, comm: %s, flags: %u, utime: %" PRIu64 ", stime: %" PRIu64 "\n",
         TASK_STRUCT(tsk, info, pid, int),
         TASK_STRUCT(tsk, info, tgid, int),
         TASK_STRUCT(tsk, info, cpu, unsigned int),
         TASK_STRUCT(tsk, info, prio, int),
-        &TASK_STRUCT(tsk, info, comm, char)
+        &TASK_STRUCT(tsk, info, comm, char),
+        TASK_STRUCT(tsk, info, flags, unsigned int),
+        TASK_STRUCT(tsk, info, utime, uint64_t),
+        TASK_STRUCT(tsk, info, stime, uint64_t)
     );
+}
 
-    if(TASK_STRUCT(tsk, info, last_wakee, struct task_struct*) != NULL 
-        && visited.find(TASK_STRUCT(tsk, info, last_wakee, struct task_struct*)) == visited.end()) {
-        walk_task_struct(TASK_STRUCT(tsk, info, last_wakee, struct task_struct*), info, visited);
+#define next_task(__task,__info)   ((struct task_struct*)(TASK_STRUCT(__task, __info, tasks, unsigned char*)-__info->off_tasks))
+
+void list_task_struct(struct task_struct* init_tsk, struct task_struct_info* info) {
+
+    struct task_struct* p;
+    unsigned long task_count = 0;
+    for (p = init_tsk; (p = next_task(p,info)) != init_tsk ; ) {
+        task_count++;
     }
 
-    if(TASK_STRUCT(tsk, info, real_parent, struct task_struct*) != NULL 
-        && visited.find(TASK_STRUCT(tsk, info, real_parent, struct task_struct*)) == visited.end()) {
-        walk_task_struct(TASK_STRUCT(tsk, info, real_parent, struct task_struct*), info, visited);
-    }
-
-    if(TASK_STRUCT(tsk, info, parent, struct task_struct*) != NULL 
-        && visited.find(TASK_STRUCT(tsk, info, parent, struct task_struct*)) == visited.end()) {
-        walk_task_struct(TASK_STRUCT(tsk, info, parent, struct task_struct*), info, visited);
-    }
-
-    if(TASK_STRUCT(tsk, info, group_leader, struct task_struct*) != NULL 
-        && visited.find(TASK_STRUCT(tsk, info, group_leader, struct task_struct*)) == visited.end()) {
-        walk_task_struct(TASK_STRUCT(tsk, info, group_leader, struct task_struct*), info, visited);
-    }
-
-    if(TASK_STRUCT(tsk, info, pi_top_task, struct task_struct*) != NULL 
-        && visited.find(TASK_STRUCT(tsk, info, pi_top_task, struct task_struct*)) == visited.end()) {
-        walk_task_struct(TASK_STRUCT(tsk, info, pi_top_task, struct task_struct*), info, visited);
-    }
-
-    if(TASK_STRUCT(tsk, info, oom_reaper_list, struct task_struct*) != NULL 
-        && visited.find(TASK_STRUCT(tsk, info, oom_reaper_list, struct task_struct*)) == visited.end()) {
-        walk_task_struct(TASK_STRUCT(tsk, info, oom_reaper_list, struct task_struct*), info, visited);
+    printf("## Found %lu tasks\n",task_count);
+    for (p = init_tsk; (p = next_task(p,info)) != init_tsk ; ) {
+        print_task_struct(p,info);
     }
 }
 
@@ -89,9 +75,9 @@ int main(int argc, char** argv) {
     printf("Loaded input file %s\n", argv[1]);
     fclose(file);
 
-    struct task_struct* task_struct = (struct task_struct*) flatten.get_named_root("task_struct", NULL);
-    if(task_struct == NULL) {
-        fprintf(stderr, "Failed to locate task_struct in loaded file\n");
+    struct task_struct* init_task_struct = (struct task_struct*) flatten.get_named_root("init_task", NULL);
+    if(init_task_struct == NULL) {
+        fprintf(stderr, "Failed to locate init task_struct in loaded file\n");
         return 1;
     }
 
@@ -101,8 +87,7 @@ int main(int argc, char** argv) {
         return 1;
     }
 
-    std::set<struct task_struct*> visited;
-    walk_task_struct(task_struct, info, visited);
+    list_task_struct(init_task_struct, info);
 
     return 0;
 }

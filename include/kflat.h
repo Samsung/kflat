@@ -961,8 +961,14 @@ struct flatten_pointer* FUNC_NAME(struct kflat* kflat, const void* ptr, uintptr_
 #define AGGREGATE_FLATTEN_STRUCT_ARRAY_SHIFTED(T,f,n,_shift)	\
 	AGGREGATE_FLATTEN_GENERIC(struct T, flatten_struct_array_##T, sizeof(struct T),f,offsetof(_container_type,f),n,0,0,0,_shift)
 
+#define AGGREGATE_FLATTEN_STRUCT_SHIFTED(T,f,_shift)	\
+	AGGREGATE_FLATTEN_GENERIC(struct T, flatten_struct_array_##T, sizeof(struct T),f,offsetof(_container_type,f),1,0,0,0,_shift)
+
 #define AGGREGATE_FLATTEN_STRUCT_TYPE_ARRAY_SHIFTED(T,f,n,_shift)	\
 	AGGREGATE_FLATTEN_GENERIC(T, flatten_struct_type_array_##T, sizeof(T),f,offsetof(_container_type,f),n,0,0,0,_shift)
+
+#define AGGREGATE_FLATTEN_STRUCT_TYPE_SHIFTED(T,f,_shift)	\
+	AGGREGATE_FLATTEN_GENERIC(T, flatten_struct_type_array_##T, sizeof(T),f,offsetof(_container_type,f),1,0,0,0,_shift)
 
 #define AGGREGATE_FLATTEN_STRUCT_EMBEDDED_POINTER_ARRAY_SELF_CONTAINED_SHIFTED(T,N,f,_off,pre_f,post_f,n,_shift)	\
 	AGGREGATE_FLATTEN_GENERIC(struct T, flatten_struct_array_##T, sizeof(struct T),f,offsetof(_container_type,f),n,0,pre_f,post_f,_shift)	
