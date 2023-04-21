@@ -2,7 +2,7 @@
  * @file client_app.c
  * @author Pawel Wieczorek (p.wieczorek@samsung.com)
  * @brief User application presenting the content of memory dump performed
- *      by mem_map_recipe.ko module
+ *      by memory_map_recipe.ko module
  */
 #include <cerrno>
 #include <cstdio>

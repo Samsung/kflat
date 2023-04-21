@@ -1233,5 +1233,14 @@ struct flatten_pointer* FUNC_NAME(struct kflat* kflat, const void* ptr, uintptr_
 #define PTRNODE(PTRV)	(interval_tree_iter_first(&kflat->FLCTRL.imap_root, (uintptr_t)(PTRV), (uintptr_t)(PTRV)))
 #define KFLAT_ACCESSOR kflat
 
+/* Helper functions for recipes */
+static inline void *ptr_clear_2lsb_bits(const void *ptr) {
+	return (void *)((uintptr_t)ptr & ~3);
+}
+
+static inline struct flatten_pointer *flatten_ptr_restore_2lsb_bits(struct flatten_pointer *fptr, const struct flatten_base *ptr) {
+	fptr->offset |= (size_t)((uintptr_t)ptr & 3);
+	return fptr;
+}
 
 #endif /* _LINUX_KFLAT_H */

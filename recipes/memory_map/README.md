@@ -8,7 +8,7 @@ to browse through this interval tree and list physicall addresses of maped VA pa
 
 This kernel module is build alongside all other files in this repo - simply enter
 root directory of KFLAT repository and run `make` command from README.md. After that, there should
-be file `mem_map_recipe.ko` present in this directory.
+be file `memory_map_recipe.ko` present in this directory.
 
 Building userspace test app is a bit more complicated as it has to be done manually. See
 below example commands for cross-compiling for ARM64 and for native compiling for x86_64.
@@ -25,7 +25,7 @@ aarch64-linux-gnu-g++ $CFLAGS -o client_app client_app.cpp ../../lib/libunflatte
 
 ## Run
 
-Load `kflat_core.ko` module first. Next, load `mem_map_recipe.ko` module present in this
+Load `kflat_core.ko` module first. Next, load `memory_map_recipe.ko` module present in this
 directory. Finally, execute `./client_app` program to test flattening and display your's
 kernel VA memory layout.
 

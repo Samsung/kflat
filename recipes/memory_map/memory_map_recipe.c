@@ -1,5 +1,5 @@
 /**
- * @file mem_map_recipe.c
+ * @file memory_map_recipe.c
  * @author Pawel Wieczorek (p.wieczorek@samsung.com)
  * @brief Example kflat recipe hooking into kflat itself and dumping
  *  kernel's memory map
@@ -13,18 +13,9 @@
 
 
 // Declare recipes for required data_types
-static inline void* ptr_remove_color(const void *ptr) {
-	return (void*)((uintptr_t)ptr & ~3ULL);
-}
-
-static inline struct flatten_pointer *fptr_add_color(struct flatten_pointer *fptr, const struct flatten_base* ptr) {
-	fptr->offset |= (size_t)((uintptr_t)ptr & 3);
-	return fptr;
-}
-
 FUNCTION_DECLARE_FLATTEN_STRUCT(kdump_memory_node);
 FUNCTION_DEFINE_FLATTEN_STRUCT(kdump_memory_node,
-	AGGREGATE_FLATTEN_STRUCT_EMBEDDED_POINTER(kdump_memory_node, rb.__rb_parent_color, ptr_remove_color, fptr_add_color);
+	AGGREGATE_FLATTEN_STRUCT_EMBEDDED_POINTER(kdump_memory_node, rb.__rb_parent_color, ptr_clear_2lsb_bits, flatten_ptr_restore_2lsb_bits);
     AGGREGATE_FLATTEN_STRUCT(kdump_memory_node, rb.rb_right);
     AGGREGATE_FLATTEN_STRUCT(kdump_memory_node, rb.rb_left);
 );

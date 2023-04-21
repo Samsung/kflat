@@ -29,24 +29,15 @@ struct myTreeNode {
 #ifdef __KERNEL__
 /********************************/
 
-static inline void *rbnode_remove_color(const void *ptr) {
-	return (void *)((uintptr_t)ptr & ~3);
-}
-
-static inline struct flatten_pointer *rbnode_add_color(struct flatten_pointer *fptr, const struct flatten_base *ptr) {
-	fptr->offset |= (size_t)((uintptr_t)ptr & 3);
-	return fptr;
-}
-
 FUNCTION_DECLARE_FLATTEN_STRUCT_ARRAY_SELF_CONTAINED(myTreeNode, sizeof(struct myTreeNode));
 
 FUNCTION_DEFINE_FLATTEN_STRUCT_SELF_CONTAINED(myTreeNode, sizeof(struct myTreeNode),
 	AGGREGATE_FLATTEN_STRUCT_EMBEDDED_POINTER_ARRAY_SELF_CONTAINED_SHIFTED(myTreeNode, sizeof(struct myTreeNode), inode.__rb_parent_color, offsetof(struct myTreeNode,inode.__rb_parent_color),
-										rbnode_remove_color, rbnode_add_color, 1, -offsetof(struct myTreeNode,inode));
+										ptr_clear_2lsb_bits, flatten_ptr_restore_2lsb_bits, 1, -offsetof(struct myTreeNode,inode));
 	AGGREGATE_FLATTEN_STRUCT_ARRAY_SELF_CONTAINED_SHIFTED(myTreeNode, sizeof(struct myTreeNode), inode.rb_right, offsetof(struct myTreeNode,inode.rb_right), 1, -offsetof(struct myTreeNode,inode));
 	AGGREGATE_FLATTEN_STRUCT_ARRAY_SELF_CONTAINED_SHIFTED(myTreeNode, sizeof(struct myTreeNode), inode.rb_left, offsetof(struct myTreeNode,inode.rb_left), 1, -offsetof(struct myTreeNode,inode));
 	AGGREGATE_FLATTEN_STRUCT_EMBEDDED_POINTER_ARRAY_SELF_CONTAINED_SHIFTED(myTreeNode, sizeof(struct myTreeNode), snode.__rb_parent_color, offsetof(struct myTreeNode,snode.__rb_parent_color),
-										rbnode_remove_color, rbnode_add_color, 1, -offsetof(struct myTreeNode,snode.__rb_parent_color));
+										ptr_clear_2lsb_bits, flatten_ptr_restore_2lsb_bits, 1, -offsetof(struct myTreeNode,snode.__rb_parent_color));
 	AGGREGATE_FLATTEN_STRUCT_ARRAY_SELF_CONTAINED_SHIFTED(myTreeNode, sizeof(struct myTreeNode), snode.rb_right, offsetof(struct myTreeNode,snode.rb_right), 1, -offsetof(struct myTreeNode,snode.__rb_parent_color));
 	AGGREGATE_FLATTEN_STRUCT_ARRAY_SELF_CONTAINED_SHIFTED(myTreeNode, sizeof(struct myTreeNode), snode.rb_left, offsetof(struct myTreeNode,snode.rb_left), 1, -offsetof(struct myTreeNode,snode.__rb_parent_color));
 	AGGREGATE_FLATTEN_STRING_SELF_CONTAINED(s, offsetof(struct myTreeNode,s));

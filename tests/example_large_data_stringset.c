@@ -26,20 +26,11 @@ struct largestring_node_atomic {
 
 static struct rb_root stringset_root = RB_ROOT;
 
-static inline void* ptr_remove_color(const void* ptr) {
-	return (void*)((uintptr_t)ptr & ~3);
-}
-
-static inline struct flatten_pointer *fptr_add_color(struct flatten_pointer *fptr, const struct flatten_base *ptr) {
-	fptr->offset |= (size_t)((uintptr_t)ptr & 3);
-	return fptr;
-}
-
 FUNCTION_DECLARE_FLATTEN_STRUCT(largestring_node_atomic);
 
 FUNCTION_DEFINE_FLATTEN_STRUCT(largestring_node_atomic,
 	STRUCT_ALIGN(4);
-	AGGREGATE_FLATTEN_STRUCT_EMBEDDED_POINTER(largestring_node_atomic, node.__rb_parent_color, ptr_remove_color, fptr_add_color);
+	AGGREGATE_FLATTEN_STRUCT_EMBEDDED_POINTER(largestring_node_atomic, node.__rb_parent_color, ptr_clear_2lsb_bits, flatten_ptr_restore_2lsb_bits);
 	AGGREGATE_FLATTEN_STRUCT(largestring_node_atomic, node.rb_right);
 	AGGREGATE_FLATTEN_STRUCT(largestring_node_atomic, node.rb_left);
 	AGGREGATE_FLATTEN_STRING(s);
