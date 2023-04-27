@@ -103,18 +103,17 @@ struct interval_nodelist {
 };
 
 struct queue_block {
-    struct queue_block* next;
-    unsigned char data[];
+	struct list_head head;
+	unsigned char data[];
 };
 
 struct bqueue {
-    size_t block_size;
-    size_t size;
-    struct queue_block* front_block;
-    size_t front_index;
-    struct queue_block* back_block;
-    size_t back_index;
-    unsigned long el_count;
+	struct queue_block *storage;
+	size_t block_size;
+	size_t size;
+	size_t front_index;
+	size_t back_index;
+	unsigned long el_count;
 };
 
 #ifdef CONFIG_ARM64

@@ -202,15 +202,12 @@ static void binary_stream_update_pointers(struct kflat* kflat) {
  *  List based implementation of two-way queue
  ******************************************************/
 int bqueue_init(struct kflat* kflat, struct bqueue* q, size_t block_size) {
-
     q->block_size = block_size;
     q->size = 0;
-    q->front_block = kflat_bqueue_zalloc(kflat,block_size+sizeof(struct queue_block*),1);
-    if (!q->front_block) {
-    	return ENOMEM;
-    }
-    q->front_block->next = 0;
-    q->back_block = q->front_block;
+    q->storage = kflat_bqueue_zalloc(kflat, block_size + sizeof(struct queue_block *), 1);
+    if (!q->storage)
+	    return ENOMEM;
+    INIT_LIST_HEAD(&q->storage->head);
     q->front_index=0;
     q->back_index=0;
     return 0;
@@ -218,13 +215,12 @@ int bqueue_init(struct kflat* kflat, struct bqueue* q, size_t block_size) {
 EXPORT_SYMBOL_GPL(bqueue_init);
 
 void bqueue_destroy(struct bqueue* q) {
-
-    struct queue_block* back = q->back_block;
-    while(back) {
-        struct queue_block* tmp = back;
-        back = back->next;
-        kflat_bqueue_free(tmp);
-    }
+	struct queue_block *cur = NULL;
+	struct queue_block *tmp = NULL;
+	list_for_each_entry_safe(cur, tmp, &q->storage->head, head) {
+		list_del(&cur->head);
+		kflat_bqueue_free(tmp);
+	}
 }
 EXPORT_SYMBOL_GPL(bqueue_destroy);
 
@@ -235,61 +231,62 @@ static size_t bqueue_size(struct bqueue* q) { return q->size; }
 static unsigned long bqueue_el_count(struct bqueue* q) { return q->el_count; }
 
 int bqueue_push_back(struct kflat* kflat, struct bqueue* q, const void* m, size_t s) {
-
-    size_t copied = 0;
-    while(s>0) {
-        size_t avail_size = q->block_size-q->front_index;
-        size_t copy_size = (s>avail_size)?(avail_size):(s);
-        memcpy(q->front_block->data+q->front_index,m+copied,copy_size);
-        copied+=copy_size;
-        if (unlikely(s>=avail_size)) {
-        	struct queue_block* new_block;
-            s=s-avail_size;
-            new_block = kflat_bqueue_zalloc(kflat,q->block_size+sizeof(struct queue_block*),1);
-            if (!new_block) {
-            	return ENOMEM;
-            }
-            new_block->next = 0;
-            q->front_block->next = new_block;
-            q->front_block = new_block;
-        }
-        else s=0;
-        q->front_index = (q->front_index+copy_size)%q->block_size;
-    }
-    q->size+=copied;
-    q->el_count++;
-    return 0;
+	size_t copied = 0;
+	struct queue_block *front = NULL;
+	while (s > 0) {
+		size_t avail_size = q->block_size - q->front_index;
+		size_t copy_size = (s > avail_size) ? (avail_size) : (s);
+		front = list_next_entry(q->storage, head);
+		memcpy(front->data + q->front_index, m + copied, copy_size);
+		copied += copy_size;
+		if (unlikely(s >= avail_size)) {
+			struct queue_block* new_block;
+			s = s - avail_size;
+			new_block = kflat_bqueue_zalloc(kflat, q->block_size + sizeof(struct queue_block*), 1);
+			if (!new_block) {
+				return ENOMEM;
+			}
+			INIT_LIST_HEAD(&new_block->head);
+			list_add(&new_block->head, &q->storage->head);
+		}
+		else
+			s = 0;
+		q->front_index = (q->front_index + copy_size) % q->block_size;
+	}
+	q->size += copied;
+	q->el_count++;
+	return 0;
 }
 EXPORT_SYMBOL_GPL(bqueue_push_back);
 
 static int bqueue_pop_front(struct bqueue* q, void* m, size_t s) {
-
 	size_t copied = 0;
+	struct queue_block *back = NULL;
 
-	if (q->size<s) {
-    	flat_errs("bqueue underflow");
-    	return EFAULT;
-    }
+	if (q->size < s) {
+		flat_errs("bqueue underflow");
+		return EFAULT;
+	}
 
-    while(s>0) {
-        size_t avail_size = q->block_size-q->back_index;
-        size_t copy_size = (s>avail_size)?(avail_size):(s);
-        memcpy(m+copied,q->back_block->data+q->back_index,copy_size);
-        copied+=copy_size;
-        if (s>=avail_size) {
-        	struct queue_block* tmp;
-        	s=s-avail_size;
-            tmp = q->back_block;
-            q->back_block = q->back_block->next;
-            kflat_bqueue_free(tmp);
-        }
-        else s=0;
-        q->back_index = (q->back_index+copy_size)%q->block_size;
-    }
-    q->size-=copied;
-    q->el_count--;
+	while (s > 0) {
+		size_t avail_size = q->block_size - q->back_index;
+		size_t copy_size = (s > avail_size) ? (avail_size) : (s);
+		back = list_prev_entry(q->storage, head);
+		memcpy(m + copied, back->data + q->back_index, copy_size);
+		copied += copy_size;
+		if (s >= avail_size) {
+			s = s - avail_size;
+			list_del(&back->head);
+			kflat_bqueue_free(back);
+		}
+		else
+			s = 0;
+		q->back_index = (q->back_index + copy_size) % q->block_size;
+	}
+	q->size -= copied;
+	q->el_count--;
 
-    return 0;
+	return 0;
 }
 
 
