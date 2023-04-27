@@ -14,7 +14,7 @@
 #include <linux/time.h>
 #include <linux/cpufreq.h>
 #include <linux/smp.h>
-
+#include <linux/list.h>
 
 /* KFLAT configuration */
 #define LINEAR_MEMORY_ALLOCATOR					1
@@ -57,9 +57,17 @@ struct flatten_header {
 	uint64_t magic;
 };
 
+struct blstream {
+	struct list_head head;
+	void* data;
+	size_t size;
+	size_t index;
+	size_t alignment;
+	size_t align_offset;
+};
+
 struct FLCONTROL {
-	struct blstream* bhead;
-	struct blstream* btail;
+	struct list_head head;
 	struct rb_root_cached fixup_set_root;
 	struct rb_root_cached imap_root;
 	struct flatten_header	HDR;
@@ -69,16 +77,6 @@ struct FLCONTROL {
 	size_t root_addr_count;
 	int debug_flag;
 	void* mem;
-};
-
-struct blstream {
-	struct blstream* next;
-	struct blstream* prev;
-	void* data;
-	size_t size;
-	size_t index;
-	size_t alignment;
-	size_t align_offset;
 };
 
 struct fixup_set_node {

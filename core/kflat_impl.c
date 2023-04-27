@@ -28,7 +28,7 @@
 #define LAST(node)  ((node)->last)
 INTERVAL_TREE_DEFINE(struct flat_node, rb,
 		     uintptr_t, __subtree_last,
-		     START, LAST,static,interval_tree)
+		     START, LAST,static,interval_tree);
 
 /*******************************************************
  * BINARY STREAM
@@ -37,110 +37,92 @@ INTERVAL_TREE_DEFINE(struct flat_node, rb,
 static struct blstream* create_binary_stream_element(struct kflat* kflat, size_t size) {
 	struct blstream* n;
 	void* m;
-	n = kflat_zalloc(kflat,sizeof(struct blstream),1);
-	if (n==0) return 0;
-	m = kflat_zalloc(kflat,size,1);
-	if (m==0) {
+	n = kflat_zalloc(kflat, sizeof(struct blstream), 1);
+	if (!n)
+		return 0;
+	m = kflat_zalloc(kflat, size, 1);
+	if (!m) {
 		kflat_free(n);
 		return 0;
 	}
 	n->data = m;
 	n->size = size;
+	INIT_LIST_HEAD(&n->head);
 	return n;
 }
 
 struct blstream* binary_stream_append(struct kflat* kflat, const void* data, size_t size) {
-	struct blstream* v = create_binary_stream_element(kflat,size);
-	if (v==0) return 0;
+	struct blstream* v = create_binary_stream_element(kflat, size);
+	if (!v)
+		return 0;
 	memcpy(v->data,data,size);
-    if (!kflat->FLCTRL.bhead) {
-    	kflat->FLCTRL.bhead = v;
-    	kflat->FLCTRL.btail = v;
-    }
-    else {
-        v->prev = kflat->FLCTRL.btail;
-        kflat->FLCTRL.btail->next = v;
-        kflat->FLCTRL.btail = kflat->FLCTRL.btail->next;
-    }
-    return v;
+	list_add_tail(&v->head, &kflat->FLCTRL.head);
+	return v;
 }
 EXPORT_SYMBOL_GPL(binary_stream_append);
 
-
 static struct blstream* binary_stream_insert_front(struct kflat* kflat, const void* data, size_t size, struct blstream* where) {
-	struct blstream* v = create_binary_stream_element(kflat,size);
-	if (v==0) return 0;
-	memcpy(v->data,data,size);
-	v->next = where;
-	v->prev = where->prev;
-	if (where->prev) {
-		where->prev->next = v;
-	}
-	else {
-		kflat->FLCTRL.bhead = v;
-	}
-	where->prev = v;
+	struct blstream* v = create_binary_stream_element(kflat, size);
+	if (!v)
+		return 0;
+	memcpy(v->data, data, size);
+	list_add_tail(&v->head, &where->head);
 	return v;
 }
 
 
 static struct blstream* binary_stream_insert_back(struct kflat* kflat, const void* data, size_t size, struct blstream* where) {
-	struct blstream* v = create_binary_stream_element(kflat,size);
-	if (v==0) return 0;
+	struct blstream* v = create_binary_stream_element(kflat, size);
+	if (!v)
+		return 0;
 	memcpy(v->data,data,size);
-	v->next = where->next;
-	v->prev = where;
-	if (where->next) {
-		where->next->prev = v;
-	}
-	else {
-		kflat->FLCTRL.btail = v;
-	}
-	where->next = v;
+	list_add(&v->head, &where->head);
 	return v;
 }
 
 
 static int binary_stream_calculate_index(struct kflat* kflat) {
-	struct blstream* p = kflat->FLCTRL.bhead;
-	size_t index=0;
-    while(p) {
-    	struct blstream* cp = p;
-    	size_t align=0;
-    	p = p->next;
-    	if (cp->alignment) {
-    		struct blstream* v;
-    		unsigned char* padding = kflat_zalloc(kflat,cp->alignment,1);
-    		if (!padding) {
-    			return ENOMEM;
-    		}
-    		if (index==0) {
-    			align=cp->alignment;
-    		}
-    		else if (index%cp->alignment) {
-    			align=cp->alignment-(index%cp->alignment);
-    		}
-    		v = binary_stream_insert_front(kflat,padding,align,cp);
-    		if (v==0) return ENOMEM;
-    		kflat_free(padding);
-    		v->index = index;
-    		index+=v->size;
-    	}
+	struct blstream *ptr = NULL;
+	size_t index = 0;
 
-    	cp->index = index;
-    	index+=cp->size;
-    }
-    return 0;
+	list_for_each_entry(ptr, &kflat->FLCTRL.head, head) {
+		size_t align = 0;
+		if (ptr->alignment) {
+			struct blstream* v;
+			unsigned char* padding = kflat_zalloc(kflat, ptr->alignment, 1);
+			if (!padding) {
+				return ENOMEM;
+			}
+			if (index==0) {
+				align = ptr->alignment;
+			}
+			else if (index % ptr->alignment) {
+				align = ptr->alignment - (index % ptr->alignment);
+			}
+			v = binary_stream_insert_front(kflat, padding, align, ptr);
+			if (!v)
+				return ENOMEM;
+			kflat_free(padding);
+			v->index = index;
+			index += v->size;
+		}
+
+		ptr->index = index;
+		index += ptr->size;
+	}
+
+	return 0;
 }
 
 static void binary_stream_destroy(struct kflat* kflat) {
-	kflat->FLCTRL.btail = kflat->FLCTRL.bhead;
-    while(kflat->FLCTRL.btail) {
-    	struct blstream* p = kflat->FLCTRL.btail;
-    	kflat->FLCTRL.btail = kflat->FLCTRL.btail->next;
-    	kflat_free(p->data);
-    	kflat_free(p);
-    }
+	struct blstream *entry = NULL;
+	struct blstream *temp = NULL;
+
+	list_for_each_entry_safe(entry, temp, &kflat->FLCTRL.head, head) {
+		list_del(&entry->head);
+		kflat_free(entry->data);
+		kflat_free(entry);
+	}
 }
 
 static int binary_stream_element_write(struct kflat* kflat, struct blstream* p, size_t* wcounter_p) {
@@ -150,44 +132,36 @@ static int binary_stream_element_write(struct kflat* kflat, struct blstream* p, 
 }
 
 static void binary_stream_print(struct kflat* kflat) {
-	struct blstream* cp;
+	struct blstream* cp = NULL;
 	size_t total_size = 0;
 
 	kflat_dbg_printf("# Binary stream\n");
-	cp = kflat->FLCTRL.bhead;
-    while(cp) {
-    	struct blstream* p = cp;
-    	cp = cp->next;
-    	
-		kflat_dbg_printf("(%zu)(%zu)[%zu]{%lx}[...]\n",p->index,p->alignment,p->size,(unsigned long)p);
-    	total_size+=p->size;
-    }
-    kflat_dbg_printf("Total size: %zu\n\n",total_size);
+	list_for_each_entry(cp, &kflat->FLCTRL.head, head) {
+		kflat_dbg_printf("(%zu)(%zu)[%zu]{%lx}[...]\n",cp->index,cp->alignment,cp->size,(unsigned long)cp);
+		total_size+=cp->size;
+	}
+
+	kflat_dbg_printf("Total size: %zu\n\n",total_size);
 }
 
 static size_t binary_stream_write(struct kflat* kflat, size_t* wcounter_p) {
 	int err;
-	struct blstream* cp = kflat->FLCTRL.bhead;
-    while(cp) {
-    	struct blstream* p = cp;
-    	cp = cp->next;
-    	if ((err = binary_stream_element_write(kflat,p,wcounter_p))!=0) {
-    		return err;
-    	}
-    }
-    return 0;
+	struct blstream* cp = NULL;
+	list_for_each_entry(cp, &kflat->FLCTRL.head, head) {
+		if ((err = binary_stream_element_write(kflat,cp,wcounter_p))!=0) {
+			return err;
+		}
+	}
+	return 0;
 }
 
 static size_t binary_stream_size(struct kflat* kflat) {
-
-	struct blstream* cp = kflat->FLCTRL.bhead;
+	struct blstream* cp = NULL;
 	size_t total_size = 0;
-    while(cp) {
-    	struct blstream* p = cp;
-    	cp = cp->next;
-    	total_size+=p->size;
-    }
-    return total_size;
+	list_for_each_entry(cp, &kflat->FLCTRL.head, head) {
+		total_size += cp->size;
+	}
+	return total_size;
 }
 
 static void binary_stream_update_pointers(struct kflat* kflat) {
@@ -211,7 +185,7 @@ static void binary_stream_update_pointers(struct kflat* kflat) {
 				memcpy(&((unsigned char*)__storage->data)[__ptr_offset],(unsigned char*)&newptr+(sizeof(void*)-size_to_cpy),cpy_size);
 				size_to_cpy-=cpy_size;
 				if (size_to_cpy>0) {
-					__storage = __storage->next;
+					__storage = list_next_entry(__storage, head);
 					__ptr_offset = 0;
 				}
 			}
@@ -1215,6 +1189,7 @@ int kflat_linear_memory_realloc(struct kflat* kflat, size_t nsize) {
  ******************************************************/
 void flatten_init(struct kflat* kflat) {
 	memset(&kflat->FLCTRL,0,sizeof(struct FLCONTROL));
+	INIT_LIST_HEAD(&kflat->FLCTRL.head);
 	kflat->FLCTRL.debug_flag = kflat->debug_flag;
 	kflat->FLCTRL.fixup_set_root = RB_ROOT_CACHED;
 	kflat->FLCTRL.imap_root = RB_ROOT_CACHED;
