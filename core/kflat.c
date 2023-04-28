@@ -338,9 +338,6 @@ static int kflat_open(struct inode *inode, struct file *filep) {
 
 	mutex_init(&kflat->lock);
 	probing_init(kflat);
-	INIT_LIST_HEAD(&kflat->FLCTRL.head);
-	kflat->FLCTRL.fixup_set_root = RB_ROOT_CACHED;
-	kflat->FLCTRL.imap_root = RB_ROOT_CACHED;
 	filep->private_data = kflat;
 	return nonseekable_open(inode, filep);
 }
