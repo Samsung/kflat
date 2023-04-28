@@ -67,12 +67,11 @@ struct blstream {
 };
 
 struct FLCONTROL {
-	struct list_head head;
+	struct list_head storage_head;
+	struct list_head root_addr_head;
 	struct rb_root_cached fixup_set_root;
 	struct rb_root_cached imap_root;
 	struct flatten_header	HDR;
-	struct root_addrnode* rhead;
-	struct root_addrnode* rtail;
 	struct root_addrnode* last_accessed_root;
 	size_t root_addr_count;
 	int debug_flag;
@@ -90,7 +89,7 @@ struct fixup_set_node {
 
 /* Root address list */
 struct root_addrnode {
-	struct root_addrnode* next;
+	struct list_head head;
 	uintptr_t root_addr;
 	const char* name;
 	size_t index;

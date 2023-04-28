@@ -56,7 +56,7 @@ struct blstream* binary_stream_append(struct kflat* kflat, const void* data, siz
 	if (!v)
 		return 0;
 	memcpy(v->data,data,size);
-	list_add_tail(&v->head, &kflat->FLCTRL.head);
+	list_add_tail(&v->head, &kflat->FLCTRL.storage_head);
 	return v;
 }
 EXPORT_SYMBOL_GPL(binary_stream_append);
@@ -85,7 +85,7 @@ static int binary_stream_calculate_index(struct kflat* kflat) {
 	struct blstream *ptr = NULL;
 	size_t index = 0;
 
-	list_for_each_entry(ptr, &kflat->FLCTRL.head, head) {
+	list_for_each_entry(ptr, &kflat->FLCTRL.storage_head, head) {
 		size_t align = 0;
 		if (ptr->alignment) {
 			struct blstream* v;
@@ -118,7 +118,7 @@ static void binary_stream_destroy(struct kflat* kflat) {
 	struct blstream *entry = NULL;
 	struct blstream *temp = NULL;
 
-	list_for_each_entry_safe(entry, temp, &kflat->FLCTRL.head, head) {
+	list_for_each_entry_safe(entry, temp, &kflat->FLCTRL.storage_head, head) {
 		list_del(&entry->head);
 		kflat_free(entry->data);
 		kflat_free(entry);
@@ -126,8 +126,7 @@ static void binary_stream_destroy(struct kflat* kflat) {
 }
 
 static int binary_stream_element_write(struct kflat* kflat, struct blstream* p, size_t* wcounter_p) {
-
-	FLATTEN_WRITE_ONCE((unsigned char*)(p->data),p->size,wcounter_p);
+	FLATTEN_WRITE_ONCE((unsigned char*)(p->data), p->size, wcounter_p);
 	return 0;
 }
 
@@ -136,8 +135,8 @@ static void binary_stream_print(struct kflat* kflat) {
 	size_t total_size = 0;
 
 	kflat_dbg_printf("# Binary stream\n");
-	list_for_each_entry(cp, &kflat->FLCTRL.head, head) {
-		kflat_dbg_printf("(%zu)(%zu)[%zu]{%lx}[...]\n",cp->index,cp->alignment,cp->size,(unsigned long)cp);
+	list_for_each_entry(cp, &kflat->FLCTRL.storage_head, head) {
+		kflat_dbg_printf("(%zu)(%zu)[%zu]{%lx}[...]\n", cp->index, cp->alignment, cp->size, (unsigned long)cp);
 		total_size+=cp->size;
 	}
 
@@ -147,8 +146,8 @@ static void binary_stream_print(struct kflat* kflat) {
 static size_t binary_stream_write(struct kflat* kflat, size_t* wcounter_p) {
 	int err;
 	struct blstream* cp = NULL;
-	list_for_each_entry(cp, &kflat->FLCTRL.head, head) {
-		if ((err = binary_stream_element_write(kflat,cp,wcounter_p))!=0) {
+	list_for_each_entry(cp, &kflat->FLCTRL.storage_head, head) {
+		if ((err = binary_stream_element_write(kflat, cp, wcounter_p))!=0) {
 			return err;
 		}
 	}
@@ -158,7 +157,7 @@ static size_t binary_stream_write(struct kflat* kflat, size_t* wcounter_p) {
 static size_t binary_stream_size(struct kflat* kflat) {
 	struct blstream* cp = NULL;
 	size_t total_size = 0;
-	list_for_each_entry(cp, &kflat->FLCTRL.head, head) {
+	list_for_each_entry(cp, &kflat->FLCTRL.storage_head, head) {
 		total_size += cp->size;
 	}
 	return total_size;
@@ -1010,87 +1009,75 @@ static int root_addr_set_insert(struct kflat* kflat, const char* name, uintptr_t
 }
 
 int root_addr_append(struct kflat* kflat, uintptr_t root_addr) {
-    struct root_addrnode* v = kflat_zalloc(kflat,sizeof(struct root_addrnode),1);
-    if (!v) {
-    	return ENOMEM;
-    }
-    v->root_addr = root_addr;
-    if (!kflat->FLCTRL.rhead) {
-    	kflat->FLCTRL.rhead = v;
-    	kflat->FLCTRL.rtail = v;
-    }
-    else {
-    	kflat->FLCTRL.rtail->next = v;
-    	kflat->FLCTRL.rtail = kflat->FLCTRL.rtail->next;
-    }
-    kflat->FLCTRL.root_addr_count++;
-    return 0;
+	struct root_addrnode* v = kflat_zalloc(kflat, sizeof(struct root_addrnode), 1);
+	if (!v)
+		return ENOMEM;
+
+	INIT_LIST_HEAD(&v->head);
+	v->root_addr = root_addr;
+	list_add_tail(&v->head, &kflat->FLCTRL.root_addr_head);
+	kflat->FLCTRL.root_addr_count++;
+	return 0;
 }
+
 EXPORT_SYMBOL_GPL(root_addr_append);
 
 int root_addr_append_extended(struct kflat* kflat, size_t root_addr, const char* name, size_t size) {
-
 	struct root_addr_set_node* root_addr_node = root_addr_set_search(kflat, name);
 	struct root_addrnode* v;
 
-	if (root_addr_node) {
+	if (root_addr_node)
 		return EEXIST;
-	}
 
-	v = kflat_zalloc(kflat,sizeof(struct root_addrnode),1);
-    if (!v) {
-    	return ENOMEM;
-    }
-    v->root_addr = root_addr;
-    v->name = name;
-    v->index = kflat->FLCTRL.root_addr_count;
-    v->size = size;
-    if (!kflat->FLCTRL.rhead) {
-    	kflat->FLCTRL.rhead = v;
-    	kflat->FLCTRL.rtail = v;
-    }
-    else {
-    	kflat->FLCTRL.rtail->next = v;
-    	kflat->FLCTRL.rtail = kflat->FLCTRL.rtail->next;
-    }
-    kflat->FLCTRL.root_addr_count++;
-    root_addr_set_insert(kflat, name, root_addr);
-    return 0;
+	v = kflat_zalloc(kflat, sizeof(struct root_addrnode), 1);
+	if (!v)
+		return ENOMEM;
+
+	INIT_LIST_HEAD(&v->head);
+	v->root_addr = root_addr;
+	v->name = name;
+	v->index = kflat->FLCTRL.root_addr_count;
+	v->size = size;
+	list_add_tail(&v->head, &kflat->FLCTRL.root_addr_head);
+	kflat->FLCTRL.root_addr_count++;
+	root_addr_set_insert(kflat, name, root_addr);
+	return 0;
 }
 EXPORT_SYMBOL_GPL(root_addr_append_extended);
 
 static size_t root_addr_count(struct kflat* kflat) {
-	struct root_addrnode* p = kflat->FLCTRL.rhead;
+	struct root_addrnode *entry = NULL;
 	size_t count = 0;
-    while(p) {
-    	count++;
-    	p = p->next;
-    }
-    return count;
+
+	list_for_each_entry(entry, &kflat->FLCTRL.root_addr_head, head)
+		count++;
+
+	return count;
 }
 
 size_t root_addr_extended_count(struct kflat* kflat) {
-	struct root_addrnode* p = kflat->FLCTRL.rhead;
+	struct root_addrnode *entry = NULL;
 	size_t count = 0;
-    while(p) {
-    	if (p->name) {
-    		count++;
-    	}
-    	p = p->next;
-    }
-    return count;
+
+	list_for_each_entry(entry, &kflat->FLCTRL.root_addr_head, head) {
+		if (entry->name)
+			count++;
+	}
+
+	return count;
 }
 
 size_t root_addr_extended_size(struct kflat* kflat) {
-	struct root_addrnode* p = kflat->FLCTRL.rhead;
+	struct root_addrnode *entry = NULL;
 	size_t size = 0;
-    while(p) {
-    	if (p->name) {
-    		size+=3*sizeof(size_t)+strlen(p->name);
-    	}
-    	p = p->next;
-    }
-    return size;
+
+	list_for_each_entry(entry, &kflat->FLCTRL.root_addr_head, head) {
+		if (entry->name) {
+			size += 3 * sizeof(size_t) + strlen(entry->name);
+		}
+	}
+
+	return size;
 }
 
 static void root_addr_set_destroy(struct kflat* kflat) {
@@ -1186,7 +1173,8 @@ int kflat_linear_memory_realloc(struct kflat* kflat, size_t nsize) {
  ******************************************************/
 void flatten_init(struct kflat* kflat) {
 	memset(&kflat->FLCTRL,0,sizeof(struct FLCONTROL));
-	INIT_LIST_HEAD(&kflat->FLCTRL.head);
+	INIT_LIST_HEAD(&kflat->FLCTRL.storage_head);
+	INIT_LIST_HEAD(&kflat->FLCTRL.root_addr_head);
 	kflat->FLCTRL.debug_flag = kflat->debug_flag;
 	kflat->FLCTRL.fixup_set_root = RB_ROOT_CACHED;
 	kflat->FLCTRL.imap_root = RB_ROOT_CACHED;
@@ -1229,9 +1217,9 @@ int flatten_base_function_address(void) {
 }
 
 static int flatten_write_internal(struct kflat* kflat, size_t* wcounter_p) {
-
 	int err = 0;
-	struct root_addrnode* p;
+	struct root_addrnode* entry = NULL;
+
 	binary_stream_calculate_index(kflat);
     binary_stream_update_pointers(kflat);
     if (kflat->FLCTRL.debug_flag) {
@@ -1247,35 +1235,35 @@ static int flatten_write_internal(struct kflat* kflat, size_t* wcounter_p) {
     kflat->FLCTRL.HDR.mcount = mem_fragment_index_count(kflat);
     kflat->FLCTRL.HDR.magic = FLATTEN_MAGIC;
     kflat->FLCTRL.HDR.fptrmapsz = fixup_fptr_info_count(kflat);
-    FLATTEN_WRITE_ONCE(&kflat->FLCTRL.HDR,sizeof(struct flatten_header),wcounter_p);
-    p = kflat->FLCTRL.rhead;
-	while(p) {
+    FLATTEN_WRITE_ONCE(&kflat->FLCTRL.HDR, sizeof(struct flatten_header), wcounter_p);
+
+	list_for_each_entry(entry, &kflat->FLCTRL.root_addr_head, head) {
 		size_t root_addr_offset;
-		if (p->root_addr) {
-			struct flat_node *node = PTRNODE(p->root_addr);
+		if (entry->root_addr) {
+			struct flat_node *node = PTRNODE(entry->root_addr);
 			if (!node) {
 				/* Actually nothing has been flattened under this root address */
-				root_addr_offset = (size_t)-1;
-			} else 
-				root_addr_offset = node->storage->index + (p->root_addr-node->start);
+				root_addr_offset = (size_t) - 1;
+			} else {
+				root_addr_offset = node->storage->index + (entry->root_addr - node->start);
+			}
+		} else {
+			root_addr_offset = (size_t) - 1;
 		}
-		else {
-			root_addr_offset = (size_t)-1;
-		}
-		FLATTEN_WRITE_ONCE(&root_addr_offset,sizeof(size_t),wcounter_p);
-		p = p->next;
+		FLATTEN_WRITE_ONCE(&root_addr_offset, sizeof(size_t), wcounter_p);
 	}
-	p = kflat->FLCTRL.rhead;
-	while(p) {
-		if (p->name) {
-			size_t name_size = strlen(p->name);
-			FLATTEN_WRITE_ONCE(&name_size,sizeof(size_t),wcounter_p);
-			FLATTEN_WRITE_ONCE(p->name,name_size,wcounter_p);
-			FLATTEN_WRITE_ONCE(&p->index,sizeof(size_t),wcounter_p);
-			FLATTEN_WRITE_ONCE(&p->size,sizeof(size_t),wcounter_p);
+
+	entry = NULL;
+	list_for_each_entry(entry, &kflat->FLCTRL.root_addr_head, head) {
+		if (entry->name) {
+			size_t name_size = strlen(entry->name);
+			FLATTEN_WRITE_ONCE(&name_size, sizeof(size_t), wcounter_p);
+			FLATTEN_WRITE_ONCE(entry->name, name_size, wcounter_p);
+			FLATTEN_WRITE_ONCE(&entry->index, sizeof(size_t), wcounter_p);
+			FLATTEN_WRITE_ONCE(&entry->size, sizeof(size_t), wcounter_p);
 		}
-		p = p->next;
 	}
+
 	if ((err = fixup_set_write(kflat,wcounter_p))!=0) {
 		return err;
 	}
@@ -1317,14 +1305,14 @@ int flatten_write(struct kflat* kflat) {
 }
 
 int flatten_fini(struct kflat* kflat) {
+	struct root_addrnode *ptr = NULL;
+	struct root_addrnode *tmp = NULL;
 	binary_stream_destroy(kflat);
     fixup_set_destroy(kflat);
-    kflat->FLCTRL.rtail = kflat->FLCTRL.rhead;
-    while(kflat->FLCTRL.rtail) {
-    	struct root_addrnode* p = kflat->FLCTRL.rtail;
-    	kflat->FLCTRL.rtail = kflat->FLCTRL.rtail->next;
-    	kflat_free(p);
-    }
+	list_for_each_entry_safe(ptr, tmp, &kflat->FLCTRL.root_addr_head, head) {
+		list_del(&ptr->head);
+		kflat_free(ptr);
+	}
     interval_tree_destroy(kflat,&kflat->FLCTRL.imap_root.rb_root);
 	root_addr_set_destroy(kflat);
 #if LINEAR_MEMORY_ALLOCATOR
