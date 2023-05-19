@@ -12,7 +12,9 @@
 #include <cstddef>
 #include <cstring>
 #include <cstdio>
+#include <fcntl.h>
 #include <sys/time.h>
+#include <sys/mman.h>
 
 #include <map>
 #include <vector>
@@ -28,6 +30,7 @@
 
 extern "C" {
 #include "interval_tree_generic.h"
+#include <kflat_uapi.h>
 }
 
 /********************************
@@ -49,61 +52,22 @@ INTERVAL_TREE_DEFINE(struct interval_tree_node, rb,
 		     uintptr_t, __subtree_last,
 		     START, LAST, __attribute__((used)), interval_tree)
 
-
-
-struct flatten_header {
-	size_t image_size;
-	size_t memory_size;
-	size_t ptr_count;
-	size_t fptr_count;
-	size_t root_addr_count;
-	size_t root_addr_extended_count;
-	size_t root_addr_extended_size;
-	uintptr_t this_addr;
-	size_t fptrmapsz;
-	size_t mcount;
-	uint64_t magic;
-};
-
 struct root_addrnode {
 	uintptr_t root_addr;
 	const char* name;
 	size_t size;
 };
 
-struct FLCONTROL {
-	struct flatten_header HDR;
-
-	struct rb_root_cached imap_root;
-	void* mem;
-
-	ssize_t last_accessed_root;
-	std::vector<struct root_addrnode> root_addr;
-	std::map<std::string, std::pair<size_t, size_t>> root_addr_map;
-};
-
-typedef uintptr_t (*get_function_address_t)(const char* fsym);
-
-#define COLOR_STRING_BLACK "\033[0;30m"
 #define COLOR_STRING_RED "\033[0;31m"
-#define COLOR_STRING_GREEN "\033[0;32m"
-#define COLOR_STRING_YELLOW "\033[0;33m"
-#define COLOR_STRING_BLUE "\033[0;34m"
-#define COLOR_STRING_PURPLE "\033[0;35m"
-#define COLOR_STRING_CYAN "\033[0;36m"
-#define COLOR_STRING_WHITE "\033[0;37m"
-
 #define COLOR_STRING COLOR_STRING_RED
 #define COLOR_OFF "\033[0m"
 
 /********************************
- * Private class Unflatten
+ * Private class UnflattenEngine
  *******************************/
-class Unflatten {
+class UnflattenEngine {
 private:
 	friend class Flatten;
-
-	constexpr static uint64_t FLATTEN_MAGIC = 0x464c415454454e00ULL;
 
 	bool need_unload;
 	enum {
@@ -112,10 +76,25 @@ private:
 		LOG_DEBUG,
 	} loglevel;
 	size_t readin;
-	struct FLCONTROL FLCTRL;
+	
+	struct FLCONTROL {
+		struct flatten_header HDR;
+
+		struct rb_root_cached imap_root;
+		void* mem;
+
+		ssize_t last_accessed_root;
+		std::vector<struct root_addrnode> root_addr;
+	} FLCTRL;
+
+	std::map<std::string, std::pair<size_t, size_t>> root_addr_map;
 	std::map<uintptr_t,std::string> fptrmap;
+	
 	struct timeval timeS;
 
+	/***************************
+	 * UTILITIES / MISC
+	 **************************/
 	inline void* flatten_memory_start() const {
 		return (char*) FLCTRL.mem + \
 				FLCTRL.HDR.ptr_count * sizeof(size_t) +  \
@@ -198,7 +177,7 @@ private:
 		size_t root_addr;
 
 		try {
-			auto& entry = FLCTRL.root_addr_map.at(name);
+			auto& entry = root_addr_map.at(name);
 			
 			if(size)
 				*size = entry.second;
@@ -220,29 +199,378 @@ private:
 	}
 
 	int root_addr_append_extended(size_t root_addr, const char* name, size_t size) {
-		if (FLCTRL.root_addr_map.find(name) != FLCTRL.root_addr_map.end())
+		if (root_addr_map.find(name) != root_addr_map.end())
 			return EEXIST;
 
 		root_addr_append(root_addr, name, size);
-		FLCTRL.root_addr_map.insert({name, {root_addr, size}});
+		root_addr_map.insert({name, {root_addr, size}});
 		return 0;
 	}
 
 	/***************************
-	 * UNFLATTEN MEMORY
+	 * I/O ACCESS
 	 **************************/
-	void read_file(void* dst, size_t size, size_t n, FILE* f) {
-		size_t rd;
+	enum open_mode_enum {
+		UNFLATTEN_OPEN_MMAP,
+		UNFLATTEN_OPEN_READ_COPY,
+		UNFLATTEN_OPEN_MMAP_WRITE,
+	} open_mode;
+	int opened_file_fd;
+	struct {
+		FILE* opened_file_file;
 
-		rd = fread(dst, size, n, f);
-		if(rd != n)
-			throw std::invalid_argument("Truncated file");
+		struct {
+			void* opened_mmap_addr;
+			size_t opened_mmap_size;
+		};
+	};
+	int current_mmap_offset;
+
+	/**
+	 * @brief Main logic behind opening flatten image. Currently we support 3 different
+	 *   open modes:
+	 *     - OPEN_MMAP -> mmap input file into current VA as MAP_PRIVATE (COW)
+	 *     - OPEN_MMAP_WRITE -> mmap input file into current VA as MAP_SHARED (changes
+	 *         to mapped memory affects the underlying file)
+	 *     - OPEN_READ_COPY -> load full flatten image as a copy into our VA
+	 *   Furthermore, we handle 3 FCNTL file-lock states:
+	 *     - O_UNLCK -> no one is using flatten image - we can do whatever we want with it
+	 *     - O_RDLCK -> flatten image is locked for READ - we cannot edit it
+	 *     - O_WRLCK -> flatten image is locked for WRITE - we cannot use it at all
+	 * 
+	 *   The idea behind this modes is as follow:
+	 *     1) After dumping memory, all pointers in flatten image are offsets in blob
+	 *     2) The first running instance of Unflatten library obtains O_WRLCK lock and opens
+	 *        file in OPEN_MMAP_WRITE mode. Next, it replaces all offsets in flatten image with
+	 *        valid pointer in current mapping and saves mapping base in flatten header (last_load_addr)
+	 *     3) The next running instances of Unflatten lib obtains O_RDLCK and maps flatten image
+	 *        at the same address as the first instance did - if they succeed, memory can be used
+	 *        without any further modifications (pointers are still valid), if not:
+	 *     4a) Try to lock O_WRLCK -> if success, repeat step 2)
+	 *     4b) Lock O_RDLCK, open file in OPEN_READ_COPY, copy it into local memory, fix locally 
+	 *         and release O_RDLCK.
+	 * 
+	 *   The OPEN_MMAP mode is fastest, while the OPEN_READ_COPY is slowest, but OPEN_MMAP requires some
+	 *   extra preresequites (like write access, RD_LOCK, mmap at the same address as previously), while
+	 *   OPEN_READ_COPY works always.
+	 * 
+	 *   TL;DR: This function attempts to open input file in the fastest possible mode.
+	 * 
+	 * @param f handler to file opened with fopen
+	 * @param support_write_lock flag indicating whether we want to support OPEN_MMAP_WRITE mode
+	 * @param support_mmap whether we want to support any OPEN_MMAP* mode
+	 */
+	void open_file(FILE* f, bool support_write_lock = true, bool support_mmap = true) {
+		int fd = fileno(f);
+		opened_file_fd = fd;
+		opened_file_file = f;
+		current_mmap_offset = 0;
+
+		fseek(f, 0, SEEK_END);
+		opened_mmap_size = ftell(f);
+		fseek(f, 0, SEEK_SET);
+
+		// Attempt to obtain read_lock
+		struct flock lock = { 0 };
+		lock.l_type = F_RDLCK;
+		lock.l_start = 0;
+		lock.l_whence = SEEK_SET;
+		lock.l_start = 0;
+
+		int ret = fcntl(fd, F_SETLKW, &lock);
+		if(ret < 0) {
+			info("Failed to obtain read-lock - fcntl returned: %s\n", strerror(errno));
+			throw std::runtime_error("Failed to acquire read-lock on input file");
+		}
+
+		// At this point we've got read-lock, check header and try to mmap file
+		size_t size = fread(&FLCTRL.HDR, sizeof(struct flatten_header), 1, f);
+		if(size != 1) {
+			lock.l_type = F_UNLCK;
+			fcntl(fd, F_SETLK, &lock);
+			throw std::runtime_error("Truncated input file");
+		}
+		fseek(f, 0, SEEK_SET);
+		try {
+			check_header();
+		} catch(...) {
+			lock.l_type = F_UNLCK;
+			fcntl(fd, F_SETLK, &lock);
+			throw;
+		}
+		void* mmap_addr = (void*) FLCTRL.HDR.last_load_addr;
+		if(mmap_addr != NULL && support_mmap) {	
+			opened_mmap_addr = mmap(mmap_addr, opened_mmap_size, 
+					PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_FIXED_NOREPLACE, fd, 0);
+			if(opened_mmap_addr != MAP_FAILED) {
+				// Succesfully mmaped file, hold lock till close_file
+				info("Opened input file in mmap mode @ %p (size: %p)\n", 
+					opened_mmap_addr, opened_mmap_size);
+				open_mode = UNFLATTEN_OPEN_MMAP;
+				return;
+			} else
+				debug("Failed to open input file in mmap mode - %s\n", strerror(errno));
+		}
+
+		// Mmap failed, acquire write lock without block
+		if(support_write_lock && support_mmap) {
+			debug("Failed to open file in mmap mode. Attempting to get write lock\n");
+			lock.l_type = F_WRLCK;
+			ret = fcntl(fd, F_SETLK, &lock);
+			if(ret >= 0) {
+				// Acquired exclusive write access - quickly rewrite image, mmap it and release lock
+				opened_mmap_addr = mmap(NULL, opened_mmap_size, 
+					PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+				if(opened_mmap_addr != MAP_FAILED) {
+					info("Opened file in write mode\n");
+					open_mode = UNFLATTEN_OPEN_MMAP_WRITE;
+					return;
+				}
+
+				info("Failed to open file in write mode - %s\n", strerror(errno));
+			} else
+				debug("Write-lock failed - %s\n", strerror(errno));
+		} else
+			info("Skipping write-lock as requested by callee\n");
+
+		lock.l_type = F_RDLCK;
+		ret = fcntl(fd, F_SETLK, &lock);
+		if(ret < 0) {
+			info("Failed to obtain read-lock - fcntl returned: %s\n", strerror(errno));
+			throw std::runtime_error("Failed to acquire read-lock on input file");
+		}
+
+		// Write-lock failed. The only thing left is to load whole image into memory
+		info("Opened file in copy mode\n");
+		open_mode = UNFLATTEN_OPEN_READ_COPY;
+		return;
+	}
+
+	void close_file() {
+		struct flock lock = { 0,  };
+		lock.l_type = F_UNLCK;
+		lock.l_start = 0;
+		lock.l_whence = SEEK_SET;
+		lock.l_start = 0;
+
+		info("Closing file with mode: '%d'\n", open_mode);
+		switch(open_mode) {
+			case UNFLATTEN_OPEN_MMAP:
+			case UNFLATTEN_OPEN_MMAP_WRITE:
+				debug("Releasing shared memory @ %p (sz:%zu)\n", 
+					opened_mmap_addr, opened_mmap_size);
+				munmap(opened_mmap_addr, opened_mmap_size);
+				fcntl(opened_file_fd, F_SETLK, &lock);
+			break;
+
+			case UNFLATTEN_OPEN_READ_COPY:
+				fcntl(opened_file_fd, F_SETLK, &lock);
+			break;
+
+			default:
+				throw std::runtime_error("Unexpected open_mode in close_file() method");
+		}
+
+		opened_file_fd = -1;
+		opened_file_file = NULL;
+	}
+
+	void read_file(void* dst, size_t size, size_t n) {
+		size_t rd, total_size;
+
+		switch(open_mode) {
+			case UNFLATTEN_OPEN_MMAP:
+			case UNFLATTEN_OPEN_MMAP_WRITE: {
+				total_size = size * n;
+				if(total_size + current_mmap_offset > opened_mmap_size)
+					throw std::invalid_argument("Truncated file");
+
+				memcpy(dst, (char*)opened_mmap_addr + current_mmap_offset, total_size);
+				current_mmap_offset += total_size;
+			}
+			break;
+
+			case UNFLATTEN_OPEN_READ_COPY: {
+				rd = fread(dst, size, n, opened_file_file);
+				if(rd != n)
+					throw std::invalid_argument("Truncated file");
+			}
+			break;
+
+			default:
+				throw std::runtime_error("Unexpected open_mode in read_file() method");
+		}
+
 		readin += size * n;
 	}
-	
+
+
+	/***************************
+	 * UNFLATTEN MEMORY
+	 **************************/
+	inline void check_header(void) const {
+		if (FLCTRL.HDR.magic != KFLAT_IMG_MAGIC)
+			throw std::invalid_argument("Invalid magic while reading flattened image");
+		if (FLCTRL.HDR.version != KFLAT_IMG_VERSION)
+			throw std::invalid_argument(
+					"Incompatible version of flattened image. Present (" +
+					std::to_string(FLCTRL.HDR.version) + ") vs Supported (" +
+					std::to_string(KFLAT_IMG_VERSION) + ")");
+	}
+
+	inline void parse_root_ptrs(void) {
+		std::vector<uintptr_t> root_ptr_vector;
+		for (size_t i = 0; i < FLCTRL.HDR.root_addr_count; ++i) {
+			size_t root_addr_offset;
+			read_file(&root_addr_offset, sizeof(size_t), 1);
+			root_ptr_vector.push_back(root_addr_offset);
+		}
+
+		std::map<size_t,std::pair<std::string,size_t>> root_ptr_ext_map;
+		for (size_t i = 0; i < FLCTRL.HDR.root_addr_extended_count; ++i) {
+			size_t name_size, index, size;
+			read_file(&name_size,sizeof(size_t),1);
+
+			char* name = new char[name_size + 1];
+			try {
+				read_file((void*)name, name_size, 1);
+				name[name_size] = '\0';
+				read_file(&index, sizeof(size_t), 1);
+				read_file(&size, sizeof(size_t), 1);
+				root_ptr_ext_map.insert({index, {std::string(name), size}});
+			} catch(...) {
+				delete[] name;
+				throw;
+			}
+			delete[] name;
+		}
+
+		for (size_t i = 0; i < root_ptr_vector.size(); ++i) {
+			if (root_ptr_ext_map.find(i) != root_ptr_ext_map.end())
+				root_addr_append_extended(root_ptr_vector[i], root_ptr_ext_map[i].first.c_str(), root_ptr_ext_map[i].second);
+			else
+				root_addr_append(root_ptr_vector[i]);
+		}
+	}
+
+	inline void parse_mem(void) {
+		size_t memsz = FLCTRL.HDR.memory_size + \
+			FLCTRL.HDR.ptr_count * sizeof(size_t) + \
+			FLCTRL.HDR.fptr_count * sizeof(size_t) + \
+			FLCTRL.HDR.mcount * 2 * sizeof(size_t);
+
+		switch(open_mode) {
+			case UNFLATTEN_OPEN_READ_COPY:
+				FLCTRL.mem = new char[memsz];
+				read_file(FLCTRL.mem, 1, memsz);
+				break;
+			case UNFLATTEN_OPEN_MMAP:
+			case UNFLATTEN_OPEN_MMAP_WRITE:
+				FLCTRL.mem = (char*)opened_mmap_addr + current_mmap_offset;
+				current_mmap_offset += memsz;
+				break;
+		}
+	}
+
+	inline void release_mem(void) {
+		if(open_mode == UNFLATTEN_OPEN_READ_COPY)
+			delete[] (char*)FLCTRL.mem;
+		FLCTRL.mem = NULL;
+	}
+
+	inline void parse_fptrmap(void) {
+		char* orig_fptrmapmem, * fptrmapmem;
+
+		if (FLCTRL.HDR.fptr_count <= 0 || FLCTRL.HDR.fptrmapsz <= 0)
+			return;
+		
+		if(open_mode == UNFLATTEN_OPEN_READ_COPY) {
+			orig_fptrmapmem = fptrmapmem = new char[FLCTRL.HDR.fptrmapsz];
+			read_file(fptrmapmem, 1, FLCTRL.HDR.fptrmapsz);
+		} else {
+			orig_fptrmapmem = fptrmapmem = (char*)opened_mmap_addr + current_mmap_offset;
+			current_mmap_offset += FLCTRL.HDR.fptrmapsz;
+		}
+
+		size_t fptrnum = *(size_t*)fptrmapmem;
+		fptrmapmem += sizeof(size_t);
+
+		for (size_t kvi = 0; kvi < fptrnum; ++kvi) {
+			uintptr_t addr = *(uintptr_t*)fptrmapmem;
+			fptrmapmem += sizeof(uintptr_t);
+
+			size_t sz = *(size_t*)fptrmapmem;
+			fptrmapmem += sizeof(size_t);
+
+			std::string sym((const char*)fptrmapmem, sz);
+			fptrmapmem += sz;
+			fptrmap.insert(std::pair<uintptr_t, std::string>(addr, sym));
+		}
+		
+		if(open_mode == UNFLATTEN_OPEN_READ_COPY)
+			delete[] orig_fptrmapmem;
+	}
+
+	/**
+	 * @brief Fix all the pointers in flattened memory area
+	 * 
+	 */
+	inline void fix_flatten_mem(bool continuous_mapping) {
+		if(open_mode == UNFLATTEN_OPEN_MMAP) {
+			// Memory was already fixed and is loaded at the same address as previously
+			return;
+		}
+
+		for (size_t i = 0; i < FLCTRL.HDR.ptr_count; ++i) {
+			void* mem = flatten_memory_start();
+			size_t fix_loc = *((size_t*)FLCTRL.mem + i);
+			uintptr_t ptr = (uintptr_t)( *(void**)((char*)mem + fix_loc) ) - FLCTRL.HDR.last_mem_addr;	// TODO: ???
+			debug("fix_loc: %zu\n", fix_loc);
+
+			if(continuous_mapping) {
+				*((void**)((unsigned char*)mem + fix_loc)) = (unsigned char*)mem + ptr;
+			} else {
+
+				struct interval_tree_node *node = interval_tree_iter_first(&FLCTRL.imap_root, fix_loc, fix_loc + 8);
+				assert(node != NULL);
+
+				size_t node_offset = fix_loc-node->start;
+				struct interval_tree_node *ptr_node = interval_tree_iter_first(&FLCTRL.imap_root, ptr, ptr + 8);
+				assert(ptr_node != NULL);
+
+				/* Make the fix */
+				size_t ptr_node_offset = ptr-ptr_node->start;
+				*((void**)((char*)node->mptr + node_offset)) = (char*)ptr_node->mptr + ptr_node_offset;
+
+				debug("%lx <- %lx (%hhx)\n", fix_loc, ptr, *(unsigned char*)((char*)ptr_node->mptr + ptr_node_offset));
+			}
+		}
+
+		// After fixing image, update its base address and change to read-lock
+		if(open_mode == UNFLATTEN_OPEN_MMAP_WRITE) {
+			struct flatten_header* header = (struct flatten_header*) opened_mmap_addr;
+			header->last_load_addr = (uintptr_t) opened_mmap_addr;
+			header->last_mem_addr = (uintptr_t) flatten_memory_start();
+
+			// Remap image as COW
+			munmap(opened_mmap_addr, opened_mmap_size);
+			opened_mmap_addr = mmap(opened_mmap_addr, opened_mmap_size, 
+				PROT_READ | PROT_WRITE, MAP_PRIVATE, opened_file_fd, 0);
+
+			struct flock lock = { 0,  };
+			lock.l_type = F_RDLCK;
+			lock.l_start = 0;
+			lock.l_whence = SEEK_SET;
+			lock.l_start = 0;
+			fcntl(opened_file_fd, F_SETLK, &lock);
+
+			open_mode = UNFLATTEN_OPEN_MMAP;
+		}
+	}
+
 
 public:
-	Unflatten(int _level = LOG_NONE) {
+	UnflattenEngine(int _level = LOG_NONE) {
 		memset(&FLCTRL.imap_root, 0, sizeof(struct rb_root_cached));
 		memset(&FLCTRL.HDR, 0, sizeof(struct flatten_header));
 		FLCTRL.last_accessed_root = -1;
@@ -252,10 +580,9 @@ public:
 	}
 
 	int imginfo(FILE* f, const char* arg) {
-
-		read_file(&FLCTRL.HDR, sizeof(struct flatten_header), 1, f);
-		if (FLCTRL.HDR.magic != FLATTEN_MAGIC)
-			throw std::invalid_argument("Invalid magic while reading flattened image");
+		open_file(f, false);
+		read_file(&FLCTRL.HDR, sizeof(struct flatten_header), 1);
+		check_header();
 
 		printf("# Image size: %zu\n\n",FLCTRL.HDR.image_size);
 
@@ -265,7 +592,7 @@ public:
 		}
 		for (size_t i = 0; i < FLCTRL.HDR.root_addr_count; ++i) {
 			size_t root_addr_offset;
-			read_file(&root_addr_offset, sizeof(size_t), 1, f);
+			read_file(&root_addr_offset, sizeof(size_t), 1);
 			if ((!arg) || (!strcmp(arg,"-r"))) {
 				printf("%zu ",root_addr_offset);
 			}
@@ -276,13 +603,13 @@ public:
 		}
 		for (size_t i = 0; i < FLCTRL.HDR.root_addr_extended_count; ++i) {
 			size_t name_size, index, size;
-			read_file(&name_size,sizeof(size_t),1,f);
+			read_file(&name_size,sizeof(size_t),1);
 
 			char* name = new char[name_size];
 			try {
-				read_file((void*)name, name_size, 1, f);
-				read_file(&index, sizeof(size_t), 1, f);
-				read_file(&size, sizeof(size_t), 1, f);
+				read_file((void*)name, name_size, 1);
+				read_file(&index, sizeof(size_t), 1);
+				read_file(&size, sizeof(size_t), 1);
 				if ((!arg) || (!strcmp(arg,"-r"))) {
 					printf(" %zu [%s:%lu]\n",index,name,size);
 				}
@@ -296,13 +623,7 @@ public:
 			printf("\n");
 		}
 
-		size_t memsz = FLCTRL.HDR.memory_size + \
-						FLCTRL.HDR.ptr_count * sizeof(size_t) + \
-						FLCTRL.HDR.fptr_count * sizeof(size_t) + \
-						FLCTRL.HDR.mcount * 2 * sizeof(size_t);
-		FLCTRL.mem = malloc(memsz);
-		assert(FLCTRL.mem != NULL);
-		read_file(FLCTRL.mem, 1, memsz, f);
+		parse_mem();
 
 		if ((!arg) || (!strcmp(arg,"-p"))) {
 			printf("# ptr_count: %zu\n",FLCTRL.HDR.ptr_count);
@@ -409,7 +730,7 @@ public:
 				char* fptrmapmem = (char*) malloc(FLCTRL.HDR.fptrmapsz);
 				assert(fptrmapmem != NULL);
 
-				read_file(fptrmapmem, 1, FLCTRL.HDR.fptrmapsz, f);
+				read_file(fptrmapmem, 1, FLCTRL.HDR.fptrmapsz);
 				size_t fptrnum = *((size_t*)fptrmapmem);
 				printf("# Function pointer count: %zu\n",fptrnum);
 				fptrmapmem += sizeof(size_t);
@@ -429,7 +750,7 @@ public:
 			}
 		}
 
-		free(FLCTRL.mem);
+		release_mem();
 		return 0;
 	}
 
@@ -438,77 +759,22 @@ public:
 			unload();
 		readin = 0;
 
+		// When continous_mapping is disabled we have to always operate on
+		//  local copy of flatten imaged, because memory chunks are not portable
+		open_file(f, continuous_mapping, continuous_mapping);
+
 		time_mark_start();
-		read_file(&FLCTRL.HDR, sizeof(struct flatten_header), 1, f);
-		if (FLCTRL.HDR.magic != FLATTEN_MAGIC)
-			throw std::invalid_argument("Invalid magic while reading flattened image");
-
-		std::vector<uintptr_t> root_ptr_vector;
-		for (size_t i = 0; i < FLCTRL.HDR.root_addr_count; ++i) {
-			size_t root_addr_offset;
-			read_file(&root_addr_offset, sizeof(size_t), 1, f);
-			root_ptr_vector.push_back(root_addr_offset);
-		}
-
-		std::map<size_t,std::pair<std::string,size_t>> root_ptr_ext_map;
-		for (size_t i = 0; i < FLCTRL.HDR.root_addr_extended_count; ++i) {
-			size_t name_size, index, size;
-			read_file(&name_size,sizeof(size_t),1,f);
-
-			char* name = new char[name_size + 1];
-			try {
-				read_file((void*)name, name_size, 1, f);
-				name[name_size] = '\0';
-				read_file(&index, sizeof(size_t), 1, f);
-				read_file(&size, sizeof(size_t), 1, f);
-				root_ptr_ext_map.insert({index, {std::string(name), size}});
-			} catch(...) {
-				delete[] name;
-				throw;
-			}
-			delete[] name;
-		}
-
-		for (size_t i = 0; i < root_ptr_vector.size(); ++i) {
-			if (root_ptr_ext_map.find(i) != root_ptr_ext_map.end())
-				root_addr_append_extended(root_ptr_vector[i], root_ptr_ext_map[i].first.c_str(), root_ptr_ext_map[i].second);
-			else
-				root_addr_append(root_ptr_vector[i]);
-		}
-
-		size_t memsz = FLCTRL.HDR.memory_size + \
-						FLCTRL.HDR.ptr_count * sizeof(size_t) + \
-						FLCTRL.HDR.fptr_count * sizeof(size_t) + \
-						FLCTRL.HDR.mcount * 2 * sizeof(size_t);
-		FLCTRL.mem = malloc(memsz);
-		assert(FLCTRL.mem != NULL);
-
-		read_file(FLCTRL.mem, 1, memsz, f);
-		if (FLCTRL.HDR.fptr_count > 0 && FLCTRL.HDR.fptrmapsz > 0 && gfa) {
-			char* fptrmapmem = (char*) malloc(FLCTRL.HDR.fptrmapsz);
-			assert(fptrmapmem != NULL);
-
-			read_file(fptrmapmem, 1, FLCTRL.HDR.fptrmapsz, f);
-			size_t fptrnum = *((size_t*)fptrmapmem);
-			fptrmapmem += sizeof(size_t);
-
-			for (size_t kvi=0; kvi < fptrnum; ++kvi) {
-				uintptr_t addr = *((uintptr_t*)fptrmapmem);
-				fptrmapmem += sizeof(uintptr_t);
-
-				size_t sz = *((size_t*)fptrmapmem);
-				fptrmapmem += sizeof(size_t);
-
-				std::string sym((const char*)fptrmapmem, sz);
-				fptrmapmem += sz;
-				fptrmap.insert(std::pair<uintptr_t,std::string>(addr, sym));
-			}
-			free(fptrmapmem - FLCTRL.HDR.fptrmapsz);
-		}
-		
+		// Parse header info and load flattened memory
+		read_file(&FLCTRL.HDR, sizeof(struct flatten_header), 1);
+		check_header();
+		parse_root_ptrs();
+		parse_mem();
+		if(gfa)
+			parse_fptrmap();
 		info(" #Unflattening done\n");
 		info(" #Image read time: %lfs\n", time_elapsed());
 
+		// Convert continous memory into chunked area
 		if(!continuous_mapping) {
 			time_mark_start();
 			size_t* minfoptr = (size_t*)((char*)FLCTRL.mem + FLCTRL.HDR.ptr_count * sizeof(size_t) + FLCTRL.HDR.fptr_count * sizeof(size_t));
@@ -530,34 +796,11 @@ public:
 			info(" #Creating chunked memory time: %lfs\n", time_elapsed());
 		}
 
+		// Fix pointers
 		time_mark_start();
-		unsigned long fix_count = 0;
-		for (size_t i = 0; i < FLCTRL.HDR.ptr_count; ++i) {
-			void* mem = flatten_memory_start();
-			size_t fix_loc = *((size_t*)FLCTRL.mem + i);
-			uintptr_t ptr = (uintptr_t)( *((void**)((char*)mem + fix_loc)) );
-			debug("fix_loc: %zu\n",fix_loc);
+		fix_flatten_mem(continuous_mapping);
 
-			if(continuous_mapping) {
-				*((void**)((unsigned char*)mem + fix_loc)) = (unsigned char*)mem + ptr;
-			} else {
-
-				struct interval_tree_node *node = interval_tree_iter_first(&FLCTRL.imap_root, fix_loc, fix_loc + 8);
-				assert(node != NULL);
-
-				size_t node_offset = fix_loc-node->start;
-				struct interval_tree_node *ptr_node = interval_tree_iter_first(&FLCTRL.imap_root, ptr, ptr + 8);
-				assert(ptr_node != NULL);
-
-				/* Make the fix */
-				size_t ptr_node_offset = ptr-ptr_node->start;
-				*((void**)((char*)node->mptr + node_offset)) = (char*)ptr_node->mptr + ptr_node_offset;
-
-				debug("%lx <- %lx (%hhx)\n", fix_loc, ptr, *(unsigned char*)((char*)ptr_node->mptr + ptr_node_offset));
-			}
-			fix_count++;
-		}
-
+		// Fix function pointers
 		if (FLCTRL.HDR.fptr_count > 0 && gfa) {
 			void* mem = flatten_memory_start();
 			for (size_t fi = 0; fi < FLCTRL.HDR.fptr_count; ++fi) {
@@ -579,10 +822,26 @@ public:
 				}
 			}
 		}
+
+		if(!continuous_mapping)
+			release_mem();
+
+		// At this point mode UNFLATTEN_OPEN_READ_COPY copied all memory to local RAM
+		//  so there's no need to hold lock any longer
+		if(open_mode == UNFLATTEN_OPEN_READ_COPY) {
+			struct flock lock = { 0,  };
+			lock.l_type = F_UNLCK;
+			lock.l_start = 0;
+			lock.l_whence = SEEK_SET;
+			lock.l_start = 0;
+			fcntl(opened_file_fd, F_SETLK, &lock);
+		}
+
 		info(" #Fixing memory time: %lfs\n", time_elapsed());
 		info("  Total bytes read: %zu\n", readin);
-		info("  Number of allocated fragments: %zu\n", FLCTRL.HDR.mcount);
-		info("  Number of fixed pointers: %lu\n", fix_count);
+		if(continuous_mapping)
+			info("  Number of allocated fragments: %zu\n", FLCTRL.HDR.mcount);
+		info("  Number of fixed pointers: %lu\n", FLCTRL.HDR.ptr_count);
 
 		need_unload = true;
 		return 0;
@@ -590,7 +849,7 @@ public:
 
 	void unload(void) {
 		struct interval_tree_node* node, *tmp;
-		free(FLCTRL.mem);
+		release_mem();
 		fptrmap.clear();
 
 		rbtree_postorder_for_each_entry_safe(node, tmp, &FLCTRL.imap_root.rb_root, rb) {
@@ -600,9 +859,10 @@ public:
 		}
 
 		FLCTRL.root_addr.clear();
-		FLCTRL.root_addr_map.clear();
+		root_addr_map.clear();
 		FLCTRL.last_accessed_root = -1;
 		need_unload = false;
+		close_file();
 	}
 
 	void* get_next_root(void) {
@@ -621,7 +881,7 @@ public:
 		return &FLCTRL.HDR;
 	}
 
-	~Unflatten() {
+	~UnflattenEngine() {
 		if(need_unload)
 			unload();
 	}
@@ -631,7 +891,7 @@ public:
  * C++ API
  *******************************/
 Flatten::Flatten(int level) {
-	engine = new Unflatten(level);
+	engine = new UnflattenEngine(level);
 }
 
 Flatten::~Flatten() {
@@ -668,7 +928,7 @@ void* Flatten::get_named_root(const char* name, size_t* size) {
 CFlatten flatten_init(int level) {
 	CFlatten flatten;
 	try {
-		flatten = new Unflatten(level);
+		flatten = new UnflattenEngine(level);
 	} catch(std::exception& ex) { 
 		fprintf(stderr, "[UnflattenLib] Failed to initalize kflat - `%s`\n", ex.what());
 		return NULL;
@@ -682,7 +942,7 @@ CFlatten flatten_init(int level) {
 void flatten_deinit(CFlatten flatten) {
 	try {
 		if(flatten != NULL)
-			delete (Unflatten*)flatten;
+			delete (UnflattenEngine*)flatten;
 	} catch(...) {
 		return;
 	}
@@ -690,7 +950,7 @@ void flatten_deinit(CFlatten flatten) {
 
 int flatten_load(CFlatten flatten, FILE* file, get_function_address_t gfa) {
 	try {
-		return ((Unflatten*)flatten)->load(file, gfa);
+		return ((UnflattenEngine*)flatten)->load(file, gfa);
 	} catch(std::exception& ex) { 
 		fprintf(stderr, "[UnflattenLib] Failed to load image - `%s`\n", ex.what());
 		return -1;
@@ -702,7 +962,7 @@ int flatten_load(CFlatten flatten, FILE* file, get_function_address_t gfa) {
 
 int flatten_imginfo(CFlatten flatten, FILE* file) {
 	try {
-		return ((Unflatten*)flatten)->imginfo(file,0);
+		return ((UnflattenEngine*)flatten)->imginfo(file,0);
 	} catch(std::exception& ex) { 
 		fprintf(stderr, "[UnflattenLib] Failed to print image information - `%s`\n", ex.what());
 		return -1;
@@ -714,7 +974,7 @@ int flatten_imginfo(CFlatten flatten, FILE* file) {
 
 int flatten_load_continuous(CFlatten flatten, FILE* file, get_function_address_t gfa) {
 	try {
-		return ((Unflatten*)flatten)->load(file, gfa, true);
+		return ((UnflattenEngine*)flatten)->load(file, gfa, true);
 	} catch(std::exception& ex) { 
 		fprintf(stderr, "[UnflattenLib] Failed to load continous image - `%s`\n", ex.what());
 		return -1;
@@ -726,7 +986,7 @@ int flatten_load_continuous(CFlatten flatten, FILE* file, get_function_address_t
 
 void flatten_unload(CFlatten flatten) {
 	try {
-		((Unflatten*)flatten)->unload();
+		((UnflattenEngine*)flatten)->unload();
 	} catch(...) {
 		return;
 	}
@@ -734,7 +994,7 @@ void flatten_unload(CFlatten flatten) {
 
 void* flatten_root_pointer_next(CFlatten flatten) {
 	try {
-		return ((Unflatten*)flatten)->get_next_root();
+		return ((UnflattenEngine*)flatten)->get_next_root();
 	} catch(std::exception& ex) { 
 		fprintf(stderr, "[UnflattenLib] Failed to get next root pointer - `%s`\n", ex.what());
 		return NULL;
@@ -746,7 +1006,7 @@ void* flatten_root_pointer_next(CFlatten flatten) {
 
 void* flatten_root_pointer_seq(CFlatten flatten, size_t idx) {
 	try {
-		return ((Unflatten*)flatten)->get_seq_root(idx);
+		return ((UnflattenEngine*)flatten)->get_seq_root(idx);
 	} catch(std::exception& ex) { 
 		fprintf(stderr, "[UnflattenLib] Failed to get seq root pointer - `%s`\n", ex.what());
 		return NULL;
@@ -758,7 +1018,7 @@ void* flatten_root_pointer_seq(CFlatten flatten, size_t idx) {
 
 void* flatten_root_pointer_named(CFlatten flatten, const char* name, size_t* idx) {
 	try {
-		return ((Unflatten*)flatten)->get_named_root(name, idx);
+		return ((UnflattenEngine*)flatten)->get_named_root(name, idx);
 	}  catch(std::exception& ex) { 
 		fprintf(stderr, "[UnflattenLib] Failed to get named root pointer - `%s`\n", ex.what());
 		return NULL;
@@ -770,7 +1030,7 @@ void* flatten_root_pointer_named(CFlatten flatten, const char* name, size_t* idx
 
 CFlattenHeader flatten_get_image_header(CFlatten flatten) {
 	try {
-		return ((Unflatten*)flatten)->get_image_header();
+		return ((UnflattenEngine*)flatten)->get_image_header();
 	}  catch(std::exception& ex) { 
 		fprintf(stderr, "[UnflattenLib] Failed to get image header\n");
 		return NULL;

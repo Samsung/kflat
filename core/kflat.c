@@ -266,6 +266,7 @@ static int kflat_test_stop_machine(void* arg) {
 int kflat_run_test(struct kflat* kflat, struct kflat_ioctl_tests* test) {
 	int err;
 	size_t tests_count = sizeof(test_cases) / sizeof(test_cases[0]);
+	struct flatten_header* kflat_hdr = (struct flatten_header*) kflat->area;
 
 	if(tests_count == 0) {
 		pr_err("KFLAT hasn't been compiled with embedded test cases");
@@ -313,7 +314,7 @@ int kflat_run_test(struct kflat* kflat, struct kflat_ioctl_tests* test) {
 				err = kflat->errno;
 			if(err)
 				return (err <= 0) ? err : -err;
-			return *(size_t*)kflat->area + sizeof(size_t);
+			return kflat_hdr->image_size;
 		}
 	}
 
@@ -405,7 +406,7 @@ static int kflat_ioctl_locked(struct kflat *kflat, unsigned int cmd,
 		
 		probing_disarm(kflat);
 
-		args.disable.size = *(size_t*)kflat->area  + sizeof(size_t);
+		args.disable.size = ((struct flatten_header*)kflat->area)->image_size;
 		args.disable.invoked = args.disable.size > sizeof(size_t);
 		args.disable.error = kflat->errno;
 		if(copy_to_user((void*)arg, &args.disable, sizeof(args.disable)))

@@ -44,19 +44,6 @@ struct flatten_uninterruptible_arg {
 	const void* arg;
 };
 
-struct flatten_header {
-	size_t memory_size;
-	size_t ptr_count;
-	size_t fptr_count;
-	size_t root_addr_count;
-	size_t root_addr_extended_count;
-	size_t root_addr_extended_size;
-	uintptr_t this_addr;
-	size_t fptrmapsz;
-	size_t mcount;
-	uint64_t magic;
-};
-
 struct blstream {
 	struct list_head head;
 	void* data;
@@ -433,8 +420,6 @@ static inline size_t strmemlen(const char* s) {
 
 	return avail_size;
 }
-
-#define FLATTEN_MAGIC 0x464c415454454e00ULL
 
 #define FLATTEN_WRITE_ONCE(addr,wsize,wcounter_p)	do {	\
 	if ((*(wcounter_p)+wsize)>kflat->size) {	\

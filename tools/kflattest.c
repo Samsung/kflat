@@ -327,7 +327,7 @@ save_image:
         if(validator == NULL)
             goto munmap_area;
 
-        file = fopen(out_name, "rb");
+        file = fopen(out_name, "r+b");
         assert(file != NULL);
 
         CFlatten flatten = flatten_init(0);

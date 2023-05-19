@@ -1225,15 +1225,18 @@ static int flatten_write_internal(struct kflat* kflat, size_t* wcounter_p) {
     if (kflat->FLCTRL.debug_flag) {
     	flatten_debug_info(kflat);
     }
+	kflat->FLCTRL.HDR.magic = KFLAT_IMG_MAGIC;
+	kflat->FLCTRL.HDR.version = KFLAT_IMG_VERSION;
+	kflat->FLCTRL.HDR.last_load_addr = (uintptr_t) NULL;
+	kflat->FLCTRL.HDR.last_mem_addr = (uintptr_t) NULL;
+	
     kflat->FLCTRL.HDR.memory_size = binary_stream_size(kflat);
     kflat->FLCTRL.HDR.ptr_count = fixup_set_count(kflat);
     kflat->FLCTRL.HDR.fptr_count = fixup_set_fptr_count(kflat);
     kflat->FLCTRL.HDR.root_addr_count = root_addr_count(kflat);
     kflat->FLCTRL.HDR.root_addr_extended_count = root_addr_extended_count(kflat);
     kflat->FLCTRL.HDR.root_addr_extended_size = root_addr_extended_size(kflat);
-    kflat->FLCTRL.HDR.this_addr = (uintptr_t)&flatten_base_function_address;
     kflat->FLCTRL.HDR.mcount = mem_fragment_index_count(kflat);
-    kflat->FLCTRL.HDR.magic = FLATTEN_MAGIC;
     kflat->FLCTRL.HDR.fptrmapsz = fixup_fptr_info_count(kflat);
     FLATTEN_WRITE_ONCE(&kflat->FLCTRL.HDR, sizeof(struct flatten_header), wcounter_p);
 
@@ -1284,7 +1287,7 @@ static int flatten_write_internal(struct kflat* kflat, size_t* wcounter_p) {
 
 int flatten_write(struct kflat* kflat) {
 
-	size_t written = sizeof(size_t);
+	size_t written = 0;
 	int err;
 
 	if ((err=flatten_write_internal(kflat,&written))==0) {
@@ -1299,10 +1302,10 @@ int flatten_write(struct kflat* kflat) {
 				kflat->FLCTRL.HDR.ptr_count,kflat->FLCTRL.HDR.root_addr_count,kflat->FLCTRL.HDR.fptr_count,kflat->FLCTRL.HDR.mcount,written-sizeof(size_t));
 	}
 
-	*((size_t*)(kflat->area)) = written-sizeof(size_t);
-
+	((struct flatten_header*)kflat->area)->image_size = written;
 	return err;
 }
+EXPORT_SYMBOL_GPL(flatten_write);
 
 int flatten_fini(struct kflat* kflat) {
 	struct root_addrnode *ptr = NULL;

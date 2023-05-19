@@ -21,17 +21,17 @@ typedef uintptr_t (*get_function_address_t)(const char* fsym);
 #ifdef __cplusplus
 /**
  * @brief Due to complicated types dependencies, implementation details
- *        of Unflatten class are hidden from end user. Use Flatten wrapper
- *        to conveniently access Unflatten library in applications
+ *        of UnflattenEngine class are hidden from end user. Use Flatten
+ *        wrapper to conveniently access UnflattenEngine library in applications
  */
-class Unflatten;
+class UnflattenEngine;
 
 /**
- * @brief User interface for accessing Unflatten library
+ * @brief User interface for accessing UnflattenEngine library
  * 
  */
 class Flatten {
-	class Unflatten* engine;
+	class UnflattenEngine* engine;
 
 public:
 	/**
