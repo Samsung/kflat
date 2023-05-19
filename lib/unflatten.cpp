@@ -110,7 +110,7 @@ private:
 		struct timeval timeE;
 		gettimeofday(&timeE, NULL);
 
-		return (double)(timeE.tv_sec - timeS.tv_sec) + (timeE.tv_usec - timeS.tv_usec) / 1000000;
+		return (double)(timeE.tv_sec - timeS.tv_sec) + (timeE.tv_usec - timeS.tv_usec) / 1000000.0;
 	}
 
 	/***************************
@@ -839,7 +839,7 @@ public:
 
 		info(" #Fixing memory time: %lfs\n", time_elapsed());
 		info("  Total bytes read: %zu\n", readin);
-		if(continuous_mapping)
+		if(!continuous_mapping)
 			info("  Number of allocated fragments: %zu\n", FLCTRL.HDR.mcount);
 		info("  Number of fixed pointers: %lu\n", FLCTRL.HDR.ptr_count);
 
