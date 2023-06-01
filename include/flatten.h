@@ -11,9 +11,6 @@
 extern "C" {
 #endif
 
-#include "flatten_port.h"
-#include "flatten_image.h"
-
 /*************************************
  * CONFIGURATION
  *************************************/
@@ -22,6 +19,13 @@ extern "C" {
 #define DEFAULT_ITER_QUEUE_SIZE					(1024 * 1024 * 8)
 #define FLAT_PING_TIME_NS						(1 * NSEC_PER_SEC)
 #define FLAT_MAX_TIME_NS						(8 * NSEC_PER_SEC)
+
+
+/*************************************
+ * BSP SPECIFIC CODE
+ *************************************/
+#include "flatten_port.h"
+#include "flatten_image.h"
 
 
 /*************************************

@@ -1,0 +1,194 @@
+/**
+ * @file uflat_bsp.h
+ * @author Pawel Wieczorek (p.wieczorek@samsung.com)
+ * @brief 
+ * 
+ */
+
+#ifndef UFLAT_BSP_H
+#define UFLAT_BSP_H
+
+#include <errno.h>
+#include <stdio.h>
+#include <stdbool.h>
+#include <stddef.h>
+#include <stdlib.h>
+#include <stdio.h>
+#include <limits.h>
+#include <string.h>
+#include <time.h>
+#include <unistd.h>
+
+
+#define container_of(ptr, type, member) ({			\
+  	const __typeof__( ((type *)0)->member ) *__mptr = (ptr);	\
+  	(type *)( (char *)__mptr - offsetof(type,member) );})
+
+#include "rbtree.h"
+#include "interval_tree_generic.h"
+
+
+/* Funcs decl */
+void uflat_dbg_log_printf(const char* fmt, ...);
+void uflat_dbg_log_clear();
+bool uflat_test_address_range(void* ptr, size_t size);
+bool uflat_test_exec_range(void* ptr);
+bool uflat_test_string_len(const char* str);
+
+
+/* Logging */
+#define uflat_fmt(fmt) 		            "uflat: " fmt "\n"
+
+#define FLATTEN_LOG_ERROR(fmt, ...)		fprintf(stderr, uflat_fmt(fmt), ##__VA_ARGS__)
+#define FLATTEN_LOG_INFO(fmt, ...)		printf(uflat_fmt(fmt), ##__VA_ARGS__)
+#define FLATTEN_LOG_DEBUG(fmt, ...)		uflat_dbg_log_printf(fmt "\n", ##__VA_ARGS__)
+#define FLATTEN_LOG_CLEAR()             uflat_dbg_log_clear()
+
+/* Memory allocation */
+#define FLATTEN_BSP_ZALLOC(SIZE)        calloc(1, SIZE)
+#define FLATTEN_BSP_FREE(PTR)           free(PTR)
+
+/* Memory validation */
+#define ADDR_VALID(PTR)				    uflat_test_address_range((void*) PTR, 1)
+#define ADDR_RANGE_VALID(PTR, SIZE)     uflat_test_address_range((void*) PTR, SIZE)
+#define TEXT_ADDR_VALID(PTR)		    uflat_test_exec_range(PTR)
+#define STRING_VALID_LEN(PTR)           uflat_test_string_len((const char*) PTR)
+
+
+static inline size_t strmemlen(const char* s) {
+	size_t str_size, avail_size, test_size;
+	
+	// 1. Fast-path. Check whether first 1000 bytes are maped
+	//  and look for null-terminator in there
+	avail_size = uflat_test_address_range((void*) s, 1000);
+	if(avail_size == 0)
+		return 0;
+
+	str_size = strnlen(s, avail_size);
+	if(str_size <= avail_size)
+		// Return string length + null terminator
+		return str_size + 1;
+	
+	// 2. Slow-path. We haven't encountered null-terminator in first
+	//  1000 bytes, let's look futher
+	test_size = 8 * 4096;
+	while(test_size < INT_MAX) {
+		size_t partial_size;
+		size_t off = avail_size;
+
+		partial_size = uflat_test_address_range((void*)s + off, test_size);
+		if(partial_size == 0)
+			return avail_size;
+		avail_size += partial_size;
+		
+		str_size = strnlen(s+off, partial_size);
+		if(str_size < partial_size)
+			return off + str_size + 1;
+		test_size *= 2;
+	}
+
+	return avail_size;
+}
+
+/* Misc */
+#define EXPORT_FUNC(X)         
+#define FLAT_EXTRACTOR		            &(uflat->flat)
+
+#define unlikely                        
+#define ALIGN(X, A)                     (((X) + (A - 1)) & ~(A -1))
+
+
+typedef long long int ktime_t;
+
+
+#define NSEC_PER_MSEC	1000L
+#define MSEC_PER_SEC	1000L
+#define NSEC_PER_SEC	1000000000L
+
+static __attribute__((used)) ktime_t ktime_get(void) {
+    ktime_t nsec_time;
+    struct timespec time;
+    
+    clock_gettime(CLOCK_MONOTONIC, &time);
+    nsec_time = time.tv_nsec + time.tv_sec * NSEC_PER_SEC;
+    return nsec_time;
+}
+
+/* List implementation */
+// From include/linux/list.h
+struct list_head {
+    struct list_head *next, *prev;
+};
+
+static inline void INIT_LIST_HEAD(struct list_head *list)
+{
+	WRITE_ONCE(list->next, list);
+	WRITE_ONCE(list->prev, list);
+}
+
+
+#define list_entry(ptr, type, member) \
+	container_of(ptr, type, member)
+
+#define list_first_entry(ptr, type, member) \
+	list_entry((ptr)->next, type, member)
+
+#define list_next_entry(pos, member) \
+	list_entry((pos)->member.next, typeof(*(pos)), member)
+
+#define list_prev_entry(pos, member) \
+	list_entry((pos)->member.prev, typeof(*(pos)), member)
+
+#define list_entry_is_head(pos, head, member)				\
+	(&pos->member == (head))
+
+#define list_for_each_entry(pos, head, member)				\
+	for (pos = list_first_entry(head, typeof(*pos), member);	\
+	     !list_entry_is_head(pos, head, member);			\
+	     pos = list_next_entry(pos, member))
+
+#define list_for_each_entry_safe(pos, n, head, member)			\
+	for (pos = list_first_entry(head, typeof(*pos), member),	\
+		n = list_next_entry(pos, member);			\
+	     !list_entry_is_head(pos, head, member); 			\
+	     pos = n, n = list_next_entry(n, member))
+
+static inline void __list_del(struct list_head * prev, struct list_head * next) {
+	next->prev = prev;
+	WRITE_ONCE(prev->next, next);
+}
+
+
+static inline void __list_del_entry(struct list_head *entry) {
+	__list_del(entry->prev, entry->next);
+}
+
+#define LIST_POISON1        (void*) 0x100
+#define LIST_POISON2        (void*) 0x122
+
+static inline void list_del(struct list_head *entry) {
+	__list_del_entry(entry);
+	entry->next = (struct list_head*) LIST_POISON1;
+	entry->prev = (struct list_head*) LIST_POISON2;
+}
+
+static inline void __list_add(struct list_head *n,
+			      struct list_head *prev,
+			      struct list_head *next) {
+	next->prev = n;
+	n->next = next;
+	n->prev = prev;
+	WRITE_ONCE(prev->next, n);
+}
+
+static inline void list_add(struct list_head *n, struct list_head *head)
+{
+	__list_add(n, head, head->next);
+}
+
+static inline void list_add_tail(struct list_head *n, struct list_head *head) {
+	__list_add(n, head->prev, head);
+}
+
+
+#endif /* UFLAT_BSP_H */

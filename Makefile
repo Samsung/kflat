@@ -47,7 +47,11 @@ default:
 
 .PHONY: library
 library:
-	$(MAKE) -C $(PWD)/lib all
+	$(MAKE) -C $(PWD)/lib unflatten
+
+.PHONY: uflat
+uflat:
+	$(MAKE) -C $(PWD)/lib uflat
 
 .PHONY: clean
 clean:
