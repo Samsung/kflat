@@ -99,9 +99,9 @@ static int kflat_flatten_string_unit_test(struct kflat *kflat) {
 
 #else
 
-static int kflat_flatten_string_validate(void *memory, size_t size, CFlatten flatten) {
-	struct str_container *str1 = (struct str_container *)flatten_root_pointer_seq(flatten, 0);
-	struct self_str_container *str2 = (struct self_str_container *)flatten_root_pointer_seq(flatten, 1);
+static int kflat_flatten_string_validate(void *memory, size_t size, CUnflatten flatten) {
+	struct str_container *str1 = (struct str_container *)unflatten_root_pointer_seq(flatten, 0);
+	struct self_str_container *str2 = (struct self_str_container *)unflatten_root_pointer_seq(flatten, 1);
 
 	ASSERT(!strcmp(str1->str, "Good morning!"));
 	ASSERT(str1->str == str1->sameAsFirst);

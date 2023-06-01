@@ -97,7 +97,7 @@ static int kflat_large_interval_tree_test(struct kflat *kflat) {
 
 #else
 
-static int kflat_large_interval_tree_validate(void *memory, size_t size, CFlatten flatten) {
+static int kflat_large_interval_tree_validate(void *memory, size_t size, CUnflatten flatten) {
 	const struct my_interval_tree_map *interval_tree_map = (struct my_interval_tree_map *)memory;
 	size_t count = my_interval_tree_count(interval_tree_map);
 	ASSERT(count == INTERVAL_COUNT);

@@ -40,7 +40,7 @@ static int kflat_simple_test(struct kflat *kflat) {
 
 #else
 
-static int kflat_simple_validate(void *memory, size_t size, CFlatten flatten) {
+static int kflat_simple_validate(void *memory, size_t size, CUnflatten flatten) {
 	struct A *pA = (struct A *)memory;
 
 	ASSERT(pA->X == 0x0000404F);

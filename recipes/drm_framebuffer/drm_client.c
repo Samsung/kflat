@@ -30,14 +30,14 @@ int main(int argc, char** argv) {
         return 1;
     }
 
-    CFlatten flatten = flatten_init(0);
+    CUnflatten flatten = unflatten_init(0);
     if(flatten == NULL) {
         fprintf(stderr, "Failed to initialize LibFlatten\n");
         fclose(file);
         return 1;
     }
 
-    int ret = flatten_load(flatten, file, 0x0);
+    int ret = unflatten_load(flatten, file, 0x0);
     if(ret) {
         fprintf(stderr, "Failed to load input file");
         fclose(file);
@@ -47,7 +47,7 @@ int main(int argc, char** argv) {
     printf("Loaded input file %s\n", argv[1]);
     fclose(file);
 
-    struct drm_device* dev = flatten_root_pointer_named(flatten, "drm_device", 0x0);
+    struct drm_device* dev = unflatten_root_pointer_named(flatten, "drm_device", 0x0);
     if(dev == NULL) {
         fprintf(stderr, "Failed to locate drm_device in loaded file\n");
         return 1;

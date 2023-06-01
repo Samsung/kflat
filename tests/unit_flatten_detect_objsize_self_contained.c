@@ -54,9 +54,9 @@ static int kflat_flatten_detect_objsize_self_contained_unit_test(struct kflat *k
 
 #else
 
-static int kflat_flatten_detect_objsize_self_contained_unit_validate(void *memory, size_t size, CFlatten flatten) {
+static int kflat_flatten_detect_objsize_self_contained_unit_validate(void *memory, size_t size, CUnflatten flatten) {
 	
-	struct mere_pointers_sc *ptrs = (struct mere_pointers_sc *)flatten_root_pointer_seq(flatten, 0);
+	struct mere_pointers_sc *ptrs = (struct mere_pointers_sc *)unflatten_root_pointer_seq(flatten, 0);
 
 	if(!ptrs->detect_obj_supported)
 		return KFLAT_TEST_UNSUPPORTED;

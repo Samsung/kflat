@@ -67,7 +67,7 @@ struct root_addrnode {
  *******************************/
 class UnflattenEngine {
 private:
-	friend class Flatten;
+	friend class Unflatten;
 
 	bool need_unload;
 	enum {
@@ -890,43 +890,43 @@ public:
 /********************************
  * C++ API
  *******************************/
-Flatten::Flatten(int level) {
+Unflatten::Unflatten(int level) {
 	engine = new UnflattenEngine(level);
 }
 
-Flatten::~Flatten() {
+Unflatten::~Unflatten() {
 	delete engine;
 }
 
-int Flatten::load(FILE* file, get_function_address_t gfa, bool continuous_mapping) {
+int Unflatten::load(FILE* file, get_function_address_t gfa, bool continuous_mapping) {
 	return engine->load(file, gfa, continuous_mapping);
 }
 
-int Flatten::info(FILE* file, const char* arg) {
+int Unflatten::info(FILE* file, const char* arg) {
 	return engine->imginfo(file,arg);
 }
 
-void Flatten::unload() {
+void Unflatten::unload() {
 	engine->unload();
 }
 
-void* Flatten::get_next_root() {
+void* Unflatten::get_next_root() {
 	return engine->root_pointer_next();
 }
 
-void* Flatten::get_seq_root(size_t idx) {
+void* Unflatten::get_seq_root(size_t idx) {
 	return engine->root_pointer_seq(idx);
 }
 
-void* Flatten::get_named_root(const char* name, size_t* size) {
+void* Unflatten::get_named_root(const char* name, size_t* size) {
 	return engine->root_pointer_named(name, size);
 }
 
 /********************************
  * C Wrappers
  *******************************/
-CFlatten flatten_init(int level) {
-	CFlatten flatten;
+CUnflatten unflatten_init(int level) {
+	CUnflatten flatten;
 	try {
 		flatten = new UnflattenEngine(level);
 	} catch(std::exception& ex) { 
@@ -939,7 +939,7 @@ CFlatten flatten_init(int level) {
 	return flatten;
 }
 
-void flatten_deinit(CFlatten flatten) {
+void unflatten_deinit(CUnflatten flatten) {
 	try {
 		if(flatten != NULL)
 			delete (UnflattenEngine*)flatten;
@@ -948,7 +948,7 @@ void flatten_deinit(CFlatten flatten) {
 	}
 }
 
-int flatten_load(CFlatten flatten, FILE* file, get_function_address_t gfa) {
+int unflatten_load(CUnflatten flatten, FILE* file, get_function_address_t gfa) {
 	try {
 		return ((UnflattenEngine*)flatten)->load(file, gfa);
 	} catch(std::exception& ex) { 
@@ -960,7 +960,7 @@ int flatten_load(CFlatten flatten, FILE* file, get_function_address_t gfa) {
 	}
 }
 
-int flatten_imginfo(CFlatten flatten, FILE* file) {
+int unflatten_imginfo(CUnflatten flatten, FILE* file) {
 	try {
 		return ((UnflattenEngine*)flatten)->imginfo(file,0);
 	} catch(std::exception& ex) { 
@@ -972,7 +972,7 @@ int flatten_imginfo(CFlatten flatten, FILE* file) {
 	}
 }
 
-int flatten_load_continuous(CFlatten flatten, FILE* file, get_function_address_t gfa) {
+int unflatten_load_continuous(CUnflatten flatten, FILE* file, get_function_address_t gfa) {
 	try {
 		return ((UnflattenEngine*)flatten)->load(file, gfa, true);
 	} catch(std::exception& ex) { 
@@ -984,7 +984,7 @@ int flatten_load_continuous(CFlatten flatten, FILE* file, get_function_address_t
 	}
 }
 
-void flatten_unload(CFlatten flatten) {
+void unflatten_unload(CUnflatten flatten) {
 	try {
 		((UnflattenEngine*)flatten)->unload();
 	} catch(...) {
@@ -992,7 +992,7 @@ void flatten_unload(CFlatten flatten) {
 	}
 }
 
-void* flatten_root_pointer_next(CFlatten flatten) {
+void* unflatten_root_pointer_next(CUnflatten flatten) {
 	try {
 		return ((UnflattenEngine*)flatten)->get_next_root();
 	} catch(std::exception& ex) { 
@@ -1004,7 +1004,7 @@ void* flatten_root_pointer_next(CFlatten flatten) {
 	}
 }
 
-void* flatten_root_pointer_seq(CFlatten flatten, size_t idx) {
+void* unflatten_root_pointer_seq(CUnflatten flatten, size_t idx) {
 	try {
 		return ((UnflattenEngine*)flatten)->get_seq_root(idx);
 	} catch(std::exception& ex) { 
@@ -1016,7 +1016,7 @@ void* flatten_root_pointer_seq(CFlatten flatten, size_t idx) {
 	}
 }
 
-void* flatten_root_pointer_named(CFlatten flatten, const char* name, size_t* idx) {
+void* unflatten_root_pointer_named(CUnflatten flatten, const char* name, size_t* idx) {
 	try {
 		return ((UnflattenEngine*)flatten)->get_named_root(name, idx);
 	}  catch(std::exception& ex) { 
@@ -1028,7 +1028,7 @@ void* flatten_root_pointer_named(CFlatten flatten, const char* name, size_t* idx
 	}
 }
 
-CFlattenHeader flatten_get_image_header(CFlatten flatten) {
+CUnflattenHeader unflatten_get_image_header(CUnflatten flatten) {
 	try {
 		return ((UnflattenEngine*)flatten)->get_image_header();
 	}  catch(std::exception& ex) { 
@@ -1040,10 +1040,10 @@ CFlattenHeader flatten_get_image_header(CFlatten flatten) {
 	}
 }
 
-unsigned long flatten_header_fragment_count(CFlattenHeader header) {
+unsigned long unflatten_header_fragment_count(CUnflattenHeader header) {
 	return (unsigned long)((struct flatten_header*)header)->mcount;
 }
 
-size_t flatten_header_memory_size(CFlattenHeader header) {
+size_t unflatten_header_memory_size(CUnflattenHeader header) {
 	return (unsigned long)((struct flatten_header*)header)->memory_size;
 }

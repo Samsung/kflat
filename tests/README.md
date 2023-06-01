@@ -40,7 +40,7 @@ static int kflat_test(struct kflat *kflat) {
 #else /* __USER__ */
 /**************************/
 
-static int kflat_validate(void* memory, size_t size, CFlatten flatten) {
+static int kflat_validate(void* memory, size_t size, CUnflatten flatten) {
 	struct B* pB = (struct B*) memory;
 	ASSERT(pB->x == 0x123);
 	return 0;

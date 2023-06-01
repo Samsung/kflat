@@ -56,9 +56,9 @@ static int kflat_flatten_struct_self_contained_unit_test(struct kflat *kflat) {
 
 #else
 
-static int kflat_flatten_struct_self_contained_unit_validate(void *memory, size_t size, CFlatten flatten) {
-	struct unit_sc_A *pA = (struct unit_sc_A *)flatten_root_pointer_seq(flatten, 0);
-	struct unit_sc_B *str = (struct unit_sc_B *)flatten_root_pointer_seq(flatten, 1);
+static int kflat_flatten_struct_self_contained_unit_validate(void *memory, size_t size, CUnflatten flatten) {
+	struct unit_sc_A *pA = (struct unit_sc_A *)unflatten_root_pointer_seq(flatten, 0);
+	struct unit_sc_B *str = (struct unit_sc_B *)unflatten_root_pointer_seq(flatten, 1);
 
 	ASSERT(pA->X == 0xCAFECAFE);
 	ASSERT(pA->pB == str);

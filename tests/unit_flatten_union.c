@@ -44,10 +44,10 @@ static int kflat_flatten_union_unit_test(struct kflat *kflat) {
 
 #else
 
-static int kflat_flatten_union_unit_validate(void *memory, size_t size, CFlatten flatten) {
+static int kflat_flatten_union_unit_validate(void *memory, size_t size, CUnflatten flatten) {
 
-    union uA* puA = (union uA*)flatten_root_pointer_seq(flatten, 0);
-    struct my_unions* pmu = (struct my_unions*)flatten_root_pointer_seq(flatten, 1);
+    union uA* puA = (union uA*)unflatten_root_pointer_seq(flatten, 0);
+    struct my_unions* pmu = (struct my_unions*)unflatten_root_pointer_seq(flatten, 1);
 
     ASSERT_EQ(puA[0].c,7);
     ASSERT_EQ(puA[1].c,8);

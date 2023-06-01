@@ -83,7 +83,7 @@ static int kflat_addr_valid_unit_test(struct kflat *kflat) {
 
 #else
 
-static int kflat_addr_valid_unit_validate(void *memory, size_t size, CFlatten flatten) {
+static int kflat_addr_valid_unit_validate(void *memory, size_t size, CUnflatten flatten) {
 	struct addr_valid_result *pResults = (struct addr_valid_result *)memory;
 
 	ASSERT(pResults->test_null_pass);

@@ -57,7 +57,7 @@ static int kflat_padding_test(struct kflat *kflat) {
 
 #else
 
-static int kflat_padding_validate(void *memory, size_t size, CFlatten flatten) {
+static int kflat_padding_validate(void *memory, size_t size, CUnflatten flatten) {
 	struct paddingRoot *r = (struct paddingRoot *)memory;
 	ASSERT(r->a0->i == 3);
 	ASSERT(r->b->c == '3');

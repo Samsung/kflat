@@ -198,7 +198,7 @@ size_t calc_size_of_phys_mem(struct kdump_memory_map* mem) {
  */
 void process_dump() {
     int ret;
-    Flatten flatten;
+    Unflatten flatten;
 
     FILE* f = fopen("mem_map.bin", "r");
     flatten.load(f, NULL);

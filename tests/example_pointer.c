@@ -29,7 +29,7 @@ static int kflat_pointer_test(struct kflat *kflat) {
 
 #else
 
-static int kflat_pointer_validate(void *memory, size_t size, CFlatten flatten) {
+static int kflat_pointer_validate(void *memory, size_t size, CUnflatten flatten) {
 
 	double ***trio = (double ***)memory;
 	double magic_number = ***trio;

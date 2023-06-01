@@ -60,7 +60,7 @@ static int kflat_large_list_test(struct kflat *kflat) {
 #else
 /********************************/
 
-static int kflat_large_list_validate(void *memory, size_t size, CFlatten flatten) {
+static int kflat_large_list_validate(void *memory, size_t size, CUnflatten flatten) {
 	struct list_head *p;
 	size_t list_size = 0;
 	struct myLongLargeList *myhead = (struct myLongLargeList *)memory;

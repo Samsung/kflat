@@ -10,8 +10,8 @@
 /********************************
  * Exported types
  *******************************/
-typedef void* CFlatten;
-typedef void* CFlattenHeader;
+typedef void* CUnflatten;
+typedef void* CUnflattenHeader;
 typedef uintptr_t (*get_function_address_t)(const char* fsym);
 
 
@@ -30,7 +30,7 @@ class UnflattenEngine;
  * @brief User interface for accessing UnflattenEngine library
  * 
  */
-class Flatten {
+class Unflatten {
 	class UnflattenEngine* engine;
 
 public:
@@ -39,12 +39,12 @@ public:
 	 * 
 	 * @param level: debug level used for printing info 
 	 */
-	Flatten(int level = 0);
+	Unflatten(int level = 0);
 
 	/**
-	 * @brief destroy the Flatten object
+	 * @brief destroy the Unflatten object
 	 */
-	~Flatten();
+	~Unflatten();
 
 	/**
 	 * @brief load new kflat image from file. This method can be safely
@@ -113,30 +113,30 @@ extern "C" {
  * @brief Create a new instance of flatten library
  * 
  * @param level log level
- * @return CFlatten instance or NULL in case of an error
+ * @return CUnflatten instance or NULL in case of an error
  */
-CFlatten flatten_init(int level);
+CUnflatten unflatten_init(int level);
 
 /**
  * @brief Destroy instance of flatten library
  * 
  * @param flatten library instance
  */
-void flatten_deinit(CFlatten flatten);
+void unflatten_deinit(CUnflatten flatten);
 
 /**
  * @brief Load new kflat image from file. This method can be safely
- *        called multiple times without need of using flatten_unload
+ *        called multiple times without need of using unflatten_unload
  * 
  * @param flatten library instance
  * @param file    pointer to opened file with kflat image
  * @param gfa     optional pointer to function resolving func pointers
  * @return        0 on success, -1 if an error occurred
  */
-int flatten_load(CFlatten flatten, FILE* file, get_function_address_t gfa);
+int unflatten_load(CUnflatten flatten, FILE* file, get_function_address_t gfa);
 
 /**
- * @brief Load new kflat image from file. Works as flatten_load except that
+ * @brief Load new kflat image from file. Works as unflatten_load except that
  * 		  loaded image will be stored as one continous blob in memory. Should
  * 		  provide better performance, but ASAN won't be able to detect overflows
  * 		  in such memory dump.
@@ -146,16 +146,16 @@ int flatten_load(CFlatten flatten, FILE* file, get_function_address_t gfa);
  * @param gfa     optional pointer to function resolving func pointers
  * @return        0 on success, -1 if an error occurred
  */
-int flatten_load_continuous(CFlatten flatten, FILE* file, get_function_address_t gfa);
+int unflatten_load_continuous(CUnflatten flatten, FILE* file, get_function_address_t gfa);
 
 /**
  * @brief Unload kflat image. Normally, there's no need for invoking this
- *        function manually - both flatten_load and flatten_deinit invokes
- *        flatten_unload when necessary
+ *        function manually - both unflatten_load and unflatten_deinit invokes
+ *        unflatten_unload when necessary
  * 
  * @param flatten library instance
  */
-void flatten_unload(CFlatten flatten);
+void unflatten_unload(CUnflatten flatten);
 
 /**
  * @brief Print information about the flattened image
@@ -163,7 +163,7 @@ void flatten_unload(CFlatten flatten);
  * @param flatten library instance
  * @param file    pointer to opened file with kflat image
  */
-int flatten_imginfo(CFlatten flatten, FILE* file);
+int unflatten_imginfo(CUnflatten flatten, FILE* file);
 
 /**
  * @brief Retrieve the pointer to the next flattened object
@@ -171,7 +171,7 @@ int flatten_imginfo(CFlatten flatten, FILE* file);
  * @param flatten library instance
  * @return        generic pointer to flattened object or NULL if an error occurred
  */
-void* flatten_root_pointer_next(CFlatten flatten);
+void* unflatten_root_pointer_next(CUnflatten flatten);
 
 /**
  * @brief Retrieve the pointer to the n-th flattened object
@@ -180,7 +180,7 @@ void* flatten_root_pointer_next(CFlatten flatten);
  * @param idx     ID of object to retrieve from image
  * @return        generic pointer to flattened object or NULL if an error occurred
  */
-void* flatten_root_pointer_seq(CFlatten flatten, size_t idx);
+void* unflatten_root_pointer_seq(CUnflatten flatten, size_t idx);
 
 /**
  * @brief Retrieve the pointer to the named flattened object
@@ -190,14 +190,14 @@ void* flatten_root_pointer_seq(CFlatten flatten, size_t idx);
  * @param size[opt]	place where the size of target object will be stored 
  * @return void* 	generic pointer to the named flattened object or NULL
  */
-void* flatten_root_pointer_named(CFlatten flatten, const char* name, size_t* size);
+void* unflatten_root_pointer_named(CUnflatten flatten, const char* name, size_t* size);
 
 /**
  * @brief Retrieve the pointer to the flatten image header structure
  * 
-  * @return CFlattenHeader 	generic pointer to the flatten image header structure or NULL
+  * @return CUnflattenHeader 	generic pointer to the flatten image header structure or NULL
  */
-CFlattenHeader flatten_get_image_header(CFlatten flatten);
+CUnflattenHeader unflatten_get_image_header(CUnflatten flatten);
 
 /**
  * @brief Retrieve the number of fragments in the flatten memory image
@@ -205,14 +205,14 @@ CFlattenHeader flatten_get_image_header(CFlatten flatten);
  * @param header 			image header instance
  * @return unsigned long 	number of memory fragments in the image
  */
-unsigned long flatten_header_fragment_count(CFlattenHeader header);
+unsigned long unflatten_header_fragment_count(CUnflattenHeader header);
 
 /**
  * @brief Retrieve the size of the flatten memory
  * @param header 	image header instance
  * @return size_t 	size of the flatten memory
  */
-size_t flatten_header_memory_size(CFlattenHeader header);
+size_t unflatten_header_memory_size(CUnflattenHeader header);
 
 #ifdef __cplusplus
 }

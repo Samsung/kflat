@@ -54,9 +54,9 @@ static int kflat_flatten_detect_objsize_unit_test(struct kflat *kflat) {
 
 #else
 
-static int kflat_flatten_detect_objsize_unit_validate(void *memory, size_t size, CFlatten flatten) {
+static int kflat_flatten_detect_objsize_unit_validate(void *memory, size_t size, CUnflatten flatten) {
 	
-	struct mere_pointers *ptrs = (struct mere_pointers *)flatten_root_pointer_seq(flatten, 0);
+	struct mere_pointers *ptrs = (struct mere_pointers *)unflatten_root_pointer_seq(flatten, 0);
 
 	if(!ptrs->detect_obj_supported)
 		return KFLAT_TEST_UNSUPPORTED;

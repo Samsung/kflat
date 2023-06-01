@@ -118,11 +118,11 @@ static int kflat_global_list_for_each_entry_test(struct kflat *kflat) {
 #else
 /********************************/
 
-static int kflat_global_list_for_each_entry_validate(void *memory, size_t size, CFlatten flatten) {
+static int kflat_global_list_for_each_entry_validate(void *memory, size_t size, CUnflatten flatten) {
 	struct list_head *p;
 	size_t list_size = 0;
-	struct list_head *gvec = (struct list_head *)flatten_root_pointer_seq(flatten, 0);
-	struct list_head *gvec2 = (struct list_head *)flatten_root_pointer_seq(flatten, 1);
+	struct list_head *gvec = (struct list_head *)unflatten_root_pointer_seq(flatten, 0);
+	struct list_head *gvec2 = (struct list_head *)unflatten_root_pointer_seq(flatten, 1);
 
 	for (p = gvec->next; p != gvec; p = p->next) {
 		struct intnodeg *entry = container_of(p, struct intnodeg, link);

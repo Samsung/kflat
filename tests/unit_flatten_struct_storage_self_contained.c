@@ -136,10 +136,10 @@ static int kflat_flatten_struct_storage_self_contained_unit_test(struct kflat *k
 
 #else
 
-static int kflat_flatten_struct_storage_self_contained_unit_validate(void *memory, size_t size, CFlatten flatten) {
+static int kflat_flatten_struct_storage_self_contained_unit_validate(void *memory, size_t size, CUnflatten flatten) {
 
-    struct MMS *obM = (struct MMS *)flatten_root_pointer_seq(flatten, 0);
-    struct SAS *sa = (struct SAS *)flatten_root_pointer_seq(flatten, 1);
+    struct MMS *obM = (struct MMS *)unflatten_root_pointer_seq(flatten, 0);
+    struct SAS *sa = (struct SAS *)unflatten_root_pointer_seq(flatten, 1);
 
     ASSERT(!strcmp(obM->s, "This is a M object here"));
 

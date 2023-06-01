@@ -71,7 +71,7 @@ static int kflat_flatten_struct_type_array_unit_test(struct kflat *kflat) {
 
 #else
 
-static int kflat_flatten_struct_type_array_unit_validate(void *memory, size_t size, CFlatten flatten) {
+static int kflat_flatten_struct_type_array_unit_validate(void *memory, size_t size, CUnflatten flatten) {
 	box_t *box = (box_t *)memory;
 
 	ASSERT(box[0].integers + 4 == box[1].integers);

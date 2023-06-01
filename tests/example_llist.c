@@ -78,11 +78,11 @@ static int kflat_llist_test(struct kflat *kflat) {
 #else
 /********************************/
 
-static int kflat_llist_test_validate(void *memory, size_t size, CFlatten flatten) {
+static int kflat_llist_test_validate(void *memory, size_t size, CUnflatten flatten) {
 	size_t list_size = 0;
 	struct llist_node *p;
-	struct llist_head *lhead = (struct llist_head *)flatten_root_pointer_seq(flatten, 0);
-	struct llist_head *lhead2 = (struct llist_head *)flatten_root_pointer_seq(flatten, 1);
+	struct llist_head *lhead = (struct llist_head *)unflatten_root_pointer_seq(flatten, 0);
+	struct llist_head *lhead2 = (struct llist_head *)unflatten_root_pointer_seq(flatten, 1);
 
 	for ((p) = (lhead->first); p; (p) = (p)->next) {
 		struct myLongLList *entry = container_of(p, struct myLongLList, l);

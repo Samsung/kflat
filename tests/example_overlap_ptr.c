@@ -51,8 +51,8 @@ static int kflat_overlapptr_test(struct kflat *kflat) {
 
 #else
 
-static int kflat_overlapptr_test_validate(void *memory, size_t size, CFlatten flatten) {
-	my_A *pA = (my_A *)flatten_root_pointer_seq(flatten, 1);
+static int kflat_overlapptr_test_validate(void *memory, size_t size, CUnflatten flatten) {
+	my_A *pA = (my_A *)unflatten_root_pointer_seq(flatten, 1);
 	ASSERT(pA->pB0->i == 1);
 	ASSERT(pA->pB1->i == 2);
 	ASSERT(pA->pB2->i == 3);

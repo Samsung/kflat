@@ -70,7 +70,7 @@ int main(int argc, char** argv) {
         return 1;
     }
 
-    Flatten flatten;
+    Unflatten flatten;
     flatten.load(file);
     printf("Loaded input file %s\n", argv[1]);
     fclose(file);

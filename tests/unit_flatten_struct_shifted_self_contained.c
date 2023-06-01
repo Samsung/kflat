@@ -58,10 +58,10 @@ static int kflat_flatten_struct_shifted_self_contained_unit_test(struct kflat *k
 
 #else
 
-static int kflat_flatten_struct_shifted_self_contained_unit_validate(void *memory, size_t size, CFlatten flatten) {
+static int kflat_flatten_struct_shifted_self_contained_unit_validate(void *memory, size_t size, CUnflatten flatten) {
 
-	struct my_device_sc *dev = (struct my_device_sc *)flatten_root_pointer_seq(flatten, 0);
-	struct my_device_sc *dev2 = (struct my_device_sc *)flatten_root_pointer_seq(flatten, 1);
+	struct my_device_sc *dev = (struct my_device_sc *)unflatten_root_pointer_seq(flatten, 0);
+	struct my_device_sc *dev2 = (struct my_device_sc *)unflatten_root_pointer_seq(flatten, 1);
 	struct my_product_sc* prod = container_of(dev,struct my_product_sc,dev);
 	product_sc_t* prod2 = container_of(dev2,product_sc_t,dev);
 

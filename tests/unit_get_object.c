@@ -105,7 +105,7 @@ static int kflat_get_object_unit_test(struct kflat *kflat) {
 
 #else
 
-static int kflat_get_object_unit_validate(void *memory, size_t size, CFlatten flatten) {
+static int kflat_get_object_unit_validate(void *memory, size_t size, CUnflatten flatten) {
 	struct get_obj_result *pResults = (struct get_obj_result *)memory;
 
 	if (!pResults->get_obj_supported)

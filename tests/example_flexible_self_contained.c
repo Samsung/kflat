@@ -123,11 +123,11 @@ static int kflat_flexible_self_contained_test(struct kflat *kflat) {
 
 #else
 
-static int kflat_flexible_self_contained_validate(void *memory, size_t size, CFlatten flatten) {
-	struct flexsc_A *pA = (struct flexsc_A*)flatten_root_pointer_seq(flatten, 0);
-	struct flexsc_C *pC = (struct flexsc_C*)flatten_root_pointer_seq(flatten, 1);
-	struct flexsc_E *pE = (struct flexsc_E*)flatten_root_pointer_seq(flatten, 2);
-	struct flexsc_G *pG = (struct flexsc_G*)flatten_root_pointer_seq(flatten, 3);
+static int kflat_flexible_self_contained_validate(void *memory, size_t size, CUnflatten flatten) {
+	struct flexsc_A *pA = (struct flexsc_A*)unflatten_root_pointer_seq(flatten, 0);
+	struct flexsc_C *pC = (struct flexsc_C*)unflatten_root_pointer_seq(flatten, 1);
+	struct flexsc_E *pE = (struct flexsc_E*)unflatten_root_pointer_seq(flatten, 2);
+	struct flexsc_G *pG = (struct flexsc_G*)unflatten_root_pointer_seq(flatten, 3);
 	
 	if(!pA->get_obj_supported)
 		return KFLAT_TEST_UNSUPPORTED;

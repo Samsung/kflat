@@ -78,11 +78,11 @@ static int kflat_fragment_test(struct kflat *kflat) {
 
 #else /* __USER__ */
 
-static int kflat_fragment_validate(void* memory, size_t size, CFlatten flatten) {
-	struct P* pP = (struct P*)flatten_root_pointer_seq(flatten,3);
+static int kflat_fragment_validate(void* memory, size_t size, CUnflatten flatten) {
+	struct P* pP = (struct P*)unflatten_root_pointer_seq(flatten,3);
 
-	CFlattenHeader hdr = flatten_get_image_header(flatten);
-	ASSERT(flatten_header_memory_size(hdr) == sizeof(struct P)+offsetof(struct S,obP)+sizeof(unsigned long)+8+sizeof(struct X));
+	CUnflattenHeader hdr = unflatten_get_image_header(flatten);
+	ASSERT(unflatten_header_memory_size(hdr) == sizeof(struct P)+offsetof(struct S,obP)+sizeof(unsigned long)+8+sizeof(struct X));
 
 	ASSERT(pP->l == 1000);
 	ASSERT(!strcmp(pP->tp, "Pobject"));
@@ -105,7 +105,7 @@ static int kflat_fragment_validate(void* memory, size_t size, CFlatten flatten) 
 	ASSERT(pP->b == 50);
 	ASSERT(pP->c == 100);
 
-	ASSERT(flatten_header_fragment_count(hdr) == 3);
+	ASSERT(unflatten_header_fragment_count(hdr) == 3);
 
 	return KFLAT_TEST_SUCCESS;
 }

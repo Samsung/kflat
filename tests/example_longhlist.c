@@ -93,11 +93,11 @@ static int kflat_longhlist_test(struct kflat *kflat) {
 
 #else
 
-static int kflat_longhlist_validate(void *memory, size_t size, CFlatten flatten) {
+static int kflat_longhlist_validate(void *memory, size_t size, CUnflatten flatten) {
 	int i;
 	struct hlist_node *p;
-	struct hlist_head *harr = (struct hlist_head *)flatten_root_pointer_seq(flatten, 0);
-	struct hlist_head *harr2 = (struct hlist_head *)flatten_root_pointer_seq(flatten, 1);
+	struct hlist_head *harr = (struct hlist_head *)unflatten_root_pointer_seq(flatten, 0);
+	struct hlist_head *harr2 = (struct hlist_head *)unflatten_root_pointer_seq(flatten, 1);
 
 	for (i = 0; i < 5; ++i) {
 		unsigned long list_size = 0;

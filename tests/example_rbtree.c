@@ -166,9 +166,9 @@ static int kflat_rbtree_example(struct kflat *kflat) {
 #else
 /********************************/
 
-static int kflat_rbtree_validate(void *memory, size_t size, CFlatten flatten) {
-	struct rb_root *iroot = (struct rb_root *)flatten_root_pointer_seq(flatten, 0);
-	struct rb_root *sroot = (struct rb_root *)flatten_root_pointer_seq(flatten, 1);
+static int kflat_rbtree_validate(void *memory, size_t size, CUnflatten flatten) {
+	struct rb_root *iroot = (struct rb_root *)unflatten_root_pointer_seq(flatten, 0);
+	struct rb_root *sroot = (struct rb_root *)unflatten_root_pointer_seq(flatten, 1);
 
 	// Validate int set
 	uint32_t visited = 0;

@@ -159,12 +159,12 @@ static int kflat_flatten_embedded_pointer_unit_test(struct kflat *kflat) {
 
 #else
 
-static int kflat_flatten_embedded_pointer_unit_validate(void *memory, size_t size, CFlatten flatten) {
+static int kflat_flatten_embedded_pointer_unit_validate(void *memory, size_t size, CUnflatten flatten) {
 
-	struct EA* pEA = (struct EA*)flatten_root_pointer_seq(flatten, 0);
-	struct EA* gEA = (struct EA*)flatten_root_pointer_seq(flatten, 1);
-	struct EA* gEA2 = (struct EA*)flatten_root_pointer_seq(flatten, 2);
-	B_t* g_B = (B_t*)flatten_root_pointer_seq(flatten, 3);
+	struct EA* pEA = (struct EA*)unflatten_root_pointer_seq(flatten, 0);
+	struct EA* gEA = (struct EA*)unflatten_root_pointer_seq(flatten, 1);
+	struct EA* gEA2 = (struct EA*)unflatten_root_pointer_seq(flatten, 2);
+	B_t* g_B = (B_t*)unflatten_root_pointer_seq(flatten, 3);
 
 	for (int i=0; i<5; ++i) {
 		char n[4];

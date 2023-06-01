@@ -119,11 +119,11 @@ static int kflat_flexible_test(struct kflat *kflat) {
 
 #else
 
-static int kflat_flexible_validate(void *memory, size_t size, CFlatten flatten) {
-	struct flex_A *pA = (struct flex_A*)flatten_root_pointer_seq(flatten, 0);
-	struct flex_C *pC = (struct flex_C*)flatten_root_pointer_seq(flatten, 1);
-	struct flex_E *pE = (struct flex_E*)flatten_root_pointer_seq(flatten, 2);
-	struct flex_G *pG = (struct flex_G*)flatten_root_pointer_seq(flatten, 3);
+static int kflat_flexible_validate(void *memory, size_t size, CUnflatten flatten) {
+	struct flex_A *pA = (struct flex_A*)unflatten_root_pointer_seq(flatten, 0);
+	struct flex_C *pC = (struct flex_C*)unflatten_root_pointer_seq(flatten, 1);
+	struct flex_E *pE = (struct flex_E*)unflatten_root_pointer_seq(flatten, 2);
+	struct flex_G *pG = (struct flex_G*)unflatten_root_pointer_seq(flatten, 3);
 	
 	if(!pA->get_obj_supported)
 		return KFLAT_TEST_UNSUPPORTED;

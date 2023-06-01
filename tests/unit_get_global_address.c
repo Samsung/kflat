@@ -37,7 +37,7 @@ static int kflat_global_addr_unit_test(struct kflat *kflat) {
 
 #else
 
-static int kflat_global_addr_unit_validate(void *memory, size_t size, CFlatten flatten) {
+static int kflat_global_addr_unit_validate(void *memory, size_t size, CUnflatten flatten) {
 	struct get_global_result *pResults = (struct get_global_result *)memory;
 
 	ASSERT(pResults->test_nonexistent_pass);

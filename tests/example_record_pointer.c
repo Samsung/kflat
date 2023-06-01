@@ -39,7 +39,7 @@ int kflat_record_pointer_test(struct kflat *kflat) {
 
 #else
 
-static int kflat_record_pointer_validate(void *memory, size_t size, CFlatten flatten) {
+static int kflat_record_pointer_validate(void *memory, size_t size, CUnflatten flatten) {
 	struct iptr *pv2 = (struct iptr *)memory;
 	ASSERT(pv2->l == 10);
 	ASSERT(!memcmp(pv2->p, iarr, sizeof(iarr)));

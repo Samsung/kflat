@@ -51,7 +51,7 @@ struct kflat_test_case {
 
 #include <unflatten.hpp>
 
-typedef int (*kflat_test_case_handler_t)(void* memory, size_t size, CFlatten flatten);
+typedef int (*kflat_test_case_handler_t)(void* memory, size_t size, CUnflatten flatten);
 
 struct kflat_test_case {
     const char* name;

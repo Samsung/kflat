@@ -60,10 +60,10 @@ static int kflat_flatten_struct_array_specialize_unit_test(struct kflat *kflat) 
 #else
 /********************************/
 
-static int kflat_flatten_struct_array_specialize_unit_validate(void *memory, size_t size, CFlatten flatten) {
-	struct spec_array *spec_int = flatten_root_pointer_seq(flatten, 0);
-	struct spec_array *spec_str = flatten_root_pointer_seq(flatten, 1);
-	struct spec_array *spec_magic = flatten_root_pointer_seq(flatten, 2);
+static int kflat_flatten_struct_array_specialize_unit_validate(void *memory, size_t size, CUnflatten flatten) {
+	struct spec_array *spec_int = unflatten_root_pointer_seq(flatten, 0);
+	struct spec_array *spec_str = unflatten_root_pointer_seq(flatten, 1);
+	struct spec_array *spec_magic = unflatten_root_pointer_seq(flatten, 2);
 
 	ASSERT(spec_int != NULL);
 	ASSERT(spec_str != NULL);

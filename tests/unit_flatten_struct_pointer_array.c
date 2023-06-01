@@ -42,7 +42,7 @@ static int kflat_flatten_struct_pointer_array_unit_test(struct kflat *kflat) {
 
 #else
 
-static int kflat_flatten_struct_pointer_array_unit_validate(void *memory, size_t size, CFlatten flatten) {
+static int kflat_flatten_struct_pointer_array_unit_validate(void *memory, size_t size, CUnflatten flatten) {
 	struct fb_info** registered_fb = (struct fb_info**)memory;
 
 	for (int i=0; i<FB_MAX; ++i) {

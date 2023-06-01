@@ -11,10 +11,10 @@ Library exposes API for both C and C++ applications.
 
 ```cpp
 /*
- * Flatten - construct new (empty) instance of flatten image
+ * Unflatten - construct new (empty) instance of flatten image
  *   (int) level:   debug level used for printing info
  */
-Flatten::Flatten(int level = 0);
+Unflatten::Unflatten(int level = 0);
 
 /*
  * load - load new kflat image from file. This method can be safely
@@ -22,38 +22,38 @@ Flatten::Flatten(int level = 0);
  *   (FILE*) file:  pointer to opened file with kflat image
  *   (fptr*) gfa:   optional pointer to function resolving function addresses
  */
-Flatten::load(FILE* file, get_function_address_t gfa = NULL);
+Unflatten::load(FILE* file, get_function_address_t gfa = NULL);
 
 /*
  * get_next_root - retrieve the pointer to the next flattened object
  */
-Flatten::get_next_root();
+Unflatten::get_next_root();
 
 /*
  * get_seq_root - retrieve the pointer to the n-th flattened object
  *   (size_t) idx:  ID of object to retrieve from image
  */
-Flatten::get_seq_root(size_t idx);
+Unflatten::get_seq_root(size_t idx);
 
 /*
  * get_named_root - retrieve the pointer to flattened object named `name`
  *   (char*)   name:  name of target object
  *   (size_t*) size:  optional pointer to where the size of object will be stored
  */
-Flatten::get_named_root(const char* name, size_t* size);
+Unflatten::get_named_root(const char* name, size_t* size);
 ```
 
 ### C Interface
 
-Flatten library exposes C binding for all available class methods. The usage and arguments are similar to those in C++ interface. Additionally, user must manually release class resources by invoking `flatten_deinit` method.
+Unflatten library exposes C binding for all available class methods. The usage and arguments are similar to those in C++ interface. Additionally, user must manually release class resources by invoking `flatten_deinit` method.
 
 ```c
-CFlatten flatten_init(int level);
-void flatten_deinit(CFlatten flatten);
-int flatten_load(CFlatten flatten, FILE* file, get_function_address_t gfa);
-void* flatten_root_pointer_next(CFlatten flatten);
-void* flatten_root_pointer_seq(CFlatten flatten, size_t idx);
-void* flatten_root_pointer_named(CFlatten flatten, const char* name, size_t* idx);
+CUnflatten flatten_init(int level);
+void flatten_deinit(CUnflatten flatten);
+int flatten_load(CUnflatten flatten, FILE* file, get_function_address_t gfa);
+void* flatten_root_pointer_next(CUnflatten flatten);
+void* flatten_root_pointer_seq(CUnflatten flatten, size_t idx);
+void* flatten_root_pointer_named(CUnflatten flatten, const char* name, size_t* idx);
 ```
 
 Any exception thrown by underlying C++ code is caught and converted to `-1` or `NULL`, depending on the function return value type.
@@ -66,7 +66,7 @@ Below, the most basic use of this library is presented. Kflat image provided as 
 #include "unflatten.hpp"
 
 int main() {
-    Flatten flatten;
+    Unflatten flatten;
 
     FILE* in = fopen(argv[1], "r");
     assert(in != NULL);

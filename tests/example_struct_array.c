@@ -102,10 +102,10 @@ static int kflat_structarray_example(struct kflat *kflat) {
 
 #else
 
-static int kflat_structarray_validate(void *memory, size_t size, CFlatten flatten) {
-	struct MM *obM = (struct MM *)flatten_root_pointer_seq(flatten, 0);
-	long *n = (long *)flatten_root_pointer_seq(flatten, 1);
-	struct MM *m2 = (struct MM *)flatten_root_pointer_seq(flatten, 2);
+static int kflat_structarray_validate(void *memory, size_t size, CUnflatten flatten) {
+	struct MM *obM = (struct MM *)unflatten_root_pointer_seq(flatten, 0);
+	long *n = (long *)unflatten_root_pointer_seq(flatten, 1);
+	struct MM *m2 = (struct MM *)unflatten_root_pointer_seq(flatten, 2);
 
 	ASSERT(obM == m2);
 	ASSERT(*n == 66);

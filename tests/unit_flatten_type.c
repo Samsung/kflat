@@ -51,11 +51,11 @@ static int kflat_flatten_type_unit_test(struct kflat *kflat) {
 
 #else
 
-static int kflat_flatten_struct_type_validate(void *memory, size_t size, CFlatten flatten) {
+static int kflat_flatten_struct_type_validate(void *memory, size_t size, CUnflatten flatten) {
 
-    const char* gs = (const char*)flatten_root_pointer_seq(flatten, 0);
-    unsigned long* gm = (unsigned long*)flatten_root_pointer_seq(flatten, 1);
-    struct tpX* gx = (struct tpX*)flatten_root_pointer_seq(flatten, 2);
+    const char* gs = (const char*)unflatten_root_pointer_seq(flatten, 0);
+    unsigned long* gm = (unsigned long*)unflatten_root_pointer_seq(flatten, 1);
+    struct tpX* gx = (struct tpX*)unflatten_root_pointer_seq(flatten, 2);
 
     ASSERT(!memcmp(gs,"ABCDEFGHIJKLMNOPQRS",20));
     ASSERT_EQ(*gm,0xCAFEBEEF);

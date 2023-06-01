@@ -105,9 +105,9 @@ static uintptr_t kflat_fptr_gfa_handler(const char *fsym) {
 	return (uintptr_t)NULL;
 }
 
-static int kflat_fptr_validate(void *memory, size_t size, CFlatten flatten) {
-	struct fptr_test_struct *fptr = (struct fptr_test_struct *)flatten_root_pointer_seq(flatten, 0);
-	struct fptr_test_struct_2 *fptr_sc = (struct fptr_test_struct_2 *)flatten_root_pointer_seq(flatten, 1);
+static int kflat_fptr_validate(void *memory, size_t size, CUnflatten flatten) {
+	struct fptr_test_struct *fptr = (struct fptr_test_struct *)unflatten_root_pointer_seq(flatten, 0);
+	struct fptr_test_struct_2 *fptr_sc = (struct fptr_test_struct_2 *)unflatten_root_pointer_seq(flatten, 1);
 
 	ASSERT(fptr->alloc == TEST_VMALLOC_ADDRESS);
 	ASSERT(fptr->set_reserve_address == TEST_SET_RESERVE_ADDRESS);

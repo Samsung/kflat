@@ -95,7 +95,7 @@ static int kflat_circle_test(struct kflat *kflat) {
 
 #include <math.h>
 
-static int kflat_circle_validate(void *memory, size_t size, CFlatten flatten) {
+static int kflat_circle_validate(void *memory, size_t size, CUnflatten flatten) {
 	const struct figure *circle = (const struct figure *)memory;
 	double length = 0, circumference = 0;
 	unsigned edge_number = 0;

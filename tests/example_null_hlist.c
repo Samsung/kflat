@@ -97,11 +97,11 @@ static inline int is_a_nulls(const struct hlist_nulls_node *ptr) {
 	return ((unsigned long)ptr & 1);
 }
 
-static int kflat_hlist_nulls_test_validate(void *memory, size_t size, CFlatten flatten) {
+static int kflat_hlist_nulls_test_validate(void *memory, size_t size, CUnflatten flatten) {
 	int i;
 	struct hlist_nulls_node *p;
-	struct hlist_nulls_head *hnarr = (struct hlist_nulls_head *)flatten_root_pointer_seq(flatten, 0);
-	struct hlist_nulls_head *hnarr2 = (struct hlist_nulls_head *)flatten_root_pointer_seq(flatten, 1);
+	struct hlist_nulls_head *hnarr = (struct hlist_nulls_head *)unflatten_root_pointer_seq(flatten, 0);
+	struct hlist_nulls_head *hnarr2 = (struct hlist_nulls_head *)unflatten_root_pointer_seq(flatten, 1);
 
 	for (i = 0; i < 5; ++i) {
 		unsigned long list_size = 0;

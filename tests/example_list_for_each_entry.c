@@ -142,11 +142,11 @@ static int kflat_list_for_each_entry_test(struct kflat *kflat) {
 #else
 /********************************/
 
-static int kflat_list_for_each_entry_validate(void *memory, size_t size, CFlatten flatten) {
+static int kflat_list_for_each_entry_validate(void *memory, size_t size, CUnflatten flatten) {
 	struct list_head *p;
 	size_t list_size = 0;
-	struct ivec *vec = (struct ivec *)flatten_root_pointer_seq(flatten, 0);
-	struct ivec *vec2 = (struct ivec *)flatten_root_pointer_seq(flatten, 1);
+	struct ivec *vec = (struct ivec *)unflatten_root_pointer_seq(flatten, 0);
+	struct ivec *vec2 = (struct ivec *)unflatten_root_pointer_seq(flatten, 1);
 
 	for (p = (&vec->head)->next; p != (&vec->head); p = p->next) {
 		struct intnode *entry = container_of(p, struct intnode, link);

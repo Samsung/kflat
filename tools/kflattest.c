@@ -330,32 +330,32 @@ save_image:
         file = fopen(out_name, "r+b");
         assert(file != NULL);
 
-        CFlatten flatten = flatten_init(0);
+        CUnflatten flatten = unflatten_init(0);
 
         if (args->imginfo) {
-            ret = flatten_imginfo(flatten, file);
+            ret = unflatten_imginfo(flatten, file);
             if(ret != 0) {
                 log_error("failed to parse flattened image - %d", ret);
-                goto flatten_cleanup;
+                goto unflatten_cleanup;
             }
             rewind(file);
         }
 
         if (args->continuous) {
-            ret = flatten_load_continuous(flatten, file, get_test_gfa(name));
+            ret = unflatten_load_continuous(flatten, file, get_test_gfa(name));
         }
         else {
-            ret = flatten_load(flatten, file, get_test_gfa(name));
+            ret = unflatten_load(flatten, file, get_test_gfa(name));
         }
         if(ret != 0) {
             log_error("failed to parse flattened image - %d", ret);
-            goto flatten_cleanup;
+            goto unflatten_cleanup;
         }
 
-        void* memory = flatten_root_pointer_seq(flatten, 0);
+        void* memory = unflatten_root_pointer_seq(flatten, 0);
         if(memory == NULL) {
             log_error("failed to acquire first root pointer from image");
-            goto flatten_cleanup;
+            goto unflatten_cleanup;
         }
 
         fflush(stdout);
@@ -372,7 +372,7 @@ save_image:
         } else {
             log_error("failed to fork subprocess");
             ret = -1;
-            goto flatten_cleanup;
+            goto unflatten_cleanup;
         }
 
         switch(test_result) {
@@ -393,8 +393,8 @@ save_image:
                 break;
         }
 
-flatten_cleanup:
-        flatten_deinit(flatten);
+unflatten_cleanup:
+        unflatten_deinit(flatten);
         goto munmap_area;
     }
 

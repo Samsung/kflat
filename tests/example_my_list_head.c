@@ -61,7 +61,7 @@ static int kflat_overlaplist_test(struct kflat *kflat) {
 
 #else
 
-static int kflat_overlaplist_validate(void *memory, size_t size, CFlatten flatten) {
+static int kflat_overlaplist_validate(void *memory, size_t size, CUnflatten flatten) {
 	struct my_task_struct *task = (struct my_task_struct *)memory;
 	ASSERT(task->pid == 123);
 	ASSERT(task->w == 1.0);
