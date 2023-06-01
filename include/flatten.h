@@ -169,6 +169,7 @@ struct fixup_set_node* fixup_set_search(struct flat* flat, uintptr_t v);
 int bqueue_init(struct flat* flat, struct bqueue* q, size_t block_size);
 void bqueue_destroy(struct bqueue* q);
 int bqueue_push_back(struct flat* flat, struct bqueue* q, const void* m, size_t s);
+int bqueue_pop_front(struct bqueue* q, void* m, size_t s);
 
 void flatten_run_iter_harness(struct flat* flat, struct bqueue* bq);
 void flatten_generic(struct flat* flat, void* q, struct flatten_pointer* fptr, const void* p, size_t el_size, size_t count, uintptr_t custom_val, flatten_struct_t func_ptr, unsigned long shift);

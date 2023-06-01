@@ -277,7 +277,7 @@ int bqueue_push_back(struct flat* flat, struct bqueue* q, const void* m, size_t 
 }
 EXPORT_FUNC(bqueue_push_back);
 
-static int bqueue_pop_front(struct bqueue* q, void* m, size_t s) {
+int bqueue_pop_front(struct bqueue* q, void* m, size_t s) {
 	size_t copied = 0;
 	struct queue_block *back = NULL;
 
