@@ -52,7 +52,7 @@ INTERVAL_TREE_DEFINE(struct interval_tree_node, rb,
 		     uintptr_t, __subtree_last,
 		     START, LAST, __attribute__((used)), interval_tree)
 
-struct root_addrnode {
+struct root_addr_node {
 	uintptr_t root_addr;
 	const char* name;
 	size_t size;
@@ -84,7 +84,7 @@ private:
 		void* mem;
 
 		ssize_t last_accessed_root;
-		std::vector<struct root_addrnode> root_addr;
+		std::vector<struct root_addr_node> root_addr;
 	} FLCTRL;
 
 	std::map<std::string, std::pair<size_t, size_t>> root_addr_map;
@@ -161,7 +161,7 @@ private:
 		assert(FLCTRL.last_accessed_root < (ssize_t)FLCTRL.root_addr.size() - 1);
 		FLCTRL.last_accessed_root++;
 		
-		struct root_addrnode* last_root = &FLCTRL.root_addr[FLCTRL.last_accessed_root];
+		struct root_addr_node* last_root = &FLCTRL.root_addr[FLCTRL.last_accessed_root];
 		return get_root_addr_mem(last_root->root_addr);
 	}
 
@@ -169,7 +169,7 @@ private:
 		assert(index < FLCTRL.root_addr.size());
 		FLCTRL.last_accessed_root = index;
 
-		struct root_addrnode* last_root = &FLCTRL.root_addr[FLCTRL.last_accessed_root];
+		struct root_addr_node* last_root = &FLCTRL.root_addr[FLCTRL.last_accessed_root];
 		return get_root_addr_mem(last_root->root_addr);
 	}
 
@@ -190,7 +190,7 @@ private:
 	}
 
 	void root_addr_append(uintptr_t root_addr, const char* name = nullptr, size_t size = 0) {
-		struct root_addrnode v {
+		struct root_addr_node v {
 			.root_addr = root_addr,
 			.name = name,
 			.size = size
