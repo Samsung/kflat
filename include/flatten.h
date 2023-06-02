@@ -12,11 +12,11 @@ extern "C" {
 #endif
 
 /*************************************
- * CONFIGURATION
+ * DEFAULT CONFIGURATION
  *************************************/
-#define LINEAR_MEMORY_ALLOCATOR					1
+#define LINEAR_MEMORY_ALLOCATOR					0
 #define FLAT_LINEAR_MEMORY_INITIAL_POOL_SIZE	(256ULL * 1024 * 1024)
-#define DEFAULT_ITER_QUEUE_SIZE					(1024 * 1024 * 8)
+#define DEFAULT_ITER_QUEUE_SIZE					(8ULL * 1024 * 1024)
 #define FLAT_PING_TIME_NS						(1 * NSEC_PER_SEC)
 #define FLAT_MAX_TIME_NS						(8 * NSEC_PER_SEC)
 
@@ -186,7 +186,7 @@ void flatten_aggregate_generic_storage(struct flat* flat, void* q, const void* _
 
 
 void* flat_zalloc(struct flat* flat, size_t size, size_t n);
-void flat_free(const void* p);
+void flat_free(void* p);
 
 
 

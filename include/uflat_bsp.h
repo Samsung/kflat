@@ -8,6 +8,10 @@
 #ifndef UFLAT_BSP_H
 #define UFLAT_BSP_H
 
+#ifndef _GNU_SOURCE
+#define _GNU_SOURCE
+#endif /* _GNU_SOURCE */
+
 #include <errno.h>
 #include <stdio.h>
 #include <stdbool.h>
@@ -27,6 +31,12 @@
 #include "rbtree.h"
 #include "interval_tree_generic.h"
 
+
+/*************************************
+ * CUSTOMIZE CONFIGURATION FOR UFLAT
+ *************************************/
+#undef LINEAR_MEMORY_ALLOCATOR
+#define LINEAR_MEMORY_ALLOCATOR					0
 
 /* Funcs decl */
 void uflat_dbg_log_printf(const char* fmt, ...);

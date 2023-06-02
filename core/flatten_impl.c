@@ -41,7 +41,7 @@ void* flat_zalloc(struct flat* flat, size_t size, size_t n) {
 }
 EXPORT_FUNC(flat_zalloc);
 
-void flat_free(const void* p) {
+void flat_free(void* p) {
 #if LINEAR_MEMORY_ALLOCATOR > 0
 #else
 	FLATTEN_BSP_FREE(p);
@@ -354,7 +354,6 @@ struct fixup_set_node *fixup_set_search(struct flat* flat, uintptr_t v) {
 		}
 	}
 
-	DBGS("fixup_set_search(%lx): 0\n",v);
 	return 0;
 }
 EXPORT_FUNC(fixup_set_search);
@@ -364,8 +363,6 @@ int fixup_set_reserve_address(struct flat* flat, uintptr_t addr) {
 	struct fixup_set_node *data;
 	struct rb_node **new_node, *parent;
 	struct fixup_set_node* inode;
-
-	DBGS("fixup_set_reserve_address(%lx)\n",addr);
 
 	inode = fixup_set_search(flat,addr);
 
