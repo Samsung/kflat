@@ -220,14 +220,13 @@ static void binary_stream_update_pointers(struct flat* flat) {
  *  List based implementation of two-way queue
  ******************************************************/
 int bqueue_init(struct flat* flat, struct bqueue* q, size_t block_size) {
+	memset(q, 0, sizeof(struct bqueue));
+
     q->block_size = block_size;
-    q->size = 0;
     q->storage = (struct queue_block*) flat_zalloc(flat, block_size + sizeof(struct queue_block), 1);
     if (!q->storage)
 	    return ENOMEM;
     INIT_LIST_HEAD(&q->storage->head);
-    q->front_index=0;
-    q->back_index=0;
     return 0;
 }
 EXPORT_FUNC(bqueue_init);
