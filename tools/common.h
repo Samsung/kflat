@@ -6,6 +6,7 @@
  */
 
 #include <stdbool.h>
+#include <sys/time.h>
 
 #undef noreturn
 
@@ -19,7 +20,7 @@
 
 #define OUTPUT_COLOR(COLOR)     (is_color_capable() ? COLOR : "")
 
-// Exported functions
+// Exported logging functions
 void init_logging(void);
 void log_generic(const char* color, const char* prefix, const char* func, bool new_line, const char* fmt, ...);
 void _log_abort(const char* func, const char* fmt, ...) __attribute__ ((noreturn));
@@ -30,3 +31,15 @@ bool is_color_capable(void);
 #define log_info(fmt, ...)          log_generic(LOG_INFO_COLOR, "+", __func__, true, fmt, ##__VA_ARGS__)
 #define log_error(fmt, ...)         log_generic(LOG_ERR_COLOR, "!", __func__, true, fmt, ##__VA_ARGS__)
 #define log_abort(fmt, ...)         _log_abort(__func__, fmt, ##__VA_ARGS__)
+
+
+// Time measurement
+struct time_elapsed {
+    struct timeval _start;
+    struct timeval _end;
+    int seconds;
+    int mseconds;
+};
+
+void mark_time_start(struct time_elapsed* time);
+void mark_time_end(struct time_elapsed* time);

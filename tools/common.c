@@ -4,6 +4,7 @@
 
 #include "common.h"
 
+#include <errno.h>
 #include <stdarg.h>
 #include <stdbool.h>
 #include <stdio.h>
@@ -79,4 +80,29 @@ void init_logging(void) {
         supports_colors = true;
 
     start_time = log_time();
+}
+
+
+/*******************************************************
+ * TIME MEASUREMENT
+ *******************************************************/
+void mark_time_start(struct time_elapsed* time) {
+    memset(&time->_start, 0, sizeof(struct timeval));
+    if(gettimeofday(&time->_start, NULL) != 0) {
+        log_error("Failed to get time_start mark: gettimeofday failed - %s", strerror(errno));
+    }
+}
+
+void mark_time_end(struct time_elapsed* time) {
+    memset(&time->_end, 0, sizeof(struct timeval));
+    if(gettimeofday(&time->_end, NULL) != 0) {
+        log_error("Failed to get time_end mark: gettimeofday failed - %s", strerror(errno));
+        return;
+    }
+
+    time_t ms_elapsed = time->_end.tv_sec * 1000 + time->_end.tv_usec / 1000 - 
+            time->_start.tv_sec * 1000 - time->_start.tv_usec / 1000;
+
+    time->seconds = ms_elapsed / 1000;
+    time->mseconds = ms_elapsed % 1000;
 }
