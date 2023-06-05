@@ -96,7 +96,7 @@ struct queue_block {
 };
 
 struct bqueue {
-	struct queue_block *storage;
+	struct list_head head;
 	size_t block_size;
 	size_t size;
 	size_t front_index;

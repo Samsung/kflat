@@ -220,23 +220,28 @@ static void binary_stream_update_pointers(struct flat* flat) {
  *  List based implementation of two-way queue
  ******************************************************/
 int bqueue_init(struct flat* flat, struct bqueue* q, size_t block_size) {
+	struct queue_block *new = NULL;
+
 	memset(q, 0, sizeof(struct bqueue));
 
-    q->block_size = block_size;
-    q->storage = (struct queue_block*) flat_zalloc(flat, block_size + sizeof(struct queue_block), 1);
-    if (!q->storage)
-	    return ENOMEM;
-    INIT_LIST_HEAD(&q->storage->head);
-    return 0;
+	new = (struct queue_block *) flat_zalloc(flat, block_size + sizeof(struct queue_block), 1);
+	if (!new)
+		return ENOMEM;
+
+	q->block_size = block_size;
+	INIT_LIST_HEAD(&q->head);
+	INIT_LIST_HEAD(&new->head);
+	list_add(&new->head, &q->head);
+	return 0;
 }
 EXPORT_FUNC(bqueue_init);
 
 void bqueue_destroy(struct bqueue* q) {
 	struct queue_block *cur = NULL;
 	struct queue_block *tmp = NULL;
-	list_for_each_entry_safe(cur, tmp, &q->storage->head, head) {
+	list_for_each_entry_safe(cur, tmp, &q->head, head) {
 		list_del(&cur->head);
-		flat_free(tmp);
+		flat_free(cur);
 	}
 }
 EXPORT_FUNC(bqueue_destroy);
@@ -250,21 +255,31 @@ static unsigned long bqueue_el_count(struct bqueue* q) { return q->el_count; }
 int bqueue_push_back(struct flat* flat, struct bqueue* q, const void* m, size_t s) {
 	size_t copied = 0;
 	struct queue_block *front = NULL;
+	struct queue_block* new_block = NULL;
+
+	if (list_empty(&q->head)) {
+		new_block = (struct queue_block *) flat_zalloc(flat, q->block_size + sizeof(struct queue_block), 1);
+		if (!new_block)
+			return ENOMEM;
+
+		INIT_LIST_HEAD(&new_block->head);
+		list_add(&new_block->head, &q->head);
+	}
+
 	while (s > 0) {
 		size_t avail_size = q->block_size - q->front_index;
 		size_t copy_size = (s > avail_size) ? (avail_size) : (s);
-		front = list_next_entry(q->storage, head);
+		front = list_first_entry(&q->head, struct queue_block, head);
 		memcpy(front->data + q->front_index, m + copied, copy_size);
 		copied += copy_size;
 		if (unlikely(s >= avail_size)) {
-			struct queue_block* new_block;
 			s = s - avail_size;
 			new_block = (struct queue_block*) flat_zalloc(flat, q->block_size + sizeof(struct queue_block), 1);
-			if (!new_block) {
+			if (!new_block)
 				return ENOMEM;
-			}
+
 			INIT_LIST_HEAD(&new_block->head);
-			list_add(&new_block->head, &q->storage->head);
+			list_add(&new_block->head, &q->head);
 		}
 		else
 			s = 0;
@@ -285,10 +300,13 @@ int bqueue_pop_front(struct bqueue* q, void* m, size_t s) {
 		return EFAULT;
 	}
 
+	if (list_empty(&q->head))
+		return ENOENT;
+
 	while (s > 0) {
 		size_t avail_size = q->block_size - q->back_index;
 		size_t copy_size = (s > avail_size) ? (avail_size) : (s);
-		back = list_prev_entry(q->storage, head);
+		back = list_last_entry(&q->head, struct queue_block, head);
 		memcpy(m + copied, back->data + q->back_index, copy_size);
 		copied += copy_size;
 		if (s >= avail_size) {
