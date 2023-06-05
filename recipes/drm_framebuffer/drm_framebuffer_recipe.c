@@ -13,7 +13,6 @@
 #include <drm/drm_device.h>
 #include <drm/drm_file.h>
 #include <drm/drm_fourcc.h>
-#include <drm/drm_gem_cma_helper.h>
 #include <drm/drm_framebuffer.h>
 
 

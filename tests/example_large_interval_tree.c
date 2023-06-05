@@ -73,12 +73,12 @@ static int kflat_large_interval_tree_test(struct kflat *kflat) {
 	
 	unsigned j;
 	unsigned long i=0;
-	unsigned char *bytes = kflat_zalloc(kflat,INTERVAL_COUNT*10,1);
+	unsigned char *bytes = flat_zalloc(&kflat->flat,INTERVAL_COUNT*10,1);
 	get_random_bytes(bytes, INTERVAL_COUNT*10);
 	interval_tree_map.imap_root.rb_root = RB_ROOT;
 
 	for (j = 0; j < INTERVAL_COUNT; ++j) {
-		struct my_interval_tree_node* node = kflat_zalloc(kflat,sizeof(*node),1);
+		struct my_interval_tree_node* node = flat_zalloc(&kflat->flat,sizeof(*node),1);
 	    node->start = i+bytes[j*10];
 	    node->end = node->start+bytes[j*10+1]-1;
 	    node->phys_addr = *((uint64_t*)&bytes[j*10+2]);;

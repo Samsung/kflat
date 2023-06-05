@@ -39,8 +39,8 @@ FUNCTION_DEFINE_FLATTEN_STRUCT_TYPE(box_t,
 );
 
 static int kflat_flatten_struct_type_array_unit_test(struct kflat *kflat) {
-	long long integers[10];
-	bucket_t el[3];
+	long long integers[14];
+	bucket_t el[4];
 	brick_t bricks[20] = {};
 	box_t box[2] = {
 		{ el, integers, bricks, &bricks[5].q }, { el + 1, integers + 4, bricks+10, &bricks[15].q }
@@ -63,7 +63,7 @@ static int kflat_flatten_struct_type_array_unit_test(struct kflat *kflat) {
 
 	// Test ADDR_RANGE_VALID macro
 	FOR_ROOT_POINTER(box,
-		FLATTEN_STRUCT_TYPE_ARRAY(box_t, box, 10000);
+		FLATTEN_STRUCT_TYPE_ARRAY(box_t, box, 100000000);
 	);
 
 	return 0;

@@ -39,11 +39,4 @@
     module_exit(__kflat_recipe_module_exit);
 
 
-#define START(node) ((node)->start)
-#define LAST(node)  ((node)->last)
-INTERVAL_TREE_DEFINE(struct flat_node, rb,
-            uintptr_t, __subtree_last,
-            START, LAST, static __used, interval_tree)
-
-
 #endif /* _LINUX_KFLAT_RECIPE_H */

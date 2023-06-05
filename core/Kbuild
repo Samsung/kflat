@@ -1,7 +1,7 @@
 # Samsung R&D Poland - Mobile Security Group
 
 TOPDIR := ${M}/../
-ccflags-y := -std=gnu99 -Wno-unused-local-typedefs -I${TOPDIR}/include/ $(patsubst %,-D%,$(KFLAT_OPTS))
+ccflags-y := -std=gnu99 -Wno-unused-local-typedefs -I${TOPDIR}/include/ $(patsubst %,-D%,$(KFLAT_OPTS)) -DFLATTEN_KERNEL_BSP
 
 LINUX_INCLUDES := ${LINUX_INCLUDES} ${TOPDIR}/include/
 
@@ -15,7 +15,7 @@ $(obj)/tests/tests_list.h: $(obj)/tests/tests_list_gen.sh
 $(obj)/kflat.o: $(obj)/tests/tests_list.h
 
 # Build kflat core module
-kflat_core-y = kflat.o kflat_impl.o probing.o kdump.o
+kflat_core-y = kflat.o kflat_impl.o probing.o kdump.o flatten_impl.o
 kflat_core-$(CONFIG_ARM64) += probing_arm.o
 kflat_core-$(CONFIG_X86_64) += probing_x86.o
 

@@ -1,5 +1,5 @@
 export KBUILD_EXTRA_SYMBOLS=${M}/../core/Module.symvers
-ccflags-y := -std=gnu99 -Wno-unused-local-typedef
+ccflags-y := -std=gnu99 -Wno-unused-local-typedef -DFLATTEN_KERNEL_BSP
 
 obj-m += random_read/
 obj-m += memory_map/

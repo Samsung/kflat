@@ -38,7 +38,7 @@ void kflat_put(struct kflat *kflat) {
 	if (atomic_dec_and_test(&kflat->refcount)) {
 		kflat_recipe_put(kflat->recipe);
 		kflat->recipe = NULL;
-		vfree(kflat->area);
+		vfree(kflat->flat.area);
 		kfree(kflat);
 	}
 }
@@ -209,11 +209,12 @@ asmlinkage __used uint64_t probing_delegate(struct probe_regs* regs) {
 	//  interrupt function
 	if(in_atomic()) {
 		pr_err("This is still an atomic context. Attaching to a non-preemtible code is not supported");
-		kflat->errno = EFAULT;
+		kflat->flat.error = EFAULT;
 		goto probing_exit;
 	}
 
-	flatten_init(kflat);
+	flatten_init(&kflat->flat);
+	kflat->flat.FLCTRL.debug_flag = kflat->debug_flag;
 
 	if(kflat->recipe->pre_handler)
 		kflat->recipe->pre_handler(kflat);
@@ -224,13 +225,13 @@ asmlinkage __used uint64_t probing_delegate(struct probe_regs* regs) {
 	else
 		kflat->recipe->handler(kflat, regs);
 
-	pr_info("Flatten done: error=%d\n", kflat->errno);
-	if (!kflat->errno) {
-		err = flatten_write(kflat);
+	pr_info("Flatten done: error=%d\n", kflat->flat.error);
+	if (!kflat->flat.error) {
+		err = flatten_write(&kflat->flat);
 		if(err)
-			pr_err("flatten write failed: %d\n", kflat->errno);
+			pr_err("flatten write failed: %d\n", kflat->flat.error);
 	}
-	flatten_fini(kflat);
+	flatten_fini(&kflat->flat);
 
 probing_exit:
 	// Prepare for return
@@ -266,7 +267,7 @@ static int kflat_test_stop_machine(void* arg) {
 int kflat_run_test(struct kflat* kflat, struct kflat_ioctl_tests* test) {
 	int err;
 	size_t tests_count = sizeof(test_cases) / sizeof(test_cases[0]);
-	struct flatten_header* kflat_hdr = (struct flatten_header*) kflat->area;
+	struct flatten_header* kflat_hdr = (struct flatten_header*) kflat->flat.area;
 
 	if(tests_count == 0) {
 		pr_err("KFLAT hasn't been compiled with embedded test cases");
@@ -277,7 +278,8 @@ int kflat_run_test(struct kflat* kflat, struct kflat_ioctl_tests* test) {
 		if(!strcmp(test->test_name, test_cases[i]->name)) {
 			kflat->debug_flag = test->debug_flag;
 
-			flatten_init(kflat);
+			flatten_init(&kflat->flat);
+			kflat->flat.FLCTRL.debug_flag = kflat->debug_flag;
 
 			if(test->use_stop_machine) {
 				cpumask_t cpumask;
@@ -289,7 +291,7 @@ int kflat_run_test(struct kflat* kflat, struct kflat_ioctl_tests* test) {
 				if(!(test_cases[i]->flags & KFLAT_TEST_ATOMIC)) {
 					pr_err("Cannot execute non-atomic test '%s' under stom_machine", 
 							test_cases[i]->name);
-							flatten_fini(kflat);
+							flatten_fini(&kflat->flat);
 					return -EINVAL;
 				}
 
@@ -304,14 +306,14 @@ int kflat_run_test(struct kflat* kflat, struct kflat_ioctl_tests* test) {
 				err = test_cases[i]->handler(kflat);
 			}
 
-			flat_infos("@Flatten done: %d\n",kflat->errno);
-			if (!kflat->errno && !err)
-				err = flatten_write(kflat);
-			flatten_fini(kflat);
+			flat_infos("@Flatten done: %d\n",kflat->flat.error);
+			if (!kflat->flat.error && !err)
+				err = flatten_write(&kflat->flat);
+			flatten_fini(&kflat->flat);
 			
 			// On success, return the size of flattened memory
 			if(!err)
-				err = kflat->errno;
+				err = kflat->flat.error;
 			if(err)
 				return (err <= 0) ? err : -err;
 			return kflat_hdr->image_size;
@@ -357,7 +359,7 @@ static int kflat_ioctl_locked(struct kflat *kflat, unsigned int cmd,
 
 	switch (cmd) {
 	case KFLAT_PROC_ENABLE:
-		if (kflat->area == NULL)
+		if (kflat->flat.area == NULL)
 			return -EINVAL;
 		if (kflat->mode == KFLAT_MODE_ENABLED)
 			return -EBUSY;
@@ -406,9 +408,9 @@ static int kflat_ioctl_locked(struct kflat *kflat, unsigned int cmd,
 		
 		probing_disarm(kflat);
 
-		args.disable.size = ((struct flatten_header*)kflat->area)->image_size;
+		args.disable.size = ((struct flatten_header*)kflat->flat.area)->image_size;
 		args.disable.invoked = args.disable.size > sizeof(size_t);
-		args.disable.error = kflat->errno;
+		args.disable.error = kflat->flat.error;
 		if(copy_to_user((void*)arg, &args.disable, sizeof(args.disable)))
 			return -EFAULT;
 		return 0;
@@ -417,7 +419,7 @@ static int kflat_ioctl_locked(struct kflat *kflat, unsigned int cmd,
 		if(kflat->mode != KFLAT_MODE_DISABLED) {
 			pr_err("Cannot run embedded tests when KFLAT is armed");
 			return -EBUSY;
-		} else if(kflat->area == NULL) {
+		} else if(kflat->flat.area == NULL) {
 			pr_err("MMap KFLAT shared buffer before running tests");
 			return -EINVAL;
 		}
@@ -470,7 +472,7 @@ static int kflat_mmap_flatten(struct kflat *kflat, struct vm_area_struct *vma) {
 
 	mutex_lock(&kflat->lock);
 
-	if(kflat->area != NULL) {
+	if(kflat->flat.area != NULL) {
 		pr_err("cannot mmap kflat device twice");
 		ret = -EBUSY;
 		goto exit;
@@ -482,12 +484,12 @@ static int kflat_mmap_flatten(struct kflat *kflat, struct vm_area_struct *vma) {
 		goto exit;
 	}
 
-	kflat->area = area;
-	kflat->size = alloc_size;
+	kflat->flat.area = area;
+	kflat->flat.size = alloc_size;
 	
 	vma->vm_flags |= VM_DONTEXPAND;
 	for (off = 0; off < alloc_size; off += PAGE_SIZE) {
-		page = vmalloc_to_page(kflat->area + off);
+		page = vmalloc_to_page(kflat->flat.area + off);
 		if (vm_insert_page(vma, vma->vm_start + off, page))
 			WARN_ONCE(1, "vm_insert_page() failed");
 	}

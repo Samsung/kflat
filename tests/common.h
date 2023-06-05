@@ -19,15 +19,6 @@
 
 #include <kflat.h>
 
-#include <linux/interval_tree_generic.h>
-#define START(node) ((node)->start)
-#define LAST(node)  ((node)->last)
-
-INTERVAL_TREE_DEFINE(struct flat_node, rb,
-		     uintptr_t, __subtree_last,
-		     START, LAST,static __used,interval_tree)
-
-
 typedef int (*kflat_test_case_handler_t)(struct kflat* kflat);
 
 enum kflat_test_flags {

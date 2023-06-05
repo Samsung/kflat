@@ -12,7 +12,7 @@
 struct task_struct_info {
     OFFSET_VAR(pid);
     OFFSET_VAR(tgid);
-    OFFSET_VAR(cpu);
+    OFFSET_VAR(on_cpu);
     OFFSET_VAR(prio);
     OFFSET_VAR(comm);
     OFFSET_VAR(flags);
@@ -26,10 +26,10 @@ struct task_struct;
 
 static void print_task_struct(struct task_struct* tsk, struct task_struct_info* info) {
 
-    printf("T[%d:%d], cpu: %u, prio: %d, comm: %s, flags: %u, utime: %" PRIu64 ", stime: %" PRIu64 "\n",
+    printf("T[%d:%d], on_cpu: %u, prio: %d, comm: %s, flags: %u, utime: %" PRIu64 ", stime: %" PRIu64 "\n",
         TASK_STRUCT(tsk, info, pid, int),
         TASK_STRUCT(tsk, info, tgid, int),
-        TASK_STRUCT(tsk, info, cpu, unsigned int),
+        TASK_STRUCT(tsk, info, on_cpu, unsigned int),
         TASK_STRUCT(tsk, info, prio, int),
         &TASK_STRUCT(tsk, info, comm, char),
         TASK_STRUCT(tsk, info, flags, unsigned int),

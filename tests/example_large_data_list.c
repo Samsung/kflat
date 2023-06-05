@@ -43,8 +43,8 @@ static int kflat_large_data_list_test(struct kflat *kflat) {
 	INIT_LIST_HEAD(&myhead.v);
 	head = &myhead.v;
 	for (i = 0; i < LIST_ELEMENT_COUNT; ++i) {
-		struct myLongLargeDataList *item = kflat_zalloc(kflat,sizeof(struct myLongLargeDataList), 1);
-		item->data = kflat_zalloc(kflat,LIST_ELEMENT_DATASIZE,1);
+		struct myLongLargeDataList *item = flat_zalloc(&kflat->flat,sizeof(struct myLongLargeDataList), 1);
+		item->data = flat_zalloc(&kflat->flat,LIST_ELEMENT_DATASIZE,1);
 		item->k = i + 1;
 		list_add(&item->v, head);
 		head = &item->v;

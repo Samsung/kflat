@@ -41,9 +41,9 @@ FUNCTION_DEFINE_FLATTEN_STRUCT_SPECIALIZE(atomic_largestringset,rb_root,
 );
 
 static int stringset_insert(struct kflat* kflat, const char *s) {
-	struct largestring_node_atomic *data = kflat_zalloc(kflat,sizeof(struct largestring_node_atomic),1);
+	struct largestring_node_atomic *data = flat_zalloc(&kflat->flat,sizeof(struct largestring_node_atomic),1);
 	struct rb_node **new, *parent = 0;
-	data->s = kflat_zalloc(kflat,strlen(s) + 1,1);
+	data->s = flat_zalloc(&kflat->flat,strlen(s) + 1,1);
 	strcpy(data->s, s);
 	new = &(stringset_root.rb_node);
 
@@ -86,7 +86,7 @@ static int kflat_large_data_stringset_test(struct kflat *kflat) {
 	prandom_seed_state(&rand_state, ktime_get_real());
 
 	for (j = 0; j < TREE_ELEMENT_COUNT; ++j) {
-		char *s = kflat_zalloc(kflat,TREE_ELEMENT_DATASIZE+1,1);
+		char *s = flat_zalloc(&kflat->flat,TREE_ELEMENT_DATASIZE+1,1);
 		for (i = 0; i < TREE_ELEMENT_DATASIZE/8; ++i) {
 			u32 r = prandom_u32_state(&rand_state);
 			s[i*8] = chars[(r>>0)&0xf];

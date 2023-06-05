@@ -30,7 +30,7 @@
 
 extern "C" {
 #include "interval_tree_generic.h"
-#include <kflat_uapi.h>
+#include <flatten_image.h>
 }
 
 /********************************

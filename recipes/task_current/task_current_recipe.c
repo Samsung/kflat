@@ -16,7 +16,7 @@
 struct task_struct_info {
     OFFSET_VAR(pid);
     OFFSET_VAR(tgid);
-    OFFSET_VAR(cpu);
+    OFFSET_VAR(on_cpu);
     OFFSET_VAR(prio);
     OFFSET_VAR(comm);
     OFFSET_VAR(flags);
@@ -41,7 +41,7 @@ static void random_read_handler(struct kflat* kflat, struct probe_regs* regs) {
     struct task_struct_info task_offsets = {
         OFFSET_INIT(pid),
         OFFSET_INIT(tgid),
-        OFFSET_INIT(cpu),
+        OFFSET_INIT(on_cpu),
         OFFSET_INIT(prio),
         OFFSET_INIT(comm),
         OFFSET_INIT(flags),

@@ -40,9 +40,9 @@ FUNCTION_DEFINE_FLATTEN_STRUCT_SPECIALIZE(atomic_stringset,rb_root,
 );
 
 static int stringset_insert(struct kflat* kflat, const char *s) {
-	struct string_node_atomic *data = kflat_zalloc(kflat,sizeof(struct string_node_atomic),1);
+	struct string_node_atomic *data = flat_zalloc(&kflat->flat,sizeof(struct string_node_atomic),1);
 	struct rb_node **new, *parent = 0;
-	data->s = kflat_zalloc(kflat,strlen(s) + 1,1);
+	data->s = flat_zalloc(&kflat->flat,strlen(s) + 1,1);
 	strcpy(data->s, s);
 	new = &(stringset_root.rb_node);
 
@@ -83,7 +83,7 @@ static int kflat_large_stringset_test(struct kflat *kflat) {
 	unsigned char r;
 
 	for (j = 0; j < TREE_ELEMENT_COUNT; ++j) {
-		char *s = kflat_zalloc(kflat,11,1);
+		char *s = flat_zalloc(&kflat->flat,11,1);
 		for (i = 0; i < 10; ++i) {
 			get_random_bytes(&r, 1);
 			s[i] = chars[r%20];
