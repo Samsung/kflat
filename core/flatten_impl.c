@@ -230,7 +230,6 @@ int bqueue_init(struct flat* flat, struct bqueue* q, size_t block_size) {
 
 	q->block_size = block_size;
 	INIT_LIST_HEAD(&q->head);
-	INIT_LIST_HEAD(&new->head);
 	list_add(&new->head, &q->head);
 	return 0;
 }
@@ -262,7 +261,6 @@ int bqueue_push_back(struct flat* flat, struct bqueue* q, const void* m, size_t 
 		if (!new_block)
 			return ENOMEM;
 
-		INIT_LIST_HEAD(&new_block->head);
 		list_add(&new_block->head, &q->head);
 	}
 
@@ -278,7 +276,6 @@ int bqueue_push_back(struct flat* flat, struct bqueue* q, const void* m, size_t 
 			if (!new_block)
 				return ENOMEM;
 
-			INIT_LIST_HEAD(&new_block->head);
 			list_add(&new_block->head, &q->head);
 		}
 		else
