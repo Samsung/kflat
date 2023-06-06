@@ -19,9 +19,9 @@ struct unit_sc_Large {
 	char data[4097];
 };
 
-#ifdef __KERNEL__
-
-#include <linux/vmalloc.h>
+/********************************/
+#ifdef __TESTER__
+/********************************/
 
 FUNCTION_DECLARE_FLATTEN_STRUCT(unit_sc_B);
 FUNCTION_DECLARE_FLATTEN_STRUCT(unit_sc_A);
@@ -33,11 +33,13 @@ FUNCTION_DEFINE_FLATTEN_STRUCT_SELF_CONTAINED(unit_sc_A, sizeof(struct unit_sc_A
 );
 FUNCTION_DEFINE_FLATTEN_STRUCT_SELF_CONTAINED(unit_sc_Large, sizeof(struct unit_sc_Large));
 
-static int kflat_flatten_struct_self_contained_unit_test(struct kflat *kflat) {
+static int kflat_flatten_struct_self_contained_unit_test(struct flat *flat) {
 	struct unit_sc_B str = { "CDF" };
 	struct unit_sc_A obj = { 0xCAFECAFE, &str };
 	struct unit_sc_A *pA = &obj;
-	struct unit_sc_Large *large = (struct unit_sc_Large *)vmalloc(4096);
+	struct unit_sc_Large *large = (struct unit_sc_Large *)FLATTEN_BSP_ZALLOC(4096);
+
+	FLATTEN_SETUP_TEST(flat);
 
 	FOR_ROOT_POINTER(pA,
 		FLATTEN_STRUCT_SELF_CONTAINED(unit_sc_A, sizeof(struct unit_sc_A), pA);
@@ -51,10 +53,14 @@ static int kflat_flatten_struct_self_contained_unit_test(struct kflat *kflat) {
 		FLATTEN_STRUCT_SELF_CONTAINED(unit_sc_Large, sizeof(struct unit_sc_Large), large);
 	);
 
+	FLATTEN_BSP_FREE(large);
 	return 0;
 }
 
-#else
+/********************************/
+#endif /* __TESTER__ */
+#ifdef __VALIDATOR__
+/********************************/
 
 static int kflat_flatten_struct_self_contained_unit_validate(void *memory, size_t size, CUnflatten flatten) {
 	struct unit_sc_A *pA = (struct unit_sc_A *)unflatten_root_pointer_seq(flatten, 0);
@@ -67,6 +73,8 @@ static int kflat_flatten_struct_self_contained_unit_validate(void *memory, size_
 	return KFLAT_TEST_SUCCESS;
 }
 
-#endif
+/********************************/
+#endif /* __VALIDATOR__ */
+/********************************/
 
 KFLAT_REGISTER_TEST_FLAGS("[UNIT] flatten_struct_self_contained", kflat_flatten_struct_self_contained_unit_test, kflat_flatten_struct_self_contained_unit_validate, KFLAT_TEST_ATOMIC);

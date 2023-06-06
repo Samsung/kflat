@@ -6,9 +6,7 @@
 
 #include "common.h"
 
-#ifdef __KERNEL__
-#include <linux/rbtree.h>
-#else
+#if defined(__VALIDATOR__) && !defined(__TESTER__)
 #include <stdbool.h>
 #include "../lib/include_priv/rbtree.h"
 #endif
@@ -26,7 +24,7 @@ struct myTreeNode {
 };
 
 /********************************/
-#ifdef __KERNEL__
+#ifdef __TESTER__
 /********************************/
 
 FUNCTION_DECLARE_FLATTEN_STRUCT_ARRAY_SELF_CONTAINED(myTreeNode, sizeof(struct myTreeNode));
@@ -116,19 +114,21 @@ static void strset_destroy(struct rb_root *root) {
 		struct myTreeNode *data = container_of(p, struct myTreeNode, snode);
 		rb_erase(p, root);
 		p = rb_next(p);
-		kvfree(data->s);
+		FLATTEN_BSP_FREE(data->s);
 		data->s = NULL;
 	}
 }
 
-static int kflat_rbtree_example(struct kflat *kflat) {
+static int kflat_rbtree_example(struct flat *flat) {
 	int i;
 	struct rb_root iroot = RB_ROOT;
 	struct rb_root sroot = RB_ROOT;
-
 	struct myTreeNode tarr[15] = {};
+
+	FLATTEN_SETUP_TEST(flat);
+
 	for (i = 0; i < 10; ++i)
-		tarr[i].s = kvzalloc(4, GFP_KERNEL);
+		tarr[i].s = FLATTEN_BSP_ZALLOC(4);
 	strcpy(tarr[0].s, "AA0");
 	strcpy(tarr[1].s, "AA5");
 	strcpy(tarr[2].s, "AA9");
@@ -163,7 +163,8 @@ static int kflat_rbtree_example(struct kflat *kflat) {
 }
 
 /********************************/
-#else
+#endif /* __TESTER__ */
+#ifdef __VALIDATOR__
 /********************************/
 
 static int kflat_rbtree_validate(void *memory, size_t size, CUnflatten flatten) {
@@ -207,7 +208,7 @@ static int kflat_rbtree_validate(void *memory, size_t size, CUnflatten flatten) 
 }
 
 /********************************/
-#endif
+#endif /* __VALIDATOR__ */
 /********************************/
 
 KFLAT_REGISTER_TEST("RBTREE", kflat_rbtree_example, kflat_rbtree_validate);

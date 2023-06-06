@@ -40,7 +40,9 @@ struct flex_G {
 	union flex_F arr[0];
 };
 
-#ifdef __KERNEL__
+/********************************/
+#ifdef __TESTER__
+/********************************/
 
 FUNCTION_DEFINE_FLATTEN_STRUCT(flex_B);
 FUNCTION_DEFINE_FLATTEN_STRUCT(flex_A,
@@ -62,11 +64,13 @@ FUNCTION_DEFINE_FLATTEN_STRUCT(flex_G,
 	AGGREGATE_FLATTEN_UNION_FLEXIBLE(flex_F, arr);
 );
 
-static int kflat_flexible_test(struct kflat *kflat) {
+static int kflat_flexible_test(struct flat *flat) {
 	struct flex_A *a;
 	struct flex_C *c;
 	struct flex_E *e;
 	struct flex_G *g;
+
+	FLATTEN_SETUP_TEST(flat);
 
 	a = kmalloc(sizeof(struct flex_A) + 3 * sizeof(struct flex_B), GFP_KERNEL);
 	a->get_obj_supported = IS_ENABLED(KFLAT_GET_OBJ_SUPPORT);
@@ -117,7 +121,10 @@ static int kflat_flexible_test(struct kflat *kflat) {
 	return 0;
 }
 
-#else
+/********************************/
+#endif /* __TESTER__ */
+#ifdef __VALIDATOR__
+/********************************/
 
 static int kflat_flexible_validate(void *memory, size_t size, CUnflatten flatten) {
 	struct flex_A *pA = (struct flex_A*)unflatten_root_pointer_seq(flatten, 0);
@@ -152,6 +159,8 @@ static int kflat_flexible_validate(void *memory, size_t size, CUnflatten flatten
 	return KFLAT_TEST_SUCCESS;
 }
 
-#endif
+/********************************/
+#endif /* __VALIDATOR__ */
+/********************************/
 
 KFLAT_REGISTER_TEST("FLEXIBLE", kflat_flexible_test, kflat_flexible_validate);

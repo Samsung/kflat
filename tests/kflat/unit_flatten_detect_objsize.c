@@ -13,7 +13,9 @@ struct mere_pointers {
 	void* c;
 };
 
-#ifdef __KERNEL__
+/********************************/
+#ifdef __TESTER__
+/********************************/
 
 FUNCTION_DEFINE_FLATTEN_STRUCT(mere_pointers,
 	AGGREGATE_FLATTEN_TYPE_ARRAY(unsigned char,a,AGGREGATE_FLATTEN_DETECT_OBJECT_SIZE(a));
@@ -25,12 +27,14 @@ FUNCTION_DEFINE_FLATTEN_STRUCT(mere_pointers,
 
 #include <linux/vmalloc.h>
 
-char gcarr[4] = "ABCD";
+static char gcarr[4] = "ABCD";
 
-static int kflat_flatten_detect_objsize_unit_test(struct kflat *kflat) {
+static int kflat_flatten_detect_objsize_unit_test(struct flat *flat) {
 
 	struct mere_pointers ptrs = {};
 	unsigned long stack_long = 0xD0D0CACA;
+
+	FLATTEN_SETUP_TEST(flat);
 
 #ifndef KFLAT_GET_OBJ_SUPPORT
 	ptrs.detect_obj_supported = false;
@@ -52,7 +56,10 @@ static int kflat_flatten_detect_objsize_unit_test(struct kflat *kflat) {
 	return 0;
 }
 
-#else
+/********************************/
+#endif /* __TESTER__ */
+#ifdef __VALIDATOR__
+/********************************/
 
 static int kflat_flatten_detect_objsize_unit_validate(void *memory, size_t size, CUnflatten flatten) {
 	
@@ -70,6 +77,8 @@ static int kflat_flatten_detect_objsize_unit_validate(void *memory, size_t size,
 	return KFLAT_TEST_SUCCESS;
 }
 
-#endif
+/********************************/
+#endif /* __VALIDATOR__ */
+/********************************/
 
 KFLAT_REGISTER_TEST("[UNIT] flatten_detect_objsize", kflat_flatten_detect_objsize_unit_test, kflat_flatten_detect_objsize_unit_validate);

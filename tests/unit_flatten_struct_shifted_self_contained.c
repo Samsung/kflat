@@ -22,9 +22,9 @@ typedef struct my_product_sc product_sc_t;
 
 static unsigned long dev_code[] = {3,3,7,2,4,1,8,5};
 
-#ifdef __KERNEL__
-
-#include <linux/vmalloc.h>
+/********************************/
+#ifdef __TESTER__
+/********************************/
 
 FUNCTION_DEFINE_FLATTEN_STRUCT_SELF_CONTAINED(my_product_sc,sizeof(struct my_product_sc),
 	AGGREGATE_FLATTEN_STRING_SELF_CONTAINED(name,offsetof(struct my_product_sc,name));
@@ -38,12 +38,14 @@ FUNCTION_DEFINE_FLATTEN_STRUCT_TYPE_SELF_CONTAINED(product_sc_t,sizeof(product_s
 	AGGREGATE_FLATTEN_TYPE_ARRAY_SELF_CONTAINED(unsigned long,dev.code,offsetof(product_sc_t,dev.code),OFFATTR(unsigned long,offsetof(product_sc_t,dev.code_size)));
 );
 
-static int kflat_flatten_struct_shifted_self_contained_unit_test(struct kflat *kflat) {
+static int kflat_flatten_struct_shifted_self_contained_unit_test(struct flat *flat) {
 
 	struct my_product_sc prod = {"productX",{"dev0",dev_code,sizeof(dev_code)/sizeof(unsigned long)},0x33449182};
 	product_sc_t prod2 = {"productY",{"dev1",dev_code,sizeof(dev_code)/sizeof(unsigned long)},0x55664356};
 	struct my_device_sc* dev = &prod.dev;
 	struct my_device_sc* dev2 = &prod2.dev;
+
+	FLATTEN_SETUP_TEST(flat);
 
 	FOR_ROOT_POINTER(dev,
 		FLATTEN_STRUCT_SHIFTED_SELF_CONTAINED(my_product_sc, sizeof(struct my_product_sc), dev, -offsetof(struct my_product_sc,dev));
@@ -56,7 +58,10 @@ static int kflat_flatten_struct_shifted_self_contained_unit_test(struct kflat *k
 	return 0;
 }
 
-#else
+/********************************/
+#endif /* __TESTER__ */
+#ifdef __VALIDATOR__
+/********************************/
 
 static int kflat_flatten_struct_shifted_self_contained_unit_validate(void *memory, size_t size, CUnflatten flatten) {
 
@@ -82,6 +87,8 @@ static int kflat_flatten_struct_shifted_self_contained_unit_validate(void *memor
 	return KFLAT_TEST_SUCCESS;
 }
 
-#endif
+/********************************/
+#endif /* __VALIDATOR__ */
+/********************************/
 
 KFLAT_REGISTER_TEST("[UNIT] flatten_struct_shifted_self_contained", kflat_flatten_struct_shifted_self_contained_unit_test, kflat_flatten_struct_shifted_self_contained_unit_validate);

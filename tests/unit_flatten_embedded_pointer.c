@@ -36,7 +36,9 @@ const char* info[5] = {
 	"!",
 };
 
-#ifdef __KERNEL__
+/********************************/
+#ifdef __TESTER__
+/********************************/
 
 static inline void *char_array_to_ptr(const void *ptr) {
 	return (void*)ptr;
@@ -99,14 +101,16 @@ struct EA g_EA;
 struct EA g_EA2;
 B_t g_B[4] = { {"ABC"},{"DEF"},{"GHI"},{"JKL"} };
 
-static int kflat_flatten_embedded_pointer_unit_test(struct kflat *kflat) {
+static int kflat_flatten_embedded_pointer_unit_test(struct flat *flat) {
 
 	B_t Bnfo[5] = { {info[0]},{info[1]},{info[2]},{info[3]},{info[4]}, };
 	struct EC Cnfo[5] = { {info[0]},{info[1]},{info[2]},{info[3]},{info[4]}, };
 	struct FC crr[40] = {};
 
+	FLATTEN_SETUP_TEST(flat);
+
 	for (int i=0; i<40; ++i) {
-		crr[i].s = kvzalloc(4, GFP_KERNEL);
+		crr[i].s = FLATTEN_BSP_ZALLOC(4);
 		snprintf(crr[i].s,4,"%d",25*i+5);
 	}
 
@@ -151,13 +155,16 @@ static int kflat_flatten_embedded_pointer_unit_test(struct kflat *kflat) {
 	);
 
 	for (int i=0; i<40; ++i) {
-		kvfree(crr[i].s);
+		FLATTEN_BSP_FREE(crr[i].s);
 	}
 
 	return 0;
 }
 
-#else
+/********************************/
+#endif /* __TESTER__ */
+#ifdef __VALIDATOR__
+/********************************/
 
 static int kflat_flatten_embedded_pointer_unit_validate(void *memory, size_t size, CUnflatten flatten) {
 
@@ -202,6 +209,8 @@ static int kflat_flatten_embedded_pointer_unit_validate(void *memory, size_t siz
 	return KFLAT_TEST_SUCCESS;
 }
 
-#endif
+/********************************/
+#endif /* __VALIDATOR__ */
+/********************************/
 
 KFLAT_REGISTER_TEST("[UNIT] flatten_embedded_pointer", kflat_flatten_embedded_pointer_unit_test, kflat_flatten_embedded_pointer_unit_validate);

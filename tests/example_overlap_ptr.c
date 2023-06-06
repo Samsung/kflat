@@ -18,7 +18,9 @@ typedef struct struct_A {
 	char *p;
 } my_A;
 
-#ifdef __KERNEL__
+/********************************/
+#ifdef __TESTER__
+/********************************/
 
 /* RECURSIVE version */
 FUNCTION_DEFINE_FLATTEN_STRUCT_TYPE(my_B);
@@ -31,11 +33,13 @@ FUNCTION_DEFINE_FLATTEN_STRUCT_TYPE(my_A,
 	AGGREGATE_FLATTEN_STRING(p);
 );
 
-static int kflat_overlapptr_test(struct kflat *kflat) {
+static int kflat_overlapptr_test(struct flat *flat) {
 	int err = 0;
 	my_B arrB[4] = { { 1 }, { 2 }, { 3 }, { 4 } };
 	my_A T[3] = { {}, { 0, &arrB[0], &arrB[1], &arrB[2], &arrB[3], "p in struct A" }, {} };
 	unsigned char *p;
+
+	FLATTEN_SETUP_TEST(flat);
 
 	p = (unsigned char *)&T[1] - 8;
 	FOR_ROOT_POINTER(p,
@@ -49,7 +53,10 @@ static int kflat_overlapptr_test(struct kflat *kflat) {
 	return err;
 }
 
-#else
+/********************************/
+#endif /* __TESTER__ */
+#ifdef __VALIDATOR__
+/********************************/
 
 static int kflat_overlapptr_test_validate(void *memory, size_t size, CUnflatten flatten) {
 	my_A *pA = (my_A *)unflatten_root_pointer_seq(flatten, 1);
@@ -62,6 +69,8 @@ static int kflat_overlapptr_test_validate(void *memory, size_t size, CUnflatten 
 	return KFLAT_TEST_SUCCESS;
 }
 
-#endif
+/********************************/
+#endif /* __VALIDATOR__ */
+/********************************/
 
 KFLAT_REGISTER_TEST_FLAGS("OVERLAP_PTR", kflat_overlapptr_test, kflat_overlapptr_test_validate, KFLAT_TEST_ATOMIC);

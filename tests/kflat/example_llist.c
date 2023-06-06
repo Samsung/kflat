@@ -6,9 +6,9 @@
 
 #include "common.h"
 
-#ifdef __KERNEL__
+#if defined(__TESTER__)
 #include <linux/llist.h>
-#else
+#elif defined(__VALIDATOR__)
 struct llist_node {
 	struct llist_node *next;
 };
@@ -24,7 +24,7 @@ struct myLongLList {
 };
 
 /********************************/
-#ifdef __KERNEL__
+#ifdef __TESTER__
 /********************************/
 
 FUNCTION_DECLARE_FLATTEN_STRUCT_ARRAY_SELF_CONTAINED(llist_node, sizeof(struct llist_node));
@@ -42,10 +42,12 @@ FUNCTION_DEFINE_FLATTEN_STRUCT_SELF_CONTAINED(myLongLList, sizeof(struct myLongL
 	AGGREGATE_FLATTEN_STRUCT_ARRAY_SELF_CONTAINED_SHIFTED(myLongLList, sizeof(struct myLongLList), l.next, offsetof(struct myLongLList,l.next), 1, -offsetof(struct myLongLList,l));
 );
 
-static int kflat_llist_test(struct kflat *kflat) {
+static int kflat_llist_test(struct flat *flat) {
 	struct llist_head lhead;
 	int i;
 	struct llist_node *p;
+
+	FLATTEN_SETUP_TEST(flat);
 
 	init_llist_head(&lhead);
 	for (i = 0; i < 10; ++i) {
@@ -75,7 +77,8 @@ static int kflat_llist_test(struct kflat *kflat) {
 }
 
 /********************************/
-#else
+#endif /* __TESTER__ */
+#ifdef __VALIDATOR__
 /********************************/
 
 static int kflat_llist_test_validate(void *memory, size_t size, CUnflatten flatten) {
@@ -103,7 +106,7 @@ static int kflat_llist_test_validate(void *memory, size_t size, CUnflatten flatt
 }
 
 /********************************/
-#endif
+#endif /* __VALIDATOR__ */
 /********************************/
 
 KFLAT_REGISTER_TEST("LLIST", kflat_llist_test, kflat_llist_test_validate);

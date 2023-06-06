@@ -8,10 +8,7 @@
 
 #define TREE_ELEMENT_COUNT	2000
 
-#ifdef __KERNEL__
-#include <linux/rbtree.h>
-#include <linux/random.h>
-#else
+#if defined(__VALIDATOR__) && !defined(__TESTER__)
 #include <stdbool.h>
 #include "../lib/include_priv/rbtree.h"
 #endif
@@ -21,7 +18,9 @@ struct string_node_atomic {
 	char *s;
 };
 
-#ifdef __KERNEL__
+/********************************/
+#ifdef __TESTER__
+/********************************/
 
 static struct rb_root stringset_root = RB_ROOT;
 
@@ -39,10 +38,10 @@ FUNCTION_DEFINE_FLATTEN_STRUCT_SPECIALIZE(atomic_stringset,rb_root,
 	AGGREGATE_FLATTEN_STRUCT(string_node_atomic,rb_node);
 );
 
-static int stringset_insert(struct kflat* kflat, const char *s) {
-	struct string_node_atomic *data = flat_zalloc(&kflat->flat,sizeof(struct string_node_atomic),1);
+static int stringset_insert(struct flat* flat, const char *s) {
+	struct string_node_atomic *data = flat_zalloc(flat,sizeof(struct string_node_atomic),1);
 	struct rb_node **new, *parent = 0;
-	data->s = flat_zalloc(&kflat->flat,strlen(s) + 1,1);
+	data->s = flat_zalloc(flat,strlen(s) + 1,1);
 	strcpy(data->s, s);
 	new = &(stringset_root.rb_node);
 
@@ -74,21 +73,24 @@ static void stringset_destroy(struct rb_root *root) {
 		rb_erase(p, root);
 		p = q;
 	}
+	// TODO: flat_free
 }
 
-static int kflat_large_stringset_test(struct kflat *kflat) {
+static int kflat_large_stringset_test(struct flat *flat) {
 	
 	unsigned i, j;
 	static const char chars[] = "ABCDEFGHIJKLMNOPQRST";
-	unsigned char r;
+	unsigned int r = 0;
+
+	FLATTEN_SETUP_TEST(flat);
 
 	for (j = 0; j < TREE_ELEMENT_COUNT; ++j) {
-		char *s = flat_zalloc(&kflat->flat,11,1);
+		char *s = flat_zalloc(flat, 11, 1);
+		r++;
 		for (i = 0; i < 10; ++i) {
-			get_random_bytes(&r, 1);
-			s[i] = chars[r%20];
+			s[i] = chars[(r >> (4*i)) & 0xf];
 		}
-		stringset_insert(kflat,s);
+		stringset_insert(flat,s);
 	}
 
 	FOR_ROOT_POINTER(&stringset_root,
@@ -100,7 +102,10 @@ static int kflat_large_stringset_test(struct kflat *kflat) {
 	return 0;
 }
 
-#else
+/********************************/
+#endif /* __TESTER__ */
+#ifdef __VALIDATOR__
+/********************************/
 
 static size_t stringset_count(const struct rb_root *root) {
 	struct rb_node *p = rb_first(root);
@@ -121,6 +126,9 @@ static int kflat_large_stringset_validate(void *memory, size_t size, CUnflatten 
 	return KFLAT_TEST_SUCCESS;
 }
 
-#endif
+/********************************/
+#endif /* __VALIDATOR__ */
+/********************************/
+
 
 KFLAT_REGISTER_TEST_FLAGS("LARGE_STRINGSET", kflat_large_stringset_test, kflat_large_stringset_validate,KFLAT_TEST_ATOMIC);

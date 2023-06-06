@@ -22,9 +22,9 @@ typedef struct my_product product_t;
 
 static unsigned long dev_code[] = {3,3,7,2,4,1,8,5};
 
-#ifdef __KERNEL__
-
-#include <linux/vmalloc.h>
+/********************************/
+#ifdef __TESTER__
+/********************************/
 
 FUNCTION_DEFINE_FLATTEN_STRUCT(my_product,
 	AGGREGATE_FLATTEN_STRING(name);
@@ -38,12 +38,14 @@ FUNCTION_DEFINE_FLATTEN_STRUCT_TYPE(product_t,
 	AGGREGATE_FLATTEN_TYPE_ARRAY(unsigned long,dev.code,ATTR(dev.code_size));
 );
 
-static int kflat_flatten_struct_shifted_unit_test(struct kflat *kflat) {
+static int kflat_flatten_struct_shifted_unit_test(struct flat *flat) {
 
 	struct my_product prod = {"productX",{"dev0",dev_code,sizeof(dev_code)/sizeof(unsigned long)},0x33449182};
 	product_t prod2 = {"productY",{"dev1",dev_code,sizeof(dev_code)/sizeof(unsigned long)},0x55664356};
 	struct my_device* dev = &prod.dev;
 	struct my_device* dev2 = &prod2.dev;
+
+	FLATTEN_SETUP_TEST(flat);
 
 	FOR_ROOT_POINTER(dev,
 		FLATTEN_STRUCT_SHIFTED(my_product, dev, -offsetof(struct my_product,dev));
@@ -56,7 +58,10 @@ static int kflat_flatten_struct_shifted_unit_test(struct kflat *kflat) {
 	return 0;
 }
 
-#else
+/********************************/
+#endif /* __TESTER__ */
+#ifdef __VALIDATOR__
+/********************************/
 
 static int kflat_flatten_struct_shifted_unit_validate(void *memory, size_t size, CUnflatten flatten) {
 
@@ -82,6 +87,8 @@ static int kflat_flatten_struct_shifted_unit_validate(void *memory, size_t size,
 	return KFLAT_TEST_SUCCESS;
 }
 
-#endif
+/********************************/
+#endif /* __VALIDATOR__ */
+/********************************/
 
 KFLAT_REGISTER_TEST("[UNIT] flatten_struct_shifted", kflat_flatten_struct_shifted_unit_test, kflat_flatten_struct_shifted_unit_validate);

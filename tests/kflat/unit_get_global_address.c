@@ -13,14 +13,18 @@ struct get_global_result {
 	bool test_module_func_pass;
 };
 
-#ifdef __KERNEL__
+/********************************/
+#ifdef __TESTER__
+/********************************/
 
 int kflat_test_global;
 
 FUNCTION_DEFINE_FLATTEN_STRUCT(get_global_result);
 
-static int kflat_global_addr_unit_test(struct kflat *kflat) {
+static int kflat_global_addr_unit_test(struct flat *flat) {
 	struct get_global_result results = { 0 };
+
+	FLATTEN_SETUP_TEST(flat);
 
 	results.test_nonexistent_pass = (NULL == flatten_global_address_by_name("not_existing_variable_this_is"));
 	results.test_module_global_pass = (&kflat_test_global == flatten_global_address_by_name("kflat_core:kflat_test_global"));
@@ -35,7 +39,10 @@ static int kflat_global_addr_unit_test(struct kflat *kflat) {
 	return 0;
 }
 
-#else
+/********************************/
+#endif /* __TESTER__ */
+#ifdef __VALIDATOR__
+/********************************/
 
 static int kflat_global_addr_unit_validate(void *memory, size_t size, CUnflatten flatten) {
 	struct get_global_result *pResults = (struct get_global_result *)memory;
@@ -48,6 +55,8 @@ static int kflat_global_addr_unit_validate(void *memory, size_t size, CUnflatten
 	return KFLAT_TEST_SUCCESS;
 }
 
-#endif
+/********************************/
+#endif /* __VALIDATOR__ */
+/********************************/
 
 KFLAT_REGISTER_TEST("[UNIT] global_address", kflat_global_addr_unit_test, kflat_global_addr_unit_validate);

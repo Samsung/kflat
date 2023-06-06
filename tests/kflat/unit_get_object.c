@@ -17,7 +17,9 @@ struct get_obj_result {
 	bool test_vmalloc_pass;
 };
 
-#ifdef __KERNEL__
+/********************************/
+#ifdef __TESTER__
+/********************************/
 
 #include <linux/vmalloc.h>
 
@@ -28,8 +30,10 @@ static int iarr[16];
 
 FUNCTION_DEFINE_FLATTEN_STRUCT(get_obj_result);
 
-static int kflat_get_object_unit_test(struct kflat *kflat) {
+static int kflat_get_object_unit_test(struct flat *flat) {
 	struct get_obj_result results = { 0 };
+
+	FLATTEN_SETUP_TEST(flat);
 
 #ifdef KFLAT_GET_OBJ_SUPPORT
 	bool ret;
@@ -103,7 +107,10 @@ static int kflat_get_object_unit_test(struct kflat *kflat) {
 	return 0;
 }
 
-#else
+/********************************/
+#endif /* __TESTER__ */
+#ifdef __VALIDATOR__
+/********************************/
 
 static int kflat_get_object_unit_validate(void *memory, size_t size, CUnflatten flatten) {
 	struct get_obj_result *pResults = (struct get_obj_result *)memory;
@@ -120,6 +127,8 @@ static int kflat_get_object_unit_validate(void *memory, size_t size, CUnflatten 
 	return KFLAT_TEST_SUCCESS;
 }
 
-#endif
+/********************************/
+#endif /* __VALIDATOR__ */
+/********************************/
 
 KFLAT_REGISTER_TEST("[UNIT] get_object", kflat_get_object_unit_test, kflat_get_object_unit_validate);

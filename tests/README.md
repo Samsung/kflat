@@ -10,7 +10,7 @@ Due to the limitation of our Makefile, after adding new test remember to run tar
 
 ## Test format
 
-Test files looks as below. Code in `__KERNEL__` macro block will be compiled for kernelspace module and the second block (`__USER__`) will be build for userspace test app. First one is allocating structure, defining recipe and performing flattening, while userspace loads dump into memory and validates it contents with custom `ASSERT` macros.
+Test files looks as below. Code in `__TESTER__` macro block will be compiled for kernelspace module and the second block (`__USER__`) will be build for userspace test app. First one is allocating structure, defining recipe and performing flattening, while userspace loads dump into memory and validates it contents with custom `ASSERT` macros.
 
 ```c
 // Generic include for both kernel and user targets
@@ -22,7 +22,7 @@ struct B {
 };
 
 /**************************/
-#ifdef __KERNEL__
+#ifdef __TESTER__
 /**************************/
 
 FUNCTION_DEFINE_FLATTEN_STRUCT(B);

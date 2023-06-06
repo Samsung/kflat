@@ -1,7 +1,7 @@
 /**
- * @file kflattest.c
+ * @file uflattest.c
  * @author Samsung R&D Poland - Mobile Security Group
- * @brief Cmdline tool for invoking kflat tests
+ * @brief Cmdline tool for invoking userspace UFLAT tests
  */
 
 #include <argp.h>
@@ -18,18 +18,15 @@
 #include <sys/ioctl.h>
 #include <sys/mman.h>
 #include <sys/stat.h>
-#include <sys/time.h>
 #include <sys/wait.h>
 #include <ucontext.h>
 #include <unistd.h>
 
+#include "uflat.h"
+
+#include "../tests/uflat_tests_list.h"
 #include "common.h"
-#include "kflat_uapi.h"
 
-#include "../tests/kflat_tests_list.h"
-
-
-#define KFLAT_NODE      "/sys/kernel/debug/kflat"
 
 struct args {
     bool list;
@@ -44,6 +41,8 @@ struct args {
 
 int enable_verbose = 0;
 static const char* current_test_name = NULL;
+
+
 
 
 /*******************************************************
@@ -107,6 +106,7 @@ bool is_tests_list_empty(void) {
 /*******************************************************
  * TESTS AREA
  *******************************************************/
+
 static ssize_t get_tests_section(struct kflat_test_case*** tests) {
     size_t tests_count = sizeof(test_cases) / sizeof(test_cases[0]);
     if(tests_count == 0) {
@@ -141,6 +141,20 @@ void add_all_tests(void) {
 		add_test_to_list(tests[i]->name);
 }
 
+flat_test_case_handler_t get_test_handler(const char* name) {
+    size_t tests_count;
+    struct kflat_test_case** tests;
+    tests_count = get_tests_section(&tests);
+
+	for(size_t i = 0; i < tests_count; i++) {
+		if(!strcmp(name, tests[i]->name))
+			return tests[i]->handler;
+	}
+
+    log_error("No available validator for test named '%s'", name);
+	return NULL;
+}
+
 flat_test_case_validator_t get_test_validator(const char* name) {
     size_t tests_count;
     struct kflat_test_case** tests;
@@ -169,18 +183,12 @@ get_function_address_t get_test_gfa(const char* name) {
 
 int run_test(struct args* args, const char* name) {
     int ret;
-    void* area;
     FILE* file;
     char out_name[128];
     int test_result = KFLAT_TEST_FAIL;
-    const size_t flat_size = 100 * 1024 * 1024;   // 10MB
+    const size_t flat_size = 10ULL * 1024 * 1024;   // 10MB
     ssize_t output_size;
-    struct time_elapsed kernel_time, total_time;
-
-    struct kflat_ioctl_tests tests = {
-        .debug_flag = args->debug,
-        .use_stop_machine = args->stop_machine
-    };
+    struct time_elapsed total_time, flatten_time;
 
     if(args->verbose)
         log_info("=> Testing %s...", name);
@@ -188,113 +196,46 @@ int run_test(struct args* args, const char* name) {
     memset(_last_assert_tested, 0, sizeof(_last_assert_tested));
     
     mark_time_start(&total_time);
-    mark_time_start(&kernel_time);
+    mark_time_start(&flatten_time);
 
-    int fd = open(KFLAT_NODE, O_RDONLY);
-    if(fd < 0) {
-        log_error("failed to open %s - %s", KFLAT_NODE, strerror(errno));
+    snprintf(out_name, sizeof(out_name), "%s/flat_%s.img", args->output_dir, name);
+    
+    // Setup UFLAT and run test
+    struct uflat* uflat = uflat_init(out_name);
+    if(uflat == NULL) {
+        log_error("failed to initialize UFLAT");
         goto exit;
     }
 
-    area = mmap(NULL, flat_size, PROT_READ, MAP_PRIVATE, fd, 0);
-    if(area == MAP_FAILED) {
-        log_error("failed to mmap kflat memory - %s", strerror(errno));
-        goto close_fd;
+    flat_test_case_handler_t handler = get_test_handler(name);
+    ret = handler(&uflat->flat);
+    if(ret) {
+        log_error("test handler failed");
+        uflat_fini(uflat);
+        goto exit;
     }
 
-    strncpy(tests.test_name, name, sizeof(tests.test_name));
-
-    output_size = ioctl(fd, KFLAT_TESTS, &tests);
-    if(args->stop_machine && output_size < 0 && errno == EINVAL) {
-        test_result = KFLAT_TEST_UNSUPPORTED;
-        goto munmap_area;
-    } else if(output_size < 0) {
-        log_error("failed to execute KFLAT_TEST ioctl - %s", strerror(errno));
-        goto munmap_area;
+    ret = uflat_write(uflat);
+    if(ret != 0) {
+        log_error("failed to write UFLAT output");
+        uflat_fini(uflat);
+        goto exit;
     }
 
-    mark_time_end(&kernel_time);
+    uflat_fini(uflat);
 
-    /* Save debug log early */
-    if (args->debug) {
-        if (args->output_dir) {
-            snprintf(out_name, sizeof(out_name), "%s/flat_%s.log", args->output_dir, name);
-            int save_fd = open(out_name, O_WRONLY | O_CREAT | O_TRUNC, 0700);
-            if(save_fd < 0) {
-                log_info("failed to save flatten log to file %s - %s", out_name, strerror(errno));
-                goto save_image;
-            }
-            unsigned long read_count = 0;
-            static unsigned char logbuff[4096];
-            do {
-                ret = read(fd, logbuff, 4096);
-                if (ret>0) {
-                    read_count+=ret;
-                    int wret;
-                    int write_count = ret;
-                    char* offset = (char*)logbuff;
-                    do {
-                        wret = write(save_fd, offset, write_count);
-                        if(wret > 0) {
-                            write_count -= wret;
-                            offset += wret;
-                        }
-                    } while(wret > 0);
-                    if(wret < 0) {
-                        log_error("failed to write flatten log to file %s - %s", out_name, strerror(errno));
-                        close(save_fd);
-                        goto save_image;
-                    }
-                }
-            } while(ret > 0);
-            close(save_fd);
-            if(!args->validate || args->verbose)
-                log_info("\t saved flatten log to file %s [%lu bytes]", out_name, read_count);
-        }
-    }
+    if(!args->validate || args->verbose)
+        log_info("\t saved flatten image to file %s", out_name);
 
-save_image:
-    if(output_size > flat_size)
-        log_abort("test somehow produced image larger than mmaped buffer (kernel bug?)"
-                    " - size: %zu; mmap size: %zu", output_size, flat_size);
-    if(args->verbose)
-        log_info("\t test produced %zu bytes of flattened memory", output_size);
 
-    // Save kflat image
-    if(args->output_dir) {
-        snprintf(out_name, sizeof(out_name), "%s/flat_%s.img", args->output_dir, name);
-
-        int save_fd = open(out_name, O_WRONLY | O_CREAT, 0700);
-        if(save_fd < 0) {
-            log_error("failed to save flatten image to file %s - %s", out_name, strerror(errno));
-            goto munmap_area;
-        }
-
-        char* offset = (char*)area;
-        do {
-            ret = write(save_fd, offset, output_size);
-            if(ret > 0) {
-                output_size -= ret;
-                offset += ret;
-            }
-        } while(ret > 0);
-        if(ret < 0) {
-            log_error("failed to write flatten image to file %s - %s", out_name, strerror(errno));
-            close(save_fd);
-            goto munmap_area;
-        }
-
-        close(save_fd);
-        if(!args->validate || args->verbose)
-            log_info("\t saved flatten image to file %s", out_name);
-    }
+    mark_time_end(&flatten_time);
 
     if(args->validate) {
         assert(args->output_dir);
 
         flat_test_case_validator_t validator = get_test_validator(name);
         if(validator == NULL)
-            goto munmap_area;
+            goto exit;
 
         file = fopen(out_name, "r+b");
         assert(file != NULL);
@@ -305,7 +246,7 @@ save_image:
             ret = unflatten_imginfo(flatten, file);
             if(ret != 0) {
                 log_error("failed to parse flattened image - %d", ret);
-                goto unflatten_cleanup;
+                goto exit;
             }
             rewind(file);
         }
@@ -364,22 +305,18 @@ save_image:
 
 unflatten_cleanup:
         unflatten_deinit(flatten);
-        goto munmap_area;
+        goto exit;
     }
 
     // If we've reached that place, everything went accordingly to plan
     test_result = KFLAT_TEST_SUCCESS;
 
-munmap_area:
-    munmap(area, flat_size);
-close_fd:
-    close(fd);
 exit:
 
     mark_time_end(&total_time);
     if(args->verbose)
-        log_info("\t=> Time spent: kernel [%d.%03ds]; total[%d.%03ds]",
-            kernel_time.seconds, kernel_time.mseconds, total_time.seconds, total_time.mseconds);
+        log_info("\t=> Time spent: flatten [%d.%03ds]; total[%d.%03ds]",
+            flatten_time.seconds, flatten_time.mseconds, total_time.seconds, total_time.mseconds);
 
     if(test_result == KFLAT_TEST_SUCCESS)
         log_info("Test %-50s [%d.%03ds] - SUCCESS", name, total_time.seconds, total_time.mseconds);
@@ -398,18 +335,17 @@ exit:
 /*******************************************************
  * OPTIONS PARSING
  *******************************************************/
-const char* argp_program_version = "kflattest 1.0";
-static const char argp_doc[] = "kflattest -- test suite for kflat kernel module";
+const char* argp_program_version = "uflattest 1.0";
+static const char argp_doc[] = "uflattest -- test suite for UFLAT library";
 static const char argp_args_doc[] = "TESTS";
 static struct argp_option options[] = {
     {"list", 'l', 0, 0, "List available tests"},
     {"output", 'o', "DIR", 0, "Save images to DIR"},
-    {"debug", 'd', 0, 0, "Enable kflat debug flag"},
+    {"debug", 'd', 0, 0, "Enable uflat debug flag"},
     {"skip-check", 's', 0, 0, "Skip saved image validation"},
     {"image-info", 'i', 0, 0, "Print image information before validation"},
     {"continuous", 'c', 0, 0, "Load memory image in continuous fashion during validation"},
     {"verbose", 'v', 0, 0, "More verbose logs"},
-    {"stop-machine", 'm', 0, 0, "Run tests under stop_machine macro"},
     { 0 }
 };
 
@@ -438,9 +374,6 @@ static error_t parse_opt(int key, char* arg, struct argp_state* state) {
             break;
         case 'v':
             options->verbose = true;
-            break;
-        case 'm':
-            options->stop_machine = true;
             break;
         
         case ARGP_KEY_ARG:

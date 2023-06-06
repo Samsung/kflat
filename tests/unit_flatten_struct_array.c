@@ -18,7 +18,9 @@ struct container {
 	int *integers;
 };
 
-#ifdef __KERNEL__
+/********************************/
+#ifdef __TESTER__
+/********************************/
 
 FUNCTION_DEFINE_FLATTEN_STRUCT(element);
 
@@ -27,12 +29,14 @@ FUNCTION_DEFINE_FLATTEN_STRUCT(container,
 	AGGREGATE_FLATTEN_TYPE_ARRAY(int, integers, 10);
 );
 
-static int kflat_flatten_struct_array_unit_test(struct kflat *kflat) {
+static int kflat_flatten_struct_array_unit_test(struct flat *flat) {
 	int integers[10];
 	struct element el[3];
 	struct container box[2] = {
 		{ el, integers }, { el + 1, integers + 4 }
 	};
+
+	FLATTEN_SETUP_TEST(flat);
 
 	for (int i = 0; i < 10; i++)
 		integers[i] = i * 2;
@@ -53,7 +57,10 @@ static int kflat_flatten_struct_array_unit_test(struct kflat *kflat) {
 	return 0;
 }
 
-#else
+/********************************/
+#endif /* __TESTER__ */
+#ifdef __VALIDATOR__
+/********************************/
 
 static int kflat_flatten_struct_array_unit_validate(void *memory, size_t size, CUnflatten flatten) {
 	struct container *box = (struct container *)memory;
@@ -71,6 +78,8 @@ static int kflat_flatten_struct_array_unit_validate(void *memory, size_t size, C
 	return KFLAT_TEST_SUCCESS;
 }
 
-#endif
+/********************************/
+#endif /* __VALIDATOR__ */
+/********************************/
 
 KFLAT_REGISTER_TEST_FLAGS("[UNIT] flatten_struct_array", kflat_flatten_struct_array_unit_test, kflat_flatten_struct_array_unit_validate, KFLAT_TEST_ATOMIC);

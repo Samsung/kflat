@@ -27,7 +27,9 @@ struct SA {
     char c[10];
 };
 
-#ifdef __KERNEL__
+/********************************/
+#ifdef __TESTER__
+/********************************/
 
 FUNCTION_DEFINE_FLATTEN_STRUCT_TYPE(string_t,
     AGGREGATE_FLATTEN_STRING(s);
@@ -48,9 +50,11 @@ FUNCTION_DEFINE_FLATTEN_STRUCT(SA,
     AGGREGATE_FLATTEN_STRUCT_TYPE_ARRAY_STORAGE(string_t,sarr,4);
 );
 
-static int kflat_flatten_struct_storage_unit_test(struct kflat *kflat) {
+static int kflat_flatten_struct_storage_unit_test(struct flat *flat) {
 
     struct SA sa = { 0x34569872, {{"in_union"}}, {{"in_union2"}}, {"BADDCAFE"}, {{"0"},{"1"},{"2"},{"3"}}, "DEADBEEF" };
+
+    FLATTEN_SETUP_TEST(flat);
 
     FOR_ROOT_POINTER(&sa,
         FLATTEN_STRUCT(SA, &sa);
@@ -59,7 +63,10 @@ static int kflat_flatten_struct_storage_unit_test(struct kflat *kflat) {
 	return 0;
 }
 
-#else
+/********************************/
+#endif /* __TESTER__ */
+#ifdef __VALIDATOR__
+/********************************/
 
 static int kflat_flatten_struct_storage_unit_validate(void *memory, size_t size, CUnflatten flatten) {
 
@@ -78,6 +85,8 @@ static int kflat_flatten_struct_storage_unit_validate(void *memory, size_t size,
 	return KFLAT_TEST_SUCCESS;
 }
 
-#endif
+/********************************/
+#endif /* __VALIDATOR__ */
+/********************************/
 
 KFLAT_REGISTER_TEST_FLAGS("[UNIT] flatten_struct_storage", kflat_flatten_struct_storage_unit_test, kflat_flatten_struct_storage_unit_validate, KFLAT_TEST_ATOMIC);

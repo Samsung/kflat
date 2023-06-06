@@ -6,8 +6,8 @@
 
 #include "common.h"
 
-unsigned long magic = 0xCAFEBEEF;
-char garr[20];
+static unsigned long magic = 0xCAFEBEEF;
+static char garr[20];
 
 struct tpX {
     long* larr;
@@ -16,7 +16,9 @@ struct tpX {
     float* f2;
 };
 
-#ifdef __KERNEL__
+/********************************/
+#ifdef __TESTER__
+/********************************/
 
 FUNCTION_DEFINE_FLATTEN_STRUCT(tpX,
     AGGREGATE_FLATTEN_TYPE_ARRAY(long,larr,4);
@@ -25,12 +27,14 @@ FUNCTION_DEFINE_FLATTEN_STRUCT(tpX,
     AGGREGATE_FLATTEN_TYPE_SELF_CONTAINED(float,f2,offsetof(struct tpX,f2));
 );
 
-static int kflat_flatten_type_unit_test(struct kflat *kflat) {
+static int kflat_flatten_type_unit_test(struct flat *flat) {
 
     long larr[4] = {-1000,-500,500,1000};
     short sarr[8] = {2,4,6,8,-900,-920,-940,-960};
     float farr[4] = {1.0,2.0,3.0,4.0};
     struct tpX x = { larr, sarr, &farr[1], &farr[3] };
+
+    FLATTEN_SETUP_TEST(flat);
 
     memcpy(garr,"ABCDEFGHIJKLMNOPQRS",20);
 
@@ -49,7 +53,10 @@ static int kflat_flatten_type_unit_test(struct kflat *kflat) {
 	return 0;
 }
 
-#else
+/********************************/
+#endif /* __TESTER__ */
+#ifdef __VALIDATOR__
+/********************************/
 
 static int kflat_flatten_struct_type_validate(void *memory, size_t size, CUnflatten flatten) {
 
@@ -80,6 +87,8 @@ static int kflat_flatten_struct_type_validate(void *memory, size_t size, CUnflat
 	return KFLAT_TEST_SUCCESS;
 }
 
-#endif
+/********************************/
+#endif /* __VALIDATOR__ */
+/********************************/
 
 KFLAT_REGISTER_TEST_FLAGS("[UNIT] flatten_type", kflat_flatten_type_unit_test, kflat_flatten_struct_type_validate, KFLAT_TEST_ATOMIC);

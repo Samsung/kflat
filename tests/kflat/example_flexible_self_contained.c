@@ -44,7 +44,9 @@ struct flexsc_G {
 	union flexsc_F arr[0];
 };
 
-#ifdef __KERNEL__
+/********************************/
+#ifdef __TESTER__
+/********************************/
 
 FUNCTION_DEFINE_FLATTEN_STRUCT(flexsc_B);
 FUNCTION_DEFINE_FLATTEN_STRUCT(flexsc_A,
@@ -66,11 +68,13 @@ FUNCTION_DEFINE_FLATTEN_STRUCT(flexsc_G,
 	AGGREGATE_FLATTEN_UNION_FLEXIBLE_SELF_CONTAINED(flexsc_F, sizeof(union flexsc_F), arr, offsetof(struct flexsc_G,arr));
 );
 
-static int kflat_flexible_self_contained_test(struct kflat *kflat) {
+static int kflat_flexible_self_contained_test(struct flat *flat) {
 	struct flexsc_A *a;
 	struct flexsc_C *c;
 	struct flexsc_E *e;
 	struct flexsc_G *g;
+
+	FLATTEN_SETUP_TEST(flat);
 
 	a = kmalloc(sizeof(struct flexsc_A) + 3 * sizeof(struct flexsc_B), GFP_KERNEL);
 	a->get_obj_supported = IS_ENABLED(KFLAT_GET_OBJ_SUPPORT);
@@ -121,7 +125,10 @@ static int kflat_flexible_self_contained_test(struct kflat *kflat) {
 	return 0;
 }
 
-#else
+/********************************/
+#endif /* __TESTER__ */
+#ifdef __VALIDATOR__
+/********************************/
 
 static int kflat_flexible_self_contained_validate(void *memory, size_t size, CUnflatten flatten) {
 	struct flexsc_A *pA = (struct flexsc_A*)unflatten_root_pointer_seq(flatten, 0);
@@ -156,6 +163,8 @@ static int kflat_flexible_self_contained_validate(void *memory, size_t size, CUn
 	return KFLAT_TEST_SUCCESS;
 }
 
-#endif
+/********************************/
+#endif /* __VALIDATOR__ */
+/********************************/
 
 KFLAT_REGISTER_TEST("FLEXIBLE_SELF_CONTAINED", kflat_flexible_self_contained_test, kflat_flexible_self_contained_validate);

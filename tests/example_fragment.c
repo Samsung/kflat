@@ -33,7 +33,9 @@ struct S {
 	char padding1[10];
 };
 
-#ifdef __KERNEL__
+/********************************/
+#ifdef __TESTER__
+/********************************/
 
 FUNCTION_DEFINE_FLATTEN_STRUCT(X);
 
@@ -44,9 +46,11 @@ FUNCTION_DEFINE_FLATTEN_STRUCT(P,
 	AGGREGATE_FLATTEN_STRUCT(X,pX);
 );
 
-static int kflat_fragment_test(struct kflat *kflat) {
+static int kflat_fragment_test(struct flat *flat) {
 	struct X xarr[10];
 	struct S stack = {"ABCDEFGHIJ",{1000,"Pobject",{-3,-2,-1,0,1,2,3,4,5,6},1.0,0,{1000000,"ABCD"},0,50,100},"KLMNOPQRST"};
+
+	FLATTEN_SETUP_TEST(flat);
 
 	for (int i=0; i<10; ++i) {
 		struct X* pX = &xarr[i];
@@ -76,7 +80,10 @@ static int kflat_fragment_test(struct kflat *kflat) {
 	return 0;
 }
 
-#else /* __USER__ */
+/********************************/
+#endif /* __TESTER__ */
+#ifdef __VALIDATOR__
+/********************************/
 
 static int kflat_fragment_validate(void* memory, size_t size, CUnflatten flatten) {
 	struct P* pP = (struct P*)unflatten_root_pointer_seq(flatten,3);
@@ -110,6 +117,8 @@ static int kflat_fragment_validate(void* memory, size_t size, CUnflatten flatten
 	return KFLAT_TEST_SUCCESS;
 }
 
-#endif
+/********************************/
+#endif /* __VALIDATOR__ */
+/********************************/
 
 KFLAT_REGISTER_TEST_FLAGS("FRAGMENT", kflat_fragment_test, kflat_fragment_validate, KFLAT_TEST_ATOMIC);

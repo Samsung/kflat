@@ -52,7 +52,9 @@ struct SAS {
     char c[10];
 };
 
-#ifdef __KERNEL__
+/********************************/
+#ifdef __TESTER__
+/********************************/
 
 FUNCTION_DEFINE_FLATTEN_STRUCT(CCS);
 
@@ -96,7 +98,7 @@ FUNCTION_DEFINE_FLATTEN_STRUCT(SAS,
     AGGREGATE_FLATTEN_STRUCT_TYPE_ARRAY_STORAGE_SELF_CONTAINED(string_s_t,sizeof(string_s_t),sarr,offsetof(struct SAS,sarr),4);
 );
 
-static int kflat_flatten_struct_storage_self_contained_unit_test(struct kflat *kflat) {
+static int kflat_flatten_struct_storage_self_contained_unit_test(struct flat *flat) {
 
     struct CCS c0 = { 0 }, c1 = { 1000 }, c2 = { 1000000 };
     int T[60] = {};
@@ -120,6 +122,8 @@ static int kflat_flatten_struct_storage_self_contained_unit_test(struct kflat *k
     };
     struct SAS sa = { 0x34569872, {{"in_union"}}, {{"in_union2"}}, {"BADDCAFE"}, {{"0"},{"1"},{"2"},{"3"}}, "DEADBEEF" };
 
+    FLATTEN_SETUP_TEST(flat);
+
     for (int i = 0; i < 60; ++i)
         T[i] = i;
 
@@ -134,7 +138,10 @@ static int kflat_flatten_struct_storage_self_contained_unit_test(struct kflat *k
 	return 0;
 }
 
-#else
+/********************************/
+#endif /* __TESTER__ */
+#ifdef __VALIDATOR__
+/********************************/
 
 static int kflat_flatten_struct_storage_self_contained_unit_validate(void *memory, size_t size, CUnflatten flatten) {
 
@@ -187,6 +194,8 @@ static int kflat_flatten_struct_storage_self_contained_unit_validate(void *memor
 	return KFLAT_TEST_SUCCESS;
 }
 
-#endif
+/********************************/
+#endif /* __VALIDATOR__ */
+/********************************/
 
 KFLAT_REGISTER_TEST_FLAGS("[UNIT] flatten_struct_storage_self_contained", kflat_flatten_struct_storage_self_contained_unit_test, kflat_flatten_struct_storage_self_contained_unit_validate, KFLAT_TEST_ATOMIC);

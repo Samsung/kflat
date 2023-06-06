@@ -20,9 +20,14 @@ kflat_core-$(CONFIG_ARM64) += probing_arm.o
 kflat_core-$(CONFIG_X86_64) += probing_x86.o
 
 # Build kflat tests
-test_files = $(wildcard $(src)/tests/*.c)
-filenames = $(notdir $(test_files))
-out_files = $(addprefix tests/, $(filenames:.c=.o))
+ccflags-y += -I${TOPDIR}/tests -D__TESTER__
+
+common_test_files = $(wildcard $(src)/tests/*.c)
+common_filenames = $(notdir $(common_test_files))
+kflat_test_files = $(wildcard $(src)/tests/kflat/*.c)
+kflat_filenames = $(notdir $(kflat_test_files))
+out_files = $(addprefix tests/, $(common_filenames:.c=.o))
+out_files += $(addprefix tests/kflat/, $(kflat_filenames:.c=.o))
 kflat_core-y += $(out_files)
 
 # Create .ko file

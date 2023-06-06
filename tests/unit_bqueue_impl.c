@@ -13,11 +13,13 @@ struct bqueue_impl_result {
 	bool bounds;
 };
 
-#ifdef __KERNEL__
+/********************************/
+#ifdef __TESTER__
+/********************************/
 
 FUNCTION_DEFINE_FLATTEN_STRUCT(bqueue_impl_result);
 
-static int kflat_bqueue_impl_unit_test(struct kflat *kflat) {
+static int kflat_bqueue_impl_unit_test(struct flat *flat) {
 	struct bqueue bq;
 	struct bqueue_impl_result results = { 0 };
 	size_t size = 6;
@@ -25,12 +27,14 @@ static int kflat_bqueue_impl_unit_test(struct kflat *kflat) {
 	char test[6];
 	char* large_mem, *copy_mem;
 
+	FLATTEN_SETUP_TEST(flat);
+
 	// Basic test
-	bqueue_init(&kflat->flat, &bq, 1000);
+	bqueue_init(flat, &bq, 1000);
 	results.small_test = true;
 
 	for(int i = 0; i < 100; i++)
-		bqueue_push_back(&kflat->flat, &bq, mem, size);
+		bqueue_push_back(flat, &bq, mem, size);
 	for(int i = 0; i < 100; i++) {
 		bqueue_pop_front(&bq, test, size);
 		if(memcmp(test, mem, size)) {
@@ -42,11 +46,11 @@ static int kflat_bqueue_impl_unit_test(struct kflat *kflat) {
 
 
 	// Check chunks creation
-	bqueue_init(&kflat->flat, &bq, 1000);
+	bqueue_init(flat, &bq, 1000);
 	results.chunks_test = true;
 
 	for(int i = 0; i < 1000; i++)
-		bqueue_push_back(&kflat->flat, &bq, mem, size);
+		bqueue_push_back(flat, &bq, mem, size);
 	for(int i = 0; i < 1000; i++) {
 		bqueue_pop_front(&bq, test, size);
 		if(memcmp(test, mem, size)) {
@@ -58,14 +62,14 @@ static int kflat_bqueue_impl_unit_test(struct kflat *kflat) {
 
 	// Check data split
 	results.single_large_test = true;
-	large_mem = flat_zalloc(&kflat->flat, PAGE_SIZE, 1);
-	copy_mem = flat_zalloc(&kflat->flat, PAGE_SIZE, 1);
+	large_mem = flat_zalloc(flat, PAGE_SIZE, 1);
+	copy_mem = flat_zalloc(flat, PAGE_SIZE, 1);
 	for(int i = 0; i < PAGE_SIZE; i++)
 		copy_mem[i] = large_mem[i] = i;
 
-	bqueue_init(&kflat->flat, &bq, 100);
+	bqueue_init(flat, &bq, 100);
 	
-	bqueue_push_back(&kflat->flat, &bq, large_mem, PAGE_SIZE);
+	bqueue_push_back(flat, &bq, large_mem, PAGE_SIZE);
 	bqueue_pop_front( &bq, test, size);
 	for(int i = 0; i < PAGE_SIZE; i++)
 		if(copy_mem[i] != large_mem[i]) {
@@ -76,8 +80,8 @@ static int kflat_bqueue_impl_unit_test(struct kflat *kflat) {
 	bqueue_destroy(&bq);
 	
 	// Boundary check
-	bqueue_init(&kflat->flat, &bq, 100);
-	bqueue_push_back(&kflat->flat, &bq, "abcd\0", 5);
+	bqueue_init(flat, &bq, 100);
+	bqueue_push_back(flat, &bq, "abcd\0", 5);
 	results.bounds = (bqueue_pop_front(&bq, test, 10) != 0);
 	bqueue_destroy(&bq);
 
@@ -89,7 +93,10 @@ static int kflat_bqueue_impl_unit_test(struct kflat *kflat) {
 	return 0;
 }
 
-#else
+/********************************/
+#endif /* __TESTER__ */
+#ifdef __VALIDATOR__
+/********************************/
 
 static int kflat_bqueue_impl_unit_validate(void *memory, size_t size, CUnflatten flatten) {
 	struct bqueue_impl_result *pResults = (struct bqueue_impl_result *)memory;
@@ -102,6 +109,8 @@ static int kflat_bqueue_impl_unit_validate(void *memory, size_t size, CUnflatten
 	return KFLAT_TEST_SUCCESS;
 }
 
-#endif
+/********************************/
+#endif /* __VALIDATOR__ */
+/********************************/
 
 KFLAT_REGISTER_TEST("[UNIT] bqueue test", kflat_bqueue_impl_unit_test, kflat_bqueue_impl_unit_validate);

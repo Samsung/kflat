@@ -12,9 +12,11 @@ struct iptr {
 	struct iptr **pp;
 };
 
-int iarr[10] = { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9 };
+static int iarr[10] = { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9 };
 
-#ifdef __KERNEL__
+/********************************/
+#ifdef __TESTER__
+/********************************/
 
 FUNCTION_DECLARE_FLATTEN_STRUCT_ARRAY_SELF_CONTAINED(iptr, sizeof(struct iptr));
 FUNCTION_DEFINE_FLATTEN_STRUCT_SELF_CONTAINED(iptr, sizeof(struct iptr),
@@ -25,10 +27,12 @@ FUNCTION_DEFINE_FLATTEN_STRUCT_SELF_CONTAINED(iptr, sizeof(struct iptr),
 	);
 );
 
-int kflat_record_pointer_test(struct kflat *kflat) {
+int kflat_record_pointer_test(struct flat *flat) {
 	struct iptr pv = { 0, 0, 0 };
 	struct iptr *ppv = &pv;
 	struct iptr pv2 = { 10, iarr, &ppv };
+
+	FLATTEN_SETUP_TEST(flat);
 
 	FOR_ROOT_POINTER(&pv2,
 		FLATTEN_STRUCT_ARRAY(iptr, &pv2, 1);
@@ -37,7 +41,10 @@ int kflat_record_pointer_test(struct kflat *kflat) {
 	return 0;
 }
 
-#else
+/********************************/
+#endif /* __TESTER__ */
+#ifdef __VALIDATOR__
+/********************************/
 
 static int kflat_record_pointer_validate(void *memory, size_t size, CUnflatten flatten) {
 	struct iptr *pv2 = (struct iptr *)memory;
@@ -52,6 +59,8 @@ static int kflat_record_pointer_validate(void *memory, size_t size, CUnflatten f
 	return KFLAT_TEST_SUCCESS;
 }
 
-#endif
+/********************************/
+#endif /* __VALIDATOR__ */
+/********************************/
 
 KFLAT_REGISTER_TEST_FLAGS("RECORD_POINTER", kflat_record_pointer_test, kflat_record_pointer_validate, KFLAT_TEST_ATOMIC);

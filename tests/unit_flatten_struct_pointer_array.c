@@ -13,22 +13,26 @@ struct fb_info {
 	unsigned long fb_id;
 };
 
-struct fb_info fb0 = { "fb0",0};
-struct fb_info fb1 = { "fb1",1};
-struct fb_info fb2 = { "fb2",2};
-struct fb_info fb3 = { "fb3",3};
+static struct fb_info fb0 = { "fb0",0};
+static struct fb_info fb1 = { "fb1",1};
+static struct fb_info fb2 = { "fb2",2};
+static struct fb_info fb3 = { "fb3",3};
 
-struct fb_info *registered_fb[FB_MAX] = {&fb0,&fb1,&fb2,&fb3};
+static struct fb_info *registered_fb[FB_MAX] = {&fb0,&fb1,&fb2,&fb3};
 
-#ifdef __KERNEL__
+/********************************/
+#ifdef __TESTER__
+/********************************/
 
 FUNCTION_DEFINE_FLATTEN_STRUCT(fb_info,
 	AGGREGATE_FLATTEN_STRING(fb_name);
 );
 
-static int kflat_flatten_struct_pointer_array_unit_test(struct kflat *kflat) {
+static int kflat_flatten_struct_pointer_array_unit_test(struct flat *flat) {
 
 	void* addr = &registered_fb;
+
+	FLATTEN_SETUP_TEST(flat);
 
 	FOR_ROOT_POINTER(addr,
 		FLATTEN_TYPE_ARRAY(struct fb_info*, addr, FB_MAX);
@@ -40,7 +44,10 @@ static int kflat_flatten_struct_pointer_array_unit_test(struct kflat *kflat) {
 	return 0;
 }
 
-#else
+/********************************/
+#endif /* __TESTER__ */
+#ifdef __VALIDATOR__
+/********************************/
 
 static int kflat_flatten_struct_pointer_array_unit_validate(void *memory, size_t size, CUnflatten flatten) {
 	struct fb_info** registered_fb = (struct fb_info**)memory;
@@ -56,6 +63,8 @@ static int kflat_flatten_struct_pointer_array_unit_validate(void *memory, size_t
 	return KFLAT_TEST_SUCCESS;
 }
 
-#endif
+/********************************/
+#endif /* __VALIDATOR__ */
+/********************************/
 
 KFLAT_REGISTER_TEST_FLAGS("[UNIT] flatten_struct_pointer_array", kflat_flatten_struct_pointer_array_unit_test, kflat_flatten_struct_pointer_array_unit_validate, KFLAT_TEST_ATOMIC);

@@ -28,7 +28,9 @@ struct addr_valid_result {
 	bool test_page_offset_5_pass;
 };
 
-#ifdef __KERNEL__
+/********************************/
+#ifdef __TESTER__
+/********************************/
 
 #include <linux/vmalloc.h>
 
@@ -36,9 +38,11 @@ static int iarr[16];
 
 FUNCTION_DEFINE_FLATTEN_STRUCT(addr_valid_result);
 
-static int kflat_addr_valid_unit_test(struct kflat *kflat) {
+static int kflat_addr_valid_unit_test(struct flat *flat) {
 	void *vmem, *kmem;
 	struct addr_valid_result results = { 0 };
+
+	FLATTEN_SETUP_TEST(flat);
 
 	vmem = vmalloc(2 * PAGE_SIZE);
 	kmem = kmalloc(30, GFP_KERNEL);
@@ -81,7 +85,10 @@ static int kflat_addr_valid_unit_test(struct kflat *kflat) {
 	return 0;
 }
 
-#else
+/********************************/
+#endif /* __TESTER__ */
+#ifdef __VALIDATOR__
+/********************************/
 
 static int kflat_addr_valid_unit_validate(void *memory, size_t size, CUnflatten flatten) {
 	struct addr_valid_result *pResults = (struct addr_valid_result *)memory;
@@ -109,6 +116,8 @@ static int kflat_addr_valid_unit_validate(void *memory, size_t size, CUnflatten 
 	return KFLAT_TEST_SUCCESS;
 }
 
-#endif
+/********************************/
+#endif /* __VALIDATOR__ */
+/********************************/
 
 KFLAT_REGISTER_TEST("[UNIT] addr_valid", kflat_addr_valid_unit_test, kflat_addr_valid_unit_validate);

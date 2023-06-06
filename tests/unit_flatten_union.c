@@ -16,7 +16,9 @@ struct my_unions {
     void* othertab;
 };
 
-#ifdef __KERNEL__
+/********************************/
+#ifdef __TESTER__
+/********************************/
 
 FUNCTION_DEFINE_FLATTEN_UNION_SELF_CONTAINED(uA,sizeof(union uA));
 
@@ -24,12 +26,13 @@ FUNCTION_DEFINE_FLATTEN_STRUCT(my_unions,
     AGGREGATE_FLATTEN_UNION_ARRAY_SELF_CONTAINED(uA,sizeof(union uA),uAtab,offsetof(struct my_unions,uAtab),3);
 );
 
-static int kflat_flatten_union_unit_test(struct kflat *kflat) {
+static int kflat_flatten_union_unit_test(struct flat *flat) {
 
     union uA utab[3] = {{7},{8},{9}};
     union uA utab2[3] = {{-1},{0},{1}};
-
     struct my_unions mu = {utab2};
+
+    FLATTEN_SETUP_TEST(flat);
 
     FOR_ROOT_POINTER(utab,
         FLATTEN_UNION_ARRAY_SELF_CONTAINED(uA,sizeof(union uA),utab,3);
@@ -42,7 +45,10 @@ static int kflat_flatten_union_unit_test(struct kflat *kflat) {
 	return 0;
 }
 
-#else
+/********************************/
+#endif /* __TESTER__ */
+#ifdef __VALIDATOR__
+/********************************/
 
 static int kflat_flatten_union_unit_validate(void *memory, size_t size, CUnflatten flatten) {
 
@@ -60,6 +66,8 @@ static int kflat_flatten_union_unit_validate(void *memory, size_t size, CUnflatt
 	return KFLAT_TEST_SUCCESS;
 }
 
-#endif
+/********************************/
+#endif /* __VALIDATOR__ */
+/********************************/
 
 KFLAT_REGISTER_TEST_FLAGS("[UNIT] flatten_union", kflat_flatten_union_unit_test, kflat_flatten_union_unit_validate, KFLAT_TEST_ATOMIC);

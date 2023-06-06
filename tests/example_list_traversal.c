@@ -6,9 +6,7 @@
 
 #include "common.h"
 
-#ifdef __KERNEL__
-#include <linux/list.h>
-#else
+#if defined(__VALIDATOR__) && !defined(__TESTER__)
 struct list_head {
 	struct list_head *next, *prev;
 };
@@ -20,7 +18,7 @@ struct myLongList {
 };
 
 /********************************/
-#ifdef __KERNEL__
+#ifdef __TESTER__
 /********************************/
 
 FUNCTION_DECLARE_FLATTEN_STRUCT_ARRAY_SELF_CONTAINED(myLongList, sizeof(struct myLongList));
@@ -30,15 +28,16 @@ FUNCTION_DEFINE_FLATTEN_STRUCT_SELF_CONTAINED(myLongList, sizeof(struct myLongLi
 	AGGREGATE_FLATTEN_STRUCT_ARRAY_SELF_CONTAINED_SHIFTED(myLongList, sizeof(struct myLongList), v.prev, offsetof(struct myLongList,v.prev), 1, -offsetof(struct myLongList,v));
 );
 
-static int kflat_list_test(struct kflat *kflat) {
+static int kflat_list_test(struct flat *flat) {
 	int i, err = 0;
 	struct list_head *head;
 	struct myLongList myhead = { -1 };
+	FLATTEN_SETUP_TEST(flat);
 
 	INIT_LIST_HEAD(&myhead.v);
 	head = &myhead.v;
 	for (i = 0; i < 100; ++i) {
-		struct myLongList *item = kvzalloc(sizeof(struct myLongList), GFP_KERNEL);
+		struct myLongList *item = FLATTEN_BSP_ZALLOC(sizeof(struct myLongList));
 		item->k = i + 1;
 		list_add(&item->v, head);
 		head = &item->v;
@@ -51,13 +50,14 @@ static int kflat_list_test(struct kflat *kflat) {
 	while (!list_empty(&myhead.v)) {
 		struct myLongList *entry = list_entry(myhead.v.next, struct myLongList, v);
 		list_del(myhead.v.next);
-		kvfree(entry);
+		FLATTEN_BSP_FREE(entry);
 	}
 	return err;
 }
 
 /********************************/
-#else
+#endif /* __TESTER__ */
+#ifdef __VALIDATOR__
 /********************************/
 
 static int kflat_list_validate(void *memory, size_t size, CUnflatten flatten) {
@@ -76,7 +76,7 @@ static int kflat_list_validate(void *memory, size_t size, CUnflatten flatten) {
 }
 
 /********************************/
-#endif
+#endif /* __VALIDATOR__ */
 /********************************/
 
 KFLAT_REGISTER_TEST("LONG_LIST", kflat_list_test, kflat_list_validate);

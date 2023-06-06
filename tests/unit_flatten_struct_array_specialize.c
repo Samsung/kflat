@@ -16,7 +16,7 @@ struct spec_array {
 };
 
 /********************************/
-#ifdef __KERNEL__
+#ifdef __TESTER__
 /********************************/
 
 FUNCTION_DEFINE_FLATTEN_STRUCT_SELF_CONTAINED_SPECIALIZE(ints, spec_array, sizeof(struct spec_array),
@@ -29,10 +29,12 @@ FUNCTION_DEFINE_FLATTEN_STRUCT_SELF_CONTAINED_SPECIALIZE(strs, spec_array, sizeo
 
 FUNCTION_DEFINE_FLATTEN_STRUCT_SELF_CONTAINED_SPECIALIZE(magic, spec_array, sizeof(struct spec_array));
 
-static int kflat_flatten_struct_array_specialize_unit_test(struct kflat *kflat) {
+static int kflat_flatten_struct_array_specialize_unit_test(struct flat *flat) {
 	int numbers[10];
 	char *str = "Hello kflat!";
 	struct spec_array spec_int, spec_str, spec_magic;
+
+	FLATTEN_SETUP_TEST(flat);
 
 	for (int i = 0; i < 10; i++)
 		numbers[i] = (2 * i) % 7;
@@ -57,7 +59,8 @@ static int kflat_flatten_struct_array_specialize_unit_test(struct kflat *kflat) 
 }
 
 /********************************/
-#else
+#endif /* __TESTER__ */
+#ifdef __VALIDATOR__
 /********************************/
 
 static int kflat_flatten_struct_array_specialize_unit_validate(void *memory, size_t size, CUnflatten flatten) {
@@ -78,7 +81,7 @@ static int kflat_flatten_struct_array_specialize_unit_validate(void *memory, siz
 }
 
 /********************************/
-#endif
+#endif /* __VALIDATOR__ */
 /********************************/
 
 KFLAT_REGISTER_TEST_FLAGS("[UNIT] flatten_struct_array_specialize", kflat_flatten_struct_array_specialize_unit_test, kflat_flatten_struct_array_specialize_unit_validate, KFLAT_TEST_ATOMIC);

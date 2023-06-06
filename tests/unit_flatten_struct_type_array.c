@@ -26,7 +26,9 @@ typedef struct {
 	void* brick_inside_tab;
 } box_t;
 
-#ifdef __KERNEL__
+/********************************/
+#ifdef __TESTER__
+/********************************/
 
 FUNCTION_DEFINE_FLATTEN_STRUCT_TYPE(bucket_t);
 FUNCTION_DEFINE_FLATTEN_STRUCT_TYPE(brick_t);
@@ -38,13 +40,15 @@ FUNCTION_DEFINE_FLATTEN_STRUCT_TYPE(box_t,
 	AGGREGATE_FLATTEN_STRUCT_TYPE_ARRAY_SELF_CONTAINED_SHIFTED(brick_t,sizeof(brick_t),brick_inside_tab,offsetof(box_t,brick_inside_tab),5,-offsetof(brick_t,q));
 );
 
-static int kflat_flatten_struct_type_array_unit_test(struct kflat *kflat) {
+static int kflat_flatten_struct_type_array_unit_test(struct flat *flat) {
 	long long integers[14];
 	bucket_t el[4];
 	brick_t bricks[20] = {};
 	box_t box[2] = {
 		{ el, integers, bricks, &bricks[5].q }, { el + 1, integers + 4, bricks+10, &bricks[15].q }
 	};
+
+	FLATTEN_SETUP_TEST(flat);
 
 	for (int i = 0; i < 10; i++)
 		integers[i] = i * 2;
@@ -69,7 +73,10 @@ static int kflat_flatten_struct_type_array_unit_test(struct kflat *kflat) {
 	return 0;
 }
 
-#else
+/********************************/
+#endif /* __TESTER__ */
+#ifdef __VALIDATOR__
+/********************************/
 
 static int kflat_flatten_struct_type_array_unit_validate(void *memory, size_t size, CUnflatten flatten) {
 	box_t *box = (box_t *)memory;
@@ -98,6 +105,8 @@ static int kflat_flatten_struct_type_array_unit_validate(void *memory, size_t si
 	return KFLAT_TEST_SUCCESS;
 }
 
-#endif
+/********************************/
+#endif /* __VALIDATOR__ */
+/********************************/
 
 KFLAT_REGISTER_TEST_FLAGS("[UNIT] flatten_struct_type_array", kflat_flatten_struct_type_array_unit_test, kflat_flatten_struct_type_array_unit_validate, KFLAT_TEST_ATOMIC);

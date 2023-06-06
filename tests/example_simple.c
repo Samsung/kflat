@@ -14,7 +14,9 @@ struct A {
 	struct B *pB;
 };
 
-#ifdef __KERNEL__
+/********************************/
+#ifdef __TESTER__
+/********************************/
 
 FUNCTION_DECLARE_FLATTEN_STRUCT(B);
 FUNCTION_DECLARE_FLATTEN_STRUCT(A);
@@ -24,11 +26,13 @@ FUNCTION_DEFINE_FLATTEN_STRUCT(A,
 	AGGREGATE_FLATTEN_STRUCT(B, pB);
 );
 
-static int kflat_simple_test(struct kflat *kflat) {
+static int kflat_simple_test(struct flat *flat) {
 	struct B b = { "ABC" };
 	struct A a = { 0x0000404F, &b };
 	struct A *pA = &a;
 	struct A *vpA = (struct A *)0xdeadbeefdabbad00;
+
+	FLATTEN_SETUP_TEST(flat);
 
 	FOR_ROOT_POINTER(pA,
 		FLATTEN_STRUCT(A, vpA);
@@ -38,7 +42,10 @@ static int kflat_simple_test(struct kflat *kflat) {
 	return 0;
 }
 
-#else
+/********************************/
+#endif /* __TESTER__ */
+#ifdef __VALIDATOR__
+/********************************/
 
 static int kflat_simple_validate(void *memory, size_t size, CUnflatten flatten) {
 	struct A *pA = (struct A *)memory;
@@ -52,6 +59,8 @@ static int kflat_simple_validate(void *memory, size_t size, CUnflatten flatten) 
 	return KFLAT_TEST_SUCCESS;
 }
 
-#endif
+/********************************/
+#endif /* __VALIDATOR__ */
+/********************************/
 
 KFLAT_REGISTER_TEST_FLAGS("SIMPLE", kflat_simple_test, kflat_simple_validate, KFLAT_TEST_ATOMIC);

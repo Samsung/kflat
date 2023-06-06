@@ -8,11 +8,7 @@
 
 #define INTERVAL_COUNT	5000
 
-#ifdef __KERNEL__
-#include <linux/rbtree.h>
-#include <linux/random.h>
-#include <linux/interval_tree_generic.h>
-#else
+#if defined(__VALIDATOR__) && !defined(__TESTER__)
 #include <stdbool.h>
 #include "../lib/include_priv/rbtree.h"
 #endif
@@ -42,7 +38,9 @@ size_t my_interval_tree_count(const struct my_interval_tree_map* interval_tree_m
     return count;
 }
 
-#ifdef __KERNEL__
+/********************************/
+#ifdef __TESTER__
+/********************************/
 
 static struct my_interval_tree_map interval_tree_map;
 
@@ -69,16 +67,16 @@ FUNCTION_DEFINE_FLATTEN_STRUCT(my_interval_tree_map,
     AGGREGATE_FLATTEN_STRUCT(my_interval_tree_node, imap_root.rb_leftmost);
 );
 
-static int kflat_large_interval_tree_test(struct kflat *kflat) {
+static int kflat_large_interval_tree_test(struct flat *flat) {
 	
 	unsigned j;
 	unsigned long i=0;
-	unsigned char *bytes = flat_zalloc(&kflat->flat,INTERVAL_COUNT*10,1);
-	get_random_bytes(bytes, INTERVAL_COUNT*10);
+	unsigned char *bytes = flat_zalloc(flat,INTERVAL_COUNT*10,1);
+	FLATTEN_SETUP_TEST(flat);
 	interval_tree_map.imap_root.rb_root = RB_ROOT;
 
 	for (j = 0; j < INTERVAL_COUNT; ++j) {
-		struct my_interval_tree_node* node = flat_zalloc(&kflat->flat,sizeof(*node),1);
+		struct my_interval_tree_node* node = flat_zalloc(flat,sizeof(*node),1);
 	    node->start = i+bytes[j*10];
 	    node->end = node->start+bytes[j*10+1]-1;
 	    node->phys_addr = *((uint64_t*)&bytes[j*10+2]);;
@@ -92,10 +90,14 @@ static int kflat_large_interval_tree_test(struct kflat *kflat) {
 	);
 
 	interval_tree_map.imap_root.rb_root = RB_ROOT;
+	// TODO: flat_free
 	return 0;
 }
 
-#else
+/********************************/
+#endif /* __TESTER__ */
+#ifdef __VALIDATOR__
+/********************************/
 
 static int kflat_large_interval_tree_validate(void *memory, size_t size, CUnflatten flatten) {
 	const struct my_interval_tree_map *interval_tree_map = (struct my_interval_tree_map *)memory;
@@ -107,6 +109,8 @@ static int kflat_large_interval_tree_validate(void *memory, size_t size, CUnflat
 	return KFLAT_TEST_SUCCESS;
 }
 
-#endif
+/********************************/
+#endif /* __VALIDATOR__ */
+/********************************/
 
 KFLAT_REGISTER_TEST_FLAGS("LARGE_INTERVAL_TREE", kflat_large_interval_tree_test, kflat_large_interval_tree_validate,KFLAT_TEST_ATOMIC);

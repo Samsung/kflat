@@ -25,7 +25,9 @@ struct paddingRoot {
 	struct paddingC *c;
 };
 
-#ifdef __KERNEL__
+/********************************/
+#ifdef __TESTER__
+/********************************/
 
 FUNCTION_DEFINE_FLATTEN_STRUCT(paddingA);
 FUNCTION_DEFINE_FLATTEN_STRUCT(paddingB,
@@ -40,13 +42,15 @@ FUNCTION_DEFINE_FLATTEN_STRUCT(paddingRoot,
 	AGGREGATE_FLATTEN_STRUCT(paddingC, c);
 );
 
-static int kflat_padding_test(struct kflat *kflat) {
+static int kflat_padding_test(struct flat *flat) {
 	struct paddingA a0 = { 3 };
 	struct paddingB b = { '3' };
 	struct paddingA a1 = { 33 };
 	struct paddingC c = { 'x' };
 
 	struct paddingRoot r = { &a0, &b, &a1, &c };
+
+	FLATTEN_SETUP_TEST(flat);
 
 	FOR_ROOT_POINTER(&r,
 		FLATTEN_STRUCT(paddingRoot, &r);
@@ -55,7 +59,10 @@ static int kflat_padding_test(struct kflat *kflat) {
 	return 0;
 }
 
-#else
+/********************************/
+#endif /* __TESTER__ */
+#ifdef __VALIDATOR__
+/********************************/
 
 static int kflat_padding_validate(void *memory, size_t size, CUnflatten flatten) {
 	struct paddingRoot *r = (struct paddingRoot *)memory;
@@ -67,6 +74,8 @@ static int kflat_padding_validate(void *memory, size_t size, CUnflatten flatten)
 	return KFLAT_TEST_SUCCESS;
 }
 
-#endif
+/********************************/
+#endif /* __VALIDATOR__ */
+/********************************/
 
 KFLAT_REGISTER_TEST_FLAGS("PADDING", kflat_padding_test, kflat_padding_validate, KFLAT_TEST_ATOMIC);

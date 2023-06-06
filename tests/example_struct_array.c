@@ -33,7 +33,7 @@ struct MM {
 };
 
 /********************************/
-#ifdef __KERNEL__
+#ifdef __TESTER__
 /********************************/
 
 FUNCTION_DEFINE_FLATTEN_STRUCT(CC);
@@ -59,7 +59,7 @@ FUNCTION_DEFINE_FLATTEN_STRUCT(MM,
 	AGGREGATE_FLATTEN_UNION_ARRAY_STORAGE_CUSTOM_INFO(K, arrK, 2, ATTR(has_s));
 );
 
-static int kflat_structarray_example(struct kflat *kflat) {
+static int kflat_structarray_example(struct flat *flat) {
 	struct CC c0 = { 0 }, c1 = { 1000 }, c2 = { 1000000 };
 	int T[60] = {};
 	struct MM obM = {
@@ -84,6 +84,8 @@ static int kflat_structarray_example(struct kflat *kflat) {
 	unsigned char *q = (unsigned char *)&obM.arrB[3].n;
 	size_t q_offset = q - p;
 
+	FLATTEN_SETUP_TEST(flat);
+
 	for (int i = 0; i < 60; ++i)
 		T[i] = i;
 
@@ -100,7 +102,10 @@ static int kflat_structarray_example(struct kflat *kflat) {
 	return 0;
 }
 
-#else
+/********************************/
+#endif /* __TESTER__ */
+#ifdef __VALIDATOR__
+/********************************/
 
 static int kflat_structarray_validate(void *memory, size_t size, CUnflatten flatten) {
 	struct MM *obM = (struct MM *)unflatten_root_pointer_seq(flatten, 0);
@@ -145,6 +150,8 @@ static int kflat_structarray_validate(void *memory, size_t size, CUnflatten flat
 	return KFLAT_TEST_SUCCESS;
 }
 
-#endif
+/********************************/
+#endif /* __VALIDATOR__ */
+/********************************/
 
 KFLAT_REGISTER_TEST_FLAGS("STRUCTARRAY", kflat_structarray_example, kflat_structarray_validate, KFLAT_TEST_ATOMIC);

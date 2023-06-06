@@ -22,7 +22,9 @@ struct my_task_struct {
 	float w;
 };
 
-#ifdef __KERNEL__
+/********************************/
+#ifdef __TESTER__
+/********************************/
 
 FUNCTION_DECLARE_FLATTEN_STRUCT(my_list_head);
 
@@ -42,10 +44,12 @@ FUNCTION_DEFINE_FLATTEN_STRUCT(my_task_struct,
 	AGGREGATE_FLATTEN_STRUCT(my_list_head, u.next);
 );
 
-static int kflat_overlaplist_test(struct kflat *kflat) {
+static int kflat_overlaplist_test(struct flat *flat) {
 	int err = 0;
 	struct my_task_struct T;
 	struct intermediate IM = { &T.u };
+
+	FLATTEN_SETUP_TEST(flat);
 
 	T.pid = 123;
 	T.im = &IM;
@@ -59,7 +63,10 @@ static int kflat_overlaplist_test(struct kflat *kflat) {
 	return err;
 }
 
-#else
+/********************************/
+#endif /* __TESTER__ */
+#ifdef __VALIDATOR__
+/********************************/
 
 static int kflat_overlaplist_validate(void *memory, size_t size, CUnflatten flatten) {
 	struct my_task_struct *task = (struct my_task_struct *)memory;
@@ -72,6 +79,8 @@ static int kflat_overlaplist_validate(void *memory, size_t size, CUnflatten flat
 	return KFLAT_TEST_SUCCESS;
 }
 
-#endif
+/********************************/
+#endif /* __VALIDATOR__ */
+/********************************/
 
 KFLAT_REGISTER_TEST_FLAGS("OVERLAP_LIST", kflat_overlaplist_test, kflat_overlaplist_validate, KFLAT_TEST_ATOMIC);

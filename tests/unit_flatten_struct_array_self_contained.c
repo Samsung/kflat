@@ -20,7 +20,7 @@ typedef struct iter_box {
 } box_t;
 
 /********************************/
-#ifdef __KERNEL__
+#ifdef __TESTER__
 /********************************/
 
 FUNCTION_DEFINE_FLATTEN_STRUCT_SELF_CONTAINED(iter_bucket, sizeof(bucket_t))
@@ -29,12 +29,14 @@ FUNCTION_DEFINE_FLATTEN_STRUCT_SELF_CONTAINED(iter_box, sizeof(box_t),
 	AGGREGATE_FLATTEN_TYPE_ARRAY_SELF_CONTAINED(long long, integers, offsetof(box_t, integers), 10);
 );
 
-static int kflat_flatten_struct_type_array_self_contained_unit_test(struct kflat *kflat) {
+static int kflat_flatten_struct_type_array_self_contained_unit_test(struct flat *flat) {
 	long long integers[10];
 	bucket_t el[3];
 	box_t box[2] = {
 		{ el, integers }, { el + 1, integers + 4 }
 	};
+
+	FLATTEN_SETUP_TEST(flat);
 
 	for (int i = 0; i < 10; i++)
 		integers[i] = i * 2;
@@ -56,7 +58,8 @@ static int kflat_flatten_struct_type_array_self_contained_unit_test(struct kflat
 }
 
 /********************************/
-#else
+#endif /* __TESTER__ */
+#ifdef __VALIDATOR__
 /********************************/
 
 static int kflat_flatten_struct_type_array_self_unit_validate(void *memory, size_t size, CUnflatten flatten) {
@@ -76,7 +79,7 @@ static int kflat_flatten_struct_type_array_self_unit_validate(void *memory, size
 }
 
 /********************************/
-#endif
+#endif /* __VALIDATOR__ */
 /********************************/
 
 KFLAT_REGISTER_TEST_FLAGS("[UNIT] flatten_struct_type_array_self_contained", kflat_flatten_struct_type_array_self_contained_unit_test, kflat_flatten_struct_type_array_self_unit_validate, KFLAT_TEST_ATOMIC);

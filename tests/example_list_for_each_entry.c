@@ -6,9 +6,7 @@
 
 #include "common.h"
 
-#ifdef __KERNEL__
-#include <linux/list.h>
-#else
+#if defined(__VALIDATOR__) && !defined(__TESTER__)
 struct list_head {
 	struct list_head *next, *prev;
 };
@@ -25,7 +23,7 @@ struct intnode {
 };
 
 /********************************/
-#ifdef __KERNEL__
+#ifdef __TESTER__
 /********************************/
 
 FUNCTION_DECLARE_FLATTEN_STRUCT(list_head);
@@ -99,20 +97,22 @@ FUNCTION_DEFINE_FLATTEN_STRUCT_SELF_CONTAINED_SPECIALIZE(self_contained, ivec, s
 	}
 );
 
-static int kflat_list_for_each_entry_test(struct kflat *kflat) {
+static int kflat_list_for_each_entry_test(struct flat *flat) {
 	int i, err = 0;
 	struct ivec vec = { "Vector of ints" };
 	struct ivec vec2 = { "Another vector of ints" };
 
+	FLATTEN_SETUP_TEST(flat);
+
 	INIT_LIST_HEAD(&vec.head);
 	for (i = 0; i < 100; ++i) {
-		struct intnode *intnode = kvzalloc(sizeof(struct intnode), GFP_KERNEL);
+		struct intnode *intnode = FLATTEN_BSP_ZALLOC(sizeof(struct intnode));
 		intnode->i = i;
 		list_add_tail(&intnode->link, &vec.head);
 	}
 	INIT_LIST_HEAD(&vec2.head);
 	for (i = 0; i < 100; ++i) {
-		struct intnode *intnode = kvzalloc(sizeof(struct intnode), GFP_KERNEL);
+		struct intnode *intnode = FLATTEN_BSP_ZALLOC(sizeof(struct intnode));
 		intnode->i = 100-1-i;
 		list_add_tail(&intnode->link, &vec2.head);
 	}
@@ -128,18 +128,19 @@ static int kflat_list_for_each_entry_test(struct kflat *kflat) {
 	while (!list_empty(&vec.head)) {
 		struct intnode *entry = list_entry(vec.head.next, struct intnode, link);
 		list_del(vec.head.next);
-		kvfree(entry);
+		FLATTEN_BSP_FREE(entry);
 	}
 	while (!list_empty(&vec2.head)) {
 		struct intnode *entry = list_entry(vec2.head.next, struct intnode, link);
 		list_del(vec2.head.next);
-		kvfree(entry);
+		FLATTEN_BSP_FREE(entry);
 	}
 	return err;
 }
 
 /********************************/
-#else
+#endif /* __TESTER__ */
+#ifdef __VALIDATOR__
 /********************************/
 
 static int kflat_list_for_each_entry_validate(void *memory, size_t size, CUnflatten flatten) {
@@ -167,7 +168,7 @@ static int kflat_list_for_each_entry_validate(void *memory, size_t size, CUnflat
 }
 
 /********************************/
-#endif
+#endif /* __VALIDATOR__ */
 /********************************/
 
 KFLAT_REGISTER_TEST("LIST_FOR_EACH_ENTRY", kflat_list_for_each_entry_test, kflat_list_for_each_entry_validate);

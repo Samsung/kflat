@@ -26,9 +26,10 @@ struct self_str_container {
 	char* strNotAligned;
 };
 
-#ifdef __KERNEL__
+/********************************/
+#ifdef __TESTER__
+/********************************/
 
-#include <linux/vmalloc.h>
 
 FUNCTION_DEFINE_FLATTEN_STRUCT(str_container,
 	AGGREGATE_FLATTEN_STRING(str);
@@ -50,10 +51,10 @@ FUNCTION_DEFINE_FLATTEN_STRUCT_SELF_CONTAINED(self_str_container, sizeof(struct 
 	AGGREGATE_FLATTEN_STRING_SELF_CONTAINED(0, offsetof(struct self_str_container, strNotAligned));
 );
 
-static int kflat_flatten_string_unit_test(struct kflat *kflat) {
-	char *long_str = (char *)vmalloc(PAGE_SIZE * 2);
-	char *long_str2 = (char *)vmalloc(PAGE_SIZE * 2);
-	char* unterminated_str = (char *) vmalloc(PAGE_SIZE);
+static int kflat_flatten_string_unit_test(struct flat *flat) {
+	char *long_str = (char *)FLATTEN_BSP_ZALLOC(PAGE_SIZE * 2);
+	char *long_str2 = (char *)FLATTEN_BSP_ZALLOC(PAGE_SIZE * 2);
+	char* unterminated_str = (char *) FLATTEN_BSP_ZALLOC(PAGE_SIZE);
 
 	struct str_container str1 = {
 		.str = "Good morning!",
@@ -71,6 +72,8 @@ static int kflat_flatten_string_unit_test(struct kflat *kflat) {
 		.strNotTerminated = unterminated_str,
 		.strNotAligned = long_str2 + 1,
 	};
+
+	FLATTEN_SETUP_TEST(flat);
 
 	str1.sameAsFirst = str1.str;
 	str2.sameAsFirst = str2.str;
@@ -91,13 +94,16 @@ static int kflat_flatten_string_unit_test(struct kflat *kflat) {
 		FLATTEN_STRUCT_SELF_CONTAINED(self_str_container, sizeof(struct self_str_container), &str2);
 	);
 
-	vfree(long_str);
-	vfree(long_str2);
-	vfree(unterminated_str);
+	FLATTEN_BSP_FREE(long_str);
+	FLATTEN_BSP_FREE(long_str2);
+	FLATTEN_BSP_FREE(unterminated_str);
 	return 0;
 }
 
-#else
+/********************************/
+#endif /* __TESTER__ */
+#ifdef __VALIDATOR__
+/********************************/
 
 static int kflat_flatten_string_validate(void *memory, size_t size, CUnflatten flatten) {
 	struct str_container *str1 = (struct str_container *)unflatten_root_pointer_seq(flatten, 0);
@@ -127,6 +133,8 @@ static int kflat_flatten_string_validate(void *memory, size_t size, CUnflatten f
 	return KFLAT_TEST_SUCCESS;
 }
 
-#endif
+/********************************/
+#endif /* __VALIDATOR__ */
+/********************************/
 
 KFLAT_REGISTER_TEST("[UNIT] flatten_string", kflat_flatten_string_unit_test, kflat_flatten_string_validate);

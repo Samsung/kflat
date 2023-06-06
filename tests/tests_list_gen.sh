@@ -1,6 +1,6 @@
 #!/bin/bash
-# Generate list of all available KFLAT tests and output it
-# as C compatible array
+# Generate list of all available KFLAT & UFLAT tests and output
+# it as C compatible array
 
 HEADER=$(cat <<-END
 /**
@@ -31,24 +31,59 @@ FOOTER=$(cat <<-END
 END
 )
 
+function collect_tests() {
+    DIR=$1
+
+    pushd $1 > /dev/null
+
+    if [[ "`ls *.c 2>/dev/null | wc -l`" == "0" ]]; then
+        return
+    fi
+
+    EXTERNS+=`grep -oP 'KFLAT_REGISTER_TEST\(".+", [^,]+' *.c | grep -oP ',\s*.*' | grep -oP '[^\s,]+' | awk '{print "test_case_" $0}' | awk '{print "extern struct kflat_test_case " $0 ";"}'`
+    ENTRIES+=`grep -oP 'KFLAT_REGISTER_TEST\(".+", [^,]+' *.c | grep -oP ',\s*.*' | grep -oP '[^\s,]+' | awk '{print "test_case_" $0}' | awk '{print "\t&" $0 ","}'`
+
+    EXTERNS+=`grep -oP 'KFLAT_REGISTER_TEST_GFA\(".+", [^,]+' *.c | grep -oP ',\s*.*' | grep -oP '[^\s,]+' | awk '{print "test_case_" $0}' | awk '{print "extern struct kflat_test_case " $0 ";"}'`
+    ENTRIES+=`grep -oP 'KFLAT_REGISTER_TEST_GFA\(".+", [^,]+' *.c | grep -oP ',\s*.*' | grep -oP '[^\s,]+' | awk '{print "test_case_" $0}' | awk '{print "\t&" $0 ","}'`
+
+    EXTERNS+=`grep -oP 'KFLAT_REGISTER_TEST_GFA_FLAGS\(".+", [^,]+' *.c | grep -oP ',\s*.*' | grep -oP '[^\s,]+' | awk '{print "test_case_" $0}' | awk '{print "extern struct kflat_test_case " $0 ";"}'`
+    ENTRIES+=`grep -oP 'KFLAT_REGISTER_TEST_GFA_FLAGS\(".+", [^,]+' *.c | grep -oP ',\s*.*' | grep -oP '[^\s,]+' | awk '{print "test_case_" $0}' | awk '{print "\t&" $0 ","}'`
+
+    EXTERNS+=`grep -oP 'KFLAT_REGISTER_TEST_FLAGS\(".+", [^,]+' *.c | grep -oP ',\s*.*' | grep -oP '[^\s,]+' | awk '{print "test_case_" $0}' | awk '{print "extern struct kflat_test_case " $0 ";"}'`
+    ENTRIES+=`grep -oP 'KFLAT_REGISTER_TEST_FLAGS\(".+", [^,]+' *.c | grep -oP ',\s*.*' | grep -oP '[^\s,]+' | awk '{print "test_case_" $0}' | awk '{print "\t&" $0 ","}'`
+
+    EXTERNS+=$'\n'
+    ENTRIES+=$'\n'
+
+    popd > /dev/null
+}
+
+
+# Generate tests list for KFLAT
+EXTERNS=
+ENTRIES=
+collect_tests "$M/tests"
+collect_tests "$M/tests/kflat"
+
 pushd $M/tests > /dev/null
-EXTERNS=`grep -oP 'KFLAT_REGISTER_TEST\(".+", [^,]+' *.c | grep -oP ',\s*.*' | grep -oP '[^\s,]+' | awk '{print "test_case_" $0}' | awk '{print "extern struct kflat_test_case " $0 ";"}'`
-ENTRIES=`grep -oP 'KFLAT_REGISTER_TEST\(".+", [^,]+' *.c | grep -oP ',\s*.*' | grep -oP '[^\s,]+' | awk '{print "test_case_" $0}' | awk '{print "\t&" $0 ","}'`
-
-EXTERNS+=`grep -oP 'KFLAT_REGISTER_TEST_GFA\(".+", [^,]+' *.c | grep -oP ',\s*.*' | grep -oP '[^\s,]+' | awk '{print "test_case_" $0}' | awk '{print "extern struct kflat_test_case " $0 ";"}'`
-ENTRIES+=`grep -oP 'KFLAT_REGISTER_TEST_GFA\(".+", [^,]+' *.c | grep -oP ',\s*.*' | grep -oP '[^\s,]+' | awk '{print "test_case_" $0}' | awk '{print "\t&" $0 ","}'`
-
-EXTERNS+=`grep -oP 'KFLAT_REGISTER_TEST_GFA_FLAGS\(".+", [^,]+' *.c | grep -oP ',\s*.*' | grep -oP '[^\s,]+' | awk '{print "test_case_" $0}' | awk '{print "extern struct kflat_test_case " $0 ";"}'`
-ENTRIES+=`grep -oP 'KFLAT_REGISTER_TEST_GFA_FLAGS\(".+", [^,]+' *.c | grep -oP ',\s*.*' | grep -oP '[^\s,]+' | awk '{print "test_case_" $0}' | awk '{print "\t&" $0 ","}'`
-
-EXTERNS+=`grep -oP 'KFLAT_REGISTER_TEST_FLAGS\(".+", [^,]+' *.c | grep -oP ',\s*.*' | grep -oP '[^\s,]+' | awk '{print "test_case_" $0}' | awk '{print "extern struct kflat_test_case " $0 ";"}'`
-ENTRIES+=`grep -oP 'KFLAT_REGISTER_TEST_FLAGS\(".+", [^,]+' *.c | grep -oP ',\s*.*' | grep -oP '[^\s,]+' | awk '{print "test_case_" $0}' | awk '{print "\t&" $0 ","}'`
+echo "$HEADER" > kflat_tests_list.h
+echo "$EXTERNS" >> kflat_tests_list.h
+echo "$MIDDLE" >> kflat_tests_list.h
+echo "$ENTRIES" >> kflat_tests_list.h
+echo "$FOOTER" >> kflat_tests_list.h
+popd > /dev/null
 
 
-echo "$HEADER" > tests_list.h
-echo "$EXTERNS" >> tests_list.h
-echo "$MIDDLE" >> tests_list.h
-echo "$ENTRIES" >> tests_list.h
-echo "$FOOTER" >> tests_list.h
+# Generate tests list for UFLAT
+EXTERNS=
+ENTRIES=
+collect_tests "$M/tests"
+collect_tests "$M/tests/uflat"
 
+pushd $M/tests > /dev/null
+echo "$HEADER" > uflat_tests_list.h
+echo "$EXTERNS" >> uflat_tests_list.h
+echo "$MIDDLE" >> uflat_tests_list.h
+echo "$ENTRIES" >> uflat_tests_list.h
+echo "$FOOTER" >> uflat_tests_list.h
 popd > /dev/null

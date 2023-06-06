@@ -8,9 +8,7 @@
 
 #define LIST_ELEMENT_COUNT	3000
 
-#ifdef __KERNEL__
-#include <linux/list.h>
-#else
+#if defined(__VALIDATOR__) && !defined(__TESTER__)
 struct list_head {
 	struct list_head *next, *prev;
 };
@@ -22,7 +20,7 @@ struct myLongLargeList {
 };
 
 /********************************/
-#ifdef __KERNEL__
+#ifdef __TESTER__
 /********************************/
 
 FUNCTION_DECLARE_FLATTEN_STRUCT_ARRAY_SELF_CONTAINED(myLongLargeList, sizeof(struct myLongLargeList));
@@ -32,15 +30,16 @@ FUNCTION_DEFINE_FLATTEN_STRUCT_SELF_CONTAINED(myLongLargeList, sizeof(struct myL
 	AGGREGATE_FLATTEN_STRUCT_ARRAY_SELF_CONTAINED_SHIFTED(myLongLargeList, sizeof(struct myLongLargeList), v.prev, offsetof(struct myLongLargeList,v.prev), 1, -offsetof(struct myLongLargeList,v));
 );
 
-static int kflat_large_list_test(struct kflat *kflat) {
+static int kflat_large_list_test(struct flat *flat) {
 	int i, err = 0;
 	struct list_head *head;
 	struct myLongLargeList myhead = { -1 };
+	FLATTEN_SETUP_TEST(flat);
 
 	INIT_LIST_HEAD(&myhead.v);
 	head = &myhead.v;
 	for (i = 0; i < LIST_ELEMENT_COUNT; ++i) {
-		struct myLongLargeList *item = flat_zalloc(&kflat->flat,sizeof(struct myLongLargeList), 1);
+		struct myLongLargeList *item = flat_zalloc(flat,sizeof(struct myLongLargeList), 1);
 		item->k = i + 1;
 		list_add(&item->v, head);
 		head = &item->v;
@@ -53,11 +52,14 @@ static int kflat_large_list_test(struct kflat *kflat) {
 	while (!list_empty(&myhead.v)) {
 		list_del(myhead.v.next);
 	}
+
+	// TODO: flat_free
 	return err;
 }
 
 /********************************/
-#else
+#endif /* __TESTER__ */
+#ifdef __VALIDATOR__
 /********************************/
 
 static int kflat_large_list_validate(void *memory, size_t size, CUnflatten flatten) {
@@ -79,7 +81,7 @@ static int kflat_large_list_validate(void *memory, size_t size, CUnflatten flatt
 }
 
 /********************************/
-#endif
+#endif /* __VALIDATOR__ */
 /********************************/
 
 KFLAT_REGISTER_TEST_FLAGS("LARGE_LIST", kflat_large_list_test, kflat_large_list_validate,KFLAT_TEST_ATOMIC);

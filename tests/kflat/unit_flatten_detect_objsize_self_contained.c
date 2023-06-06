@@ -13,7 +13,9 @@ struct mere_pointers_sc {
 	void* c;
 };
 
-#ifdef __KERNEL__
+/********************************/
+#ifdef __TESTER__
+/********************************/
 
 FUNCTION_DEFINE_FLATTEN_STRUCT(mere_pointers_sc,
 	AGGREGATE_FLATTEN_TYPE_ARRAY_SELF_CONTAINED(unsigned char,a,offsetof(struct mere_pointers_sc,a),AGGREGATE_FLATTEN_DETECT_OBJECT_SIZE_SELF_CONTAINED(a,offsetof(struct mere_pointers_sc,a)));
@@ -27,10 +29,12 @@ FUNCTION_DEFINE_FLATTEN_STRUCT(mere_pointers_sc,
 
 char gcarr_sc[4] = "ABCD";
 
-static int kflat_flatten_detect_objsize_self_contained_unit_test(struct kflat *kflat) {
+static int kflat_flatten_detect_objsize_self_contained_unit_test(struct flat *flat) {
 
 	struct mere_pointers_sc ptrs = {};
 	unsigned long stack_long = 0xD0D0CACA;
+
+	FLATTEN_SETUP_TEST(flat);
 
 #ifndef KFLAT_GET_OBJ_SUPPORT
 	ptrs.detect_obj_supported = false;
@@ -52,7 +56,10 @@ static int kflat_flatten_detect_objsize_self_contained_unit_test(struct kflat *k
 	return 0;
 }
 
-#else
+/********************************/
+#endif /* __TESTER__ */
+#ifdef __VALIDATOR__
+/********************************/
 
 static int kflat_flatten_detect_objsize_self_contained_unit_validate(void *memory, size_t size, CUnflatten flatten) {
 	
@@ -70,6 +77,8 @@ static int kflat_flatten_detect_objsize_self_contained_unit_validate(void *memor
 	return KFLAT_TEST_SUCCESS;
 }
 
-#endif
+/********************************/
+#endif /* __VALIDATOR__ */
+/********************************/
 
 KFLAT_REGISTER_TEST("[UNIT] flatten_detect_objsize_self_contained", kflat_flatten_detect_objsize_self_contained_unit_test, kflat_flatten_detect_objsize_self_contained_unit_validate);

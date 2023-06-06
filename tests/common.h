@@ -1,9 +1,9 @@
 /**
  * @file common.h
  * @author Samsung R&D Poland - Mobile Security Group
- * @brief Common include header for all KFLAT tests. Section under
- *  __KERNEL__ ifdef is compiled for kernel module and the other one
- *  for userspace tests app
+ * @brief Common include header for all KFLAT & UFLAT tests. Sections
+ *  marked __TESTER__ performs flattening of sample data, while sections
+ *  __VALIDATOR__ restores and checks memory.
  * 
  */
 #ifndef _LINUX_KFLAT_COMMON_H
@@ -14,25 +14,36 @@
  ********************************/
 
 /********************************/
-#ifdef __KERNEL__
+#ifdef __TESTER__
 /********************************/
 
+#ifdef FLATTEN_KERNEL_BSP
 #include <kflat.h>
 
-typedef int (*kflat_test_case_handler_t)(struct kflat* kflat);
+#define FLATTEN_SETUP_TEST(FLAT)    \
+                        struct kflat* kflat = container_of(flat, struct kflat, flat)
 
-enum kflat_test_flags {
-    KFLAT_TEST_ATOMIC   = 1 << 1,
-};
+#elif defined(FLATTEN_USERSPACE_BSP)
+#include <uflat.h>
 
-struct kflat_test_case {
-    const char* name;
-    kflat_test_case_handler_t handler;
-    enum kflat_test_flags flags;
-};
+#define FLATTEN_SETUP_TEST(FLAT)    \
+                        struct uflat* uflat = container_of(flat, struct uflat, flat)
+#define PAGE_SIZE       (4096)
 
-/********************************/
 #else
+#error "No BSP config provided"
+
+#endif /* FLATTEN_KERNEL_BSP */
+
+// Stubs for __TESTER__ purpose
+#ifndef __VALIDATOR__
+typedef void* CUnflatten;
+typedef uintptr_t (*get_function_address_t)(const char* fsym);
+#endif /* __VALIDATOR__ */
+
+#endif /* __TESTER__ */
+/********************************/
+#ifdef __VALIDATOR__
 /********************************/
 
 #include <stdbool.h>
@@ -42,24 +53,18 @@ struct kflat_test_case {
 
 #include <unflatten.hpp>
 
-typedef int (*kflat_test_case_handler_t)(void* memory, size_t size, CUnflatten flatten);
-
-struct kflat_test_case {
-    const char* name;
-    kflat_test_case_handler_t handler;
-    get_function_address_t gfa;
-};
-
 enum {
     KFLAT_TEST_SUCCESS  =   0,
     KFLAT_TEST_FAIL,
     KFLAT_TEST_UNSUPPORTED,
 };
 
+#ifndef container_of
 #define container_of(ptr, type, member) ({			\
   	const typeof( ((type *)0)->member ) *__mptr = (ptr);	\
   	(type *)( (char *)__mptr - offsetof(type,member) );})
 
+#endif /* container_of */
 
 extern int enable_verbose;
 
@@ -94,17 +99,61 @@ extern char _last_assert_tested[MAX_LAST_ASSERT];
                         if(enable_verbose)                      \
                             printf("\t##" FMT "\n", ##__VA_ARGS__)
 
+#ifndef __TESTER__
+struct flat;
+#endif /* __TESTER__ */
+
 /********************************/
 #endif
 /********************************/
 
+
+typedef int (*flat_test_case_handler_t)(struct flat* flat);
+typedef int (*flat_test_case_validator_t)(void* memory, size_t size, CUnflatten flatten);
+
+enum flat_test_flags {
+    KFLAT_TEST_ATOMIC   = 1 << 1,
+};
+
+struct kflat_test_case {
+    const char* name;
+    flat_test_case_handler_t handler;
+    flat_test_case_validator_t validator;
+    enum flat_test_flags flags;
+    get_function_address_t gfa;
+};
 
 /********************************
  * TESTS REGISTRATION MACRO
  ********************************/
 
 /********************************/
-#ifdef __KERNEL__
+#if defined(__TESTER__) && defined (__VALIDATOR__)
+/********************************/
+
+#define KFLAT_REGISTER_TEST_GFA_FLAGS(NAME, FUNC, FUNC_USER, GFA, FLAGS) \
+    const struct kflat_test_case test_case_ ## FUNC             \
+        __attribute__((used))                                   \
+        = {                                                     \
+            .name = NAME,                                       \
+            .handler = FUNC,                                    \
+            .flags = FLAGS,                                     \
+            .gfa = GFA,                                         \
+            .validator = FUNC_USER                              \
+        }
+
+#define KFLAT_REGISTER_TEST_FLAGS(NAME, FUNC, FUNC_USER, FLAGS) \
+    KFLAT_REGISTER_TEST_GFA_FLAGS(NAME, FUNC, FUNC_USER, NULL, FLAGS)
+
+#define KFLAT_REGISTER_TEST(NAME, FUNC, FUNC_USER)              \
+    KFLAT_REGISTER_TEST_FLAGS(NAME, FUNC, FUNC_USER, 0)
+
+#define KFLAT_REGISTER_TEST_GFA(NAME, FUNC, FUNC_USER, GFA)     \
+    KFLAT_REGISTER_TEST(NAME, FUNC, FUNC_USER)
+
+
+/********************************/
+#elif defined(__TESTER__) /* __VALIDATOR__ */
 /********************************/
 
 #define KFLAT_REGISTER_TEST_FLAGS(NAME, FUNC, FUNC_USER, FLAGS) \
@@ -114,6 +163,8 @@ extern char _last_assert_tested[MAX_LAST_ASSERT];
             .name = NAME,                                       \
             .handler = FUNC,                                    \
             .flags = FLAGS,                                     \
+            .gfa = 0,                                           \
+            .validator = NULL                                   \
         }
 
 #define KFLAT_REGISTER_TEST(NAME, FUNC, FUNC_USER)              \
@@ -126,7 +177,7 @@ extern char _last_assert_tested[MAX_LAST_ASSERT];
     KFLAT_REGISTER_TEST_FLAGS(NAME, FUNC, FUNC_USER, 0)
 
 /********************************/
-#else
+#elif defined(__VALIDATOR__)
 /********************************/
 
 #define KFLAT_REGISTER_TEST_GFA(NAME, FUNC, FUNC_USER, GFA)     \
@@ -134,8 +185,10 @@ extern char _last_assert_tested[MAX_LAST_ASSERT];
         __attribute__((used))                                   \
         = {                                                     \
             .name = NAME,                                       \
-            .handler = FUNC_USER,                               \
+            .handler = NULL,                                    \
             .gfa = GFA,                                         \
+            .validator = FUNC_USER,                             \
+            .flags = 0,                                         \
         }
 
 #define KFLAT_REGISTER_TEST(NAME, FUNC, FUNC_USER)              \
@@ -148,6 +201,9 @@ extern char _last_assert_tested[MAX_LAST_ASSERT];
     KFLAT_REGISTER_TEST(NAME, FUNC, FUNC_USER)
 
 /********************************/
+#else
+#error "Neither __VALIDATOR__ nor __TESTER__ macro is set"
+
 #endif
 /********************************/
 

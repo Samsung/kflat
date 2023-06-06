@@ -136,6 +136,10 @@ static inline void INIT_LIST_HEAD(struct list_head *list)
 	WRITE_ONCE(list->prev, list);
 }
 
+static inline int list_empty(const struct list_head *head)
+{
+	return head->next == head;
+}
 
 #define list_entry(ptr, type, member) \
 	container_of(ptr, type, member)

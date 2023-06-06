@@ -5,6 +5,9 @@
  * 
  */
 
+#ifndef _HEADER_COMMON_H
+#define _HEADER_COMMON_H
+
 #include <stdbool.h>
 #include <sys/time.h>
 
@@ -43,3 +46,6 @@ struct time_elapsed {
 
 void mark_time_start(struct time_elapsed* time);
 void mark_time_end(struct time_elapsed* time);
+
+
+#endif /* _HEADER_COMMON_H */

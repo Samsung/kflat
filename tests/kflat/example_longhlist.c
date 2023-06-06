@@ -6,7 +6,7 @@
 
 #include "common.h"
 
-#ifdef __KERNEL__
+#ifdef __TESTER__
 #include <linux/list_nulls.h>
 #else
 struct hlist_node {
@@ -22,7 +22,9 @@ struct myLongHList {
 	struct hlist_node r;
 };
 
-#ifdef __KERNEL__
+/********************************/
+#ifdef __TESTER__
+/********************************/
 
 FUNCTION_DECLARE_FLATTEN_STRUCT_ARRAY_SELF_CONTAINED(hlist_node, sizeof(struct hlist_node));
 FUNCTION_DEFINE_FLATTEN_STRUCT_SELF_CONTAINED(hlist_node, sizeof(struct hlist_node),
@@ -47,10 +49,12 @@ FUNCTION_DEFINE_FLATTEN_STRUCT_SELF_CONTAINED(myLongHList, sizeof(struct myLongH
 	);
 );
 
-static int kflat_longhlist_test(struct kflat *kflat) {
+static int kflat_longhlist_test(struct flat *flat) {
 	struct hlist_head harr[5];
 	int i, j;
 	struct hlist_node *p;
+
+	FLATTEN_SETUP_TEST(flat);
 
 	for (i = 0; i < 5; ++i) {
 		struct hlist_node *node;
@@ -91,7 +95,10 @@ static int kflat_longhlist_test(struct kflat *kflat) {
 	return 0;
 	}
 
-#else
+/********************************/
+#endif /* __TESTER__ */
+#ifdef __VALIDATOR__
+/********************************/
 
 static int kflat_longhlist_validate(void *memory, size_t size, CUnflatten flatten) {
 	int i;
@@ -122,6 +129,8 @@ static int kflat_longhlist_validate(void *memory, size_t size, CUnflatten flatte
 	return KFLAT_TEST_SUCCESS;
 }
 
-#endif
+/********************************/
+#endif /* __VALIDATOR__ */
+/********************************/
 
 KFLAT_REGISTER_TEST("LONGHLIST", kflat_longhlist_test, kflat_longhlist_validate);

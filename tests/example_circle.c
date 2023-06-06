@@ -21,7 +21,7 @@ struct figure {
 };
 
 /********************************/
-#ifdef __KERNEL__
+#ifdef __TESTER__
 /********************************/
 #include "kflat_test_data.h"
 
@@ -45,13 +45,13 @@ FUNCTION_DEFINE_FLATTEN_STRUCT(figure,
 	p.x = (cosx[i]);    \
 	p.y = (sinx[i]);    \
 	p.n = (N);          \
-	p.other = kvzalloc((N) * sizeof *p.other, GFP_KERNEL);
+	p.other = FLATTEN_BSP_ZALLOC((N) * sizeof *p.other);
 
 static void create_circle(struct figure *circle, size_t num_points, double *cosx, double *sinx) {
 	unsigned i, j, u;
 
 	circle->n = num_points;
-	circle->points = kvzalloc(circle->n * sizeof(struct point), GFP_KERNEL);
+	circle->points = FLATTEN_BSP_ZALLOC(circle->n * sizeof(struct point));
 	for (i = 0; i < circle->n; ++i) {
 		MAKE_POINT(circle->points[i], i, circle->n - 1);
 	}
@@ -70,13 +70,15 @@ static void free_circle(struct figure *circle) {
 	unsigned i;
 
 	for (i = 0; i < circle->n; ++i) {
-		kvfree(circle->points[i].other);
+		FLATTEN_BSP_FREE(circle->points[i].other);
 	}
-	kvfree(circle->points);
+	FLATTEN_BSP_FREE(circle->points);
 }
 
-static int kflat_circle_test(struct kflat *kflat) {
+static int kflat_circle_test(struct flat *flat) {
 	struct figure circle;
+
+	FLATTEN_SETUP_TEST(flat);
 
 	circle.name = "circle";
 	create_circle(&circle, 30, cosx, sinx);
@@ -90,7 +92,8 @@ static int kflat_circle_test(struct kflat *kflat) {
 }
 
 /********************************/
-#else
+#endif /* __TESTER__ */
+#ifdef __VALIDATOR__
 /********************************/
 
 #include <math.h>
@@ -135,7 +138,7 @@ static int kflat_circle_validate(void *memory, size_t size, CUnflatten flatten) 
 }
 
 /********************************/
-#endif
+#endif /* __VALIDATOR__ */
 /********************************/
 
 KFLAT_REGISTER_TEST("CIRCLE", kflat_circle_test, kflat_circle_validate);

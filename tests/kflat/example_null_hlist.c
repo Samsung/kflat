@@ -6,7 +6,7 @@
 
 #include "common.h"
 
-#ifdef __KERNEL__
+#ifdef __TESTER__
 #include <linux/list_nulls.h>
 #else
 struct hlist_nulls_node {
@@ -22,7 +22,9 @@ struct myLongHnullsList {
 	struct hlist_nulls_node n;
 };
 
-#ifdef __KERNEL__
+/********************************/
+#ifdef __TESTER__
+/********************************/
 
 FUNCTION_DECLARE_FLATTEN_STRUCT_ARRAY_SELF_CONTAINED(hlist_nulls_node, sizeof(struct hlist_nulls_node));
 
@@ -54,10 +56,12 @@ FUNCTION_DEFINE_FLATTEN_STRUCT_SELF_CONTAINED(myLongHnullsList, sizeof(struct my
 	);
 );
 
-static int kflat_hlist_nulls_test(struct kflat *kflat) {
+static int kflat_hlist_nulls_test(struct flat *flat) {
 	struct hlist_nulls_head hnarr[5];
 	int i, j;
 	struct hlist_nulls_node *p;
+
+	FLATTEN_SETUP_TEST(flat);
 
 	for (i = 0; i < 5; ++i) {
 		INIT_HLIST_NULLS_HEAD(&hnarr[i], 0);
@@ -91,7 +95,10 @@ static int kflat_hlist_nulls_test(struct kflat *kflat) {
 	return 0;
 }
 
-#else
+/********************************/
+#endif /* __TESTER__ */
+#ifdef __VALIDATOR__
+/********************************/
 
 static inline int is_a_nulls(const struct hlist_nulls_node *ptr) {
 	return ((unsigned long)ptr & 1);
@@ -130,6 +137,8 @@ static int kflat_hlist_nulls_test_validate(void *memory, size_t size, CUnflatten
 	return KFLAT_TEST_SUCCESS;
 }
 
-#endif
+/********************************/
+#endif /* __VALIDATOR__ */
+/********************************/
 
 KFLAT_REGISTER_TEST("HNULLSLIST", kflat_hlist_nulls_test, kflat_hlist_nulls_test_validate);

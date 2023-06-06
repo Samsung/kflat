@@ -7,7 +7,7 @@
  */
 #include "kflat.h"
 #include "probing.h"
-#include "tests/tests_list.h"
+#include "tests/kflat_tests_list.h"
 
 #include <linux/atomic.h>
 #include <linux/cpumask.h>
@@ -256,12 +256,12 @@ NOKPROBE_SYMBOL(probing_delegate);
  *******************************************************/
 struct stopm_kflat_test {
 	struct kflat* kflat;
-	kflat_test_case_handler_t handler;
+	flat_test_case_handler_t handler;
 };
 
 static int kflat_test_stop_machine(void* arg) {
 	struct stopm_kflat_test* target = (struct stopm_kflat_test*) arg;
-	return target->handler(target->kflat);
+	return target->handler(&target->kflat->flat);
 }
 
 int kflat_run_test(struct kflat* kflat, struct kflat_ioctl_tests* test) {
@@ -303,7 +303,7 @@ int kflat_run_test(struct kflat* kflat, struct kflat_ioctl_tests* test) {
 				if(err)
 					pr_err("@Flatten stop_machine failed: %d", err);
 			} else {
-				err = test_cases[i]->handler(kflat);
+				err = test_cases[i]->handler(&kflat->flat);
 			}
 
 			flat_infos("@Flatten done: %d\n",kflat->flat.error);
