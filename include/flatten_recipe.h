@@ -494,7 +494,7 @@ struct flatten_pointer* FUNC_NAME(struct flat* flat, const void* ptr, uintptr_t 
 	do {	\
 		DBGM1(FLATTEN_STRING,p);	\
 		if ((!FLAT_ACCESSOR->error)&&(ADDR_VALID(p))) {   \
-			int err = fixup_set_insert_force_update(FLAT_ACCESSOR,__fptr->node,__fptr->offset,flatten_plain_type(FLAT_ACCESSOR,(p),strmemlen(p)));	\
+			int err = fixup_set_insert_force_update(FLAT_ACCESSOR,__fptr->node,__fptr->offset,flatten_plain_type(FLAT_ACCESSOR,(p),STRING_VALID_LEN(p)));	\
 			if ((err) && (err!=EINVAL) && (err!=EEXIST) && (err!=EAGAIN)) {	\
 				FLAT_ACCESSOR->error = err;	\
 			}	\
@@ -575,7 +575,7 @@ struct flatten_pointer* FUNC_NAME(struct flat* flat, const void* ptr, uintptr_t 
 			}	\
 			else {	\
 				int err = fixup_set_insert_force_update(FLAT_ACCESSOR,__node,(uint64_t)_ptr-__node->start+_off,	\
-						flatten_plain_type(FLAT_ACCESSOR,OFFATTR(const char*,_off),strmemlen(OFFATTR(const char*,_off))));	\
+						flatten_plain_type(FLAT_ACCESSOR,OFFATTR(const char*,_off),STRING_VALID_LEN(OFFATTR(const char*,_off))));	\
 				if ((err) && (err!=EEXIST) && (err!=EAGAIN)) {	\
 					FLAT_ACCESSOR->error = err;	\
 				}	\

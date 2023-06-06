@@ -360,15 +360,19 @@ int udump_dump_vma(struct udump_memory_map* mem) {
     return 0;
 }
 
-
-bool uflat_test_address_range(void* ptr, size_t size) {
+static size_t uflat_test_address(void* ptr, size_t size) {
     struct udump_memory_node* node;
 
     node = memory_tree_iter_first(&udump_memory.imap_root, (uintptr_t)ptr, (uintptr_t)ptr);
     if(node == NULL)
-        return false;
+        return 0;
     
     ssize_t remaining = (uintptr_t)node->end - (uintptr_t)ptr + 1;
+    return remaining;
+}
+
+bool uflat_test_address_range(void* ptr, size_t size) {    
+    ssize_t remaining = uflat_test_address(ptr, size);
     if(remaining < 0 || (size_t) remaining < size) {
         FLATTEN_LOG_ERROR("Failed to access memory at %lx@%zu - access violation", (uintptr_t) ptr, size);
         return false;
@@ -392,12 +396,12 @@ bool uflat_test_exec_range(void* ptr) {
     return true;
 }
 
-bool uflat_test_string_len(const char* str) {
+size_t uflat_test_string_len(const char* str) {
 	size_t str_size, avail_size, test_size;
 	
 	// 1. Fast-path. Check whether first 1000 bytes are maped
 	//  and look for null-terminator in there
-	avail_size = uflat_test_address_range((void*) str, 1000);
+	avail_size = uflat_test_address((void*) str, 1000);
 	if(avail_size == 0)
 		return 0;
 
@@ -413,7 +417,7 @@ bool uflat_test_string_len(const char* str) {
 		size_t partial_size;
 		size_t off = avail_size;
 
-		partial_size = uflat_test_address_range((char*)str + off, test_size);
+		partial_size = uflat_test_address((char*)str + off, test_size);
 		if(partial_size == 0)
 			return avail_size;
 		avail_size += partial_size;

@@ -42,8 +42,8 @@
 void uflat_dbg_log_printf(const char* fmt, ...);
 void uflat_dbg_log_clear();
 bool uflat_test_address_range(void* ptr, size_t size);
-bool uflat_test_exec_range(void* ptr);
-bool uflat_test_string_len(const char* str);
+bool uflat_test_exec_range(void* ptr) ;
+size_t uflat_test_string_len(const char* str);
 
 
 /* Logging */
@@ -63,42 +63,6 @@ bool uflat_test_string_len(const char* str);
 #define ADDR_RANGE_VALID(PTR, SIZE)     uflat_test_address_range((void*) PTR, SIZE)
 #define TEXT_ADDR_VALID(PTR)		    uflat_test_exec_range(PTR)
 #define STRING_VALID_LEN(PTR)           uflat_test_string_len((const char*) PTR)
-
-
-static inline size_t strmemlen(const char* s) {
-	size_t str_size, avail_size, test_size;
-	
-	// 1. Fast-path. Check whether first 1000 bytes are maped
-	//  and look for null-terminator in there
-	avail_size = uflat_test_address_range((void*) s, 1000);
-	if(avail_size == 0)
-		return 0;
-
-	str_size = strnlen(s, avail_size);
-	if(str_size <= avail_size)
-		// Return string length + null terminator
-		return str_size + 1;
-	
-	// 2. Slow-path. We haven't encountered null-terminator in first
-	//  1000 bytes, let's look futher
-	test_size = 8 * 4096;
-	while(test_size < INT_MAX) {
-		size_t partial_size;
-		size_t off = avail_size;
-
-		partial_size = uflat_test_address_range((void*)s + off, test_size);
-		if(partial_size == 0)
-			return avail_size;
-		avail_size += partial_size;
-		
-		str_size = strnlen(s+off, partial_size);
-		if(str_size < partial_size)
-			return off + str_size + 1;
-		test_size *= 2;
-	}
-
-	return avail_size;
-}
 
 /* Misc */
 #define EXPORT_FUNC(X)         
