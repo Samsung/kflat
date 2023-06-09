@@ -1417,7 +1417,7 @@ void flatten_generic(struct flat* flat, void* q, struct flatten_pointer* fptr, c
 	size_t i;
 	struct flatten_pointer* __shifted;
 	struct flat_node* __ptr_node;
-	const void* _fp = (const void*)(p+shift);
+	const void* _fp = (const void*)((char*)p+shift);
 
 	DBGS("flatten_generic: ADDR(%lx)\n", (uintptr_t) _fp);
 
@@ -1451,7 +1451,7 @@ void flatten_generic(struct flat* flat, void* q, struct flatten_pointer* fptr, c
 		err = 0;
 
 		for (i = 0; i < count; ++i) {
-			const void* target = _fp + i * el_size;
+			const void* target = (char*)_fp + i * el_size;
 			struct_inode = fixup_set_search(flat, (uint64_t)target);
 			if (!struct_inode) {
 				struct flatten_job job = {0, };
@@ -1492,7 +1492,7 @@ void flatten_aggregate_generic(struct flat* flat, void* q, const void* _ptr,
 	if (pre_f)
 		_p = pre_f(_p);
 	if (_p)
-		_fp = (const void*) ( _p+_shift);
+		_fp = (const void*) ( (char*)_p+_shift);
 	DBGTNFOMF(AGGREGATE_FLATTEN_GENERIC,"", el_size,f,"%lx:%zu",_fp,(size_t)_off,pre_f,post_f);
 
 	if (flat->error || !ADDR_RANGE_VALID(_fp, el_size * count)) {
@@ -1538,24 +1538,24 @@ void flatten_aggregate_generic(struct flat* flat, void* q, const void* _ptr,
 	for (_i = 0; _i < count; ++_i) {
 		struct flat_node *__struct_node = interval_tree_iter_first(
 				&flat->FLCTRL.imap_root,
-				(uint64_t)((void*)_fp + _i * el_size),
-				(uint64_t)((void*)_fp + (_i + 1) * el_size - 1));
+				(uint64_t)((char*)_fp + _i * el_size),
+				(uint64_t)((char*)_fp + (_i + 1) * el_size - 1));
 		if (__struct_node == NULL) {
 			err = EFAULT;
 			break;
 		}
 
-		__struct_inode = fixup_set_search(flat,(uint64_t)((void*)_fp + _i * el_size));
+		__struct_inode = fixup_set_search(flat,(uint64_t)((char*)_fp + _i * el_size));
 		if (!__struct_inode) {
 			struct flatten_job __job;
-			int err = fixup_set_reserve_address(flat,(uint64_t)((void*)_fp + _i * el_size));
+			int err = fixup_set_reserve_address(flat,(uint64_t)((char*)_fp + _i * el_size));
 			if (err) break;
 			__job.node = 0;
 			__job.offset = 0;
 			__job.size = 1;
 			__job.custom_val = (uintptr_t)custom_val;
 			__job.index = _i;
-			__job.ptr = (struct flatten_base*)((void*)_fp + _i * el_size);
+			__job.ptr = (struct flatten_base*)((char*)_fp + _i * el_size);
 			__job.fun = func_ptr;
 			__job.fp = 0;
 			__job.convert = 0;
@@ -1581,7 +1581,7 @@ void flatten_aggregate_generic_storage(struct flat* flat, void* q, const void* _
 		return;
 	}
 
-	for (int i = 0; i < count; ++i) {
+	for (size_t i = 0; i < count; ++i) {
 		target = (unsigned char*)_ptr + _off + i * el_size;
 		if (flat->error)
 			break;
