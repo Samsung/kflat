@@ -1,7 +1,7 @@
 export INCLUDE_PATH=$(PWD)/include/
 
 CFLAGS += -I${INCLUDE_PATH} -I$(PWD)/tests -DFLATTEN_USERSPACE_BSP
-EXTRA_CFLAGS = -ggdb3 -I$(PWD)/lib
+EXTRA_CFLAGS = -ggdb3 -I$(PWD)/lib -Og
 
 ifeq ($(ARCH), arm64)
 CFLAGS += -isystem /usr/aarch64-linux-gnu/include
@@ -38,7 +38,7 @@ $(KFLAT_TEST_OBJS): $(PWD)/tests/kflat/user_%.o: $(PWD)/tests/kflat/%.c
 	$(CC) $(CFLAGS) $(EXTRA_CFLAGS) -c -o $@ $< -D__VALIDATOR__
 
 # UFLAT-common tests
-$(UFLAT_SPEC_TEST_OBJS): $(PWD)/tests/user_%.o: $(PWD)/tests/%.c
+$(UFLAT_SPEC_TEST_OBJS): $(PWD)/tests/uflat/test_%.o: $(PWD)/tests/uflat/%.c
 	$(CC) $(CFLAGS) $(EXTRA_CFLAGS) -c -o $@ $< -D__TESTER__ -D__VALIDATOR__ -I$(PWD)/lib/include_priv
 
 # UFLAT-specific tests

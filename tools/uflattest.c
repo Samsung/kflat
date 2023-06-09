@@ -151,7 +151,7 @@ flat_test_case_handler_t get_test_handler(const char* name) {
 			return tests[i]->handler;
 	}
 
-    log_error("No available validator for test named '%s'", name);
+    log_error("No available handler for test named '%s'", name);
 	return NULL;
 }
 
@@ -207,13 +207,23 @@ int run_test(struct args* args, const char* name) {
         goto exit;
     }
 
+    if(args->debug)
+        uflat_set_option(uflat, UFLAT_OPT_DEBUG, 1);
+
     flat_test_case_handler_t handler = get_test_handler(name);
+    if(handler == NULL) {
+        log_error("failed to locate test handler");
+        uflat_fini(uflat);
+        goto exit;
+    }
+    
     ret = handler(&uflat->flat);
     if(ret) {
         log_error("test handler failed");
         uflat_fini(uflat);
         goto exit;
     }
+    log_info("uflat error = %d", uflat->flat.error);
 
     ret = uflat_write(uflat);
     if(ret != 0) {
