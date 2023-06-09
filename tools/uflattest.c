@@ -209,6 +209,8 @@ int run_test(struct args* args, const char* name) {
 
     if(args->debug)
         uflat_set_option(uflat, UFLAT_OPT_DEBUG, 1);
+    if(args->verbose)
+        uflat_set_option(uflat, UFLAT_OPT_VERBOSE, 1);
 
     flat_test_case_handler_t handler = get_test_handler(name);
     if(handler == NULL) {
@@ -223,7 +225,6 @@ int run_test(struct args* args, const char* name) {
         uflat_fini(uflat);
         goto exit;
     }
-    log_info("uflat error = %d", uflat->flat.error);
 
     ret = uflat_write(uflat);
     if(ret != 0) {

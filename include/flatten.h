@@ -20,6 +20,7 @@ extern "C" {
 #define FLAT_PING_TIME_NS						(1 * NSEC_PER_SEC)
 #define FLAT_MAX_TIME_NS						(8 * NSEC_PER_SEC)
 
+struct flat;
 
 /*************************************
  * BSP SPECIFIC CODE

@@ -47,32 +47,26 @@ int udump_dump_vma(struct udump_memory_map* mem);
 /*
  * Flatten API
  */
-static bool initialized = false;
-static struct udump_memory_map udump_memory;
+volatile int debug_flag = false;
+int verbose_flag = false;
 
 struct uflat* uflat_init(const char* path) {
     int rv;
     struct uflat* uflat;
-
-    /* FIXME: Original ADDR_RANGE_VALID macros used in kernel are stateless, i.e. they don't
-        require any context to work. However in UFLAT, addr_valid functions family require intialized
-        instance of udump_memory_map structure. Since, curently there's no way to pass it to them via
-        flatten engine, we're using global variable udump_memory, but this limits us to having only
-        one instance of UFLAT at the time 
-    */
-    if(initialized) {
-        FLATTEN_LOG_ERROR("Failed to initialized uflat - already initialized");
-        return NULL;
-    }
 
     uflat = (struct uflat*) calloc(1, sizeof(*uflat));
     if(uflat == NULL) {
         FLATTEN_LOG_ERROR("Failed to initialize uflat - out-of-memory");
         return NULL;
     }
-    uflat->udump_memory = &udump_memory;
 
-    memset(uflat->udump_memory, 0, sizeof(udump_memory));
+    uflat->udump_memory = (struct udump_memory_map*) calloc(1, sizeof(struct udump_memory_map));
+    if(uflat->udump_memory == NULL) {
+        FLATTEN_LOG_ERROR("Failed to initialize kflat - out-of-memory on udump_memory");
+        free(uflat);
+        return NULL;
+    }
+
     rv = udump_dump_vma(uflat->udump_memory);
     if(rv) {
         FLATTEN_LOG_ERROR("Failed to initialize uflat - udump_dump_vma returned (%d)", rv);
@@ -110,7 +104,6 @@ struct uflat* uflat_init(const char* path) {
     uflat->flat.area = uflat->out_mem;
     uflat->flat.size = uflat->out_size;
 
-    initialized = true;
     return uflat;
 
 
@@ -121,6 +114,7 @@ err_open:
 err_udump_created:
     udump_destroy(uflat->udump_memory);
 err_flat_allocated:
+    free(uflat->udump_memory);
     free(uflat);
     return NULL;
 }
@@ -135,8 +129,8 @@ void uflat_fini(struct uflat* uflat) {
 
     flatten_fini(&uflat->flat);
     udump_destroy(uflat->udump_memory);
+    free(uflat->udump_memory);
     free(uflat);
-    initialized = false;
 
     FLATTEN_LOG_DEBUG("Deinitialized uflat");
 }
@@ -149,12 +143,14 @@ int uflat_set_option(struct uflat* uflat, enum uflat_options option, unsigned lo
 
     switch(option) {
         case UFLAT_OPT_DEBUG:
-            uflat->flat.FLCTRL.debug_flag = 1;
+            uflat->flat.FLCTRL.debug_flag = value;
+            debug_flag = value;
             // [[fallthrough]];
         
         case UFLAT_OPT_VERBOSE:
             // TODO:
-            //uflat->flat.FLCTRL.vebose_flag = 1;
+            verbose_flag = value;
+            // uflat->flat.FLCTRL.vebose_flag = 1;
             break;
 
         case UFLAT_OPT_OUTPUT_SIZE: {
@@ -220,15 +216,24 @@ void uflat_dbg_log_clear(void) {}
 void uflat_dbg_log_printf(const char* fmt, ...) {
     va_list args;
 
-    // TODO: if verbose
-    // if(!uflat->flat.FLCTRL.vebose_flag)
-    //  return;
+    if(!debug_flag)
+        return;
 
     va_start(args, fmt);
     vprintf(fmt, args);
 	va_end(args);
 }
 
+void uflat_info_log_print(const char* fmt, ...) {
+    va_list args;
+    
+    if(!verbose_flag)
+        return;
+
+    va_start(args, fmt);
+    vprintf(fmt, args);
+    va_end(args);
+}
 
 /*
  * Memory regions collection
@@ -350,6 +355,7 @@ int udump_dump_vma(struct udump_memory_map* mem) {
     }
 
     free(line);
+    fclose(fp);
 
     if(count <= 0) {
         FLATTEN_LOG_ERROR("Failed to parse any line (count == 0)");
@@ -360,10 +366,10 @@ int udump_dump_vma(struct udump_memory_map* mem) {
     return 0;
 }
 
-static size_t uflat_test_address(void* ptr, size_t size) {
+static size_t uflat_test_address(struct uflat* uflat, void* ptr, size_t size) {
     struct udump_memory_node* node;
 
-    node = memory_tree_iter_first(&udump_memory.imap_root, (uintptr_t)ptr, (uintptr_t)ptr);
+    node = memory_tree_iter_first(&uflat->udump_memory->imap_root, (uintptr_t)ptr, (uintptr_t)ptr);
     if(node == NULL)
         return 0;
     
@@ -371,37 +377,51 @@ static size_t uflat_test_address(void* ptr, size_t size) {
     return remaining;
 }
 
-bool uflat_test_address_range(void* ptr, size_t size) {    
-    ssize_t remaining = uflat_test_address(ptr, size);
-    if(remaining < 0 || (size_t) remaining < size) {
-        FLATTEN_LOG_ERROR("Failed to access memory at %lx@%zu - access violation", (uintptr_t) ptr, size);
+bool uflat_test_address_range(struct flat* flat, void* ptr, size_t size) {
+    struct uflat* uflat = container_of(flat, struct uflat, flat);
+    
+    if(size == 0 || ptr == NULL)
         return false;
+
+    ssize_t remaining = uflat_test_address(uflat, ptr, size);
+    if(remaining <= 0 || (size_t) remaining < size) {
+        // Check if there are any new mapping
+        udump_destroy(uflat->udump_memory);
+        udump_dump_vma(uflat->udump_memory);
+
+        ssize_t remaining = uflat_test_address(uflat, ptr, size);
+        if(remaining <= 0 || (size_t) remaining < size) {
+            FLATTEN_LOG_INFO("Failed to access memory at %lx@%zu - access violation", (uintptr_t) ptr, size);
+            return false;
+        }
     }
 
     return true;
 }
 
-bool uflat_test_exec_range(void* ptr) {
+bool uflat_test_exec_range(struct flat* flat, void* ptr) {
     struct udump_memory_node* node;
+    struct uflat* uflat = container_of(flat, struct uflat, flat);
 
-    node = memory_tree_iter_first(&udump_memory.imap_root, (uintptr_t)ptr, (uintptr_t)ptr);
+    node = memory_tree_iter_first(&uflat->udump_memory->imap_root, (uintptr_t)ptr, (uintptr_t)ptr);
     if (node == NULL)
         return false;
 
     if(!(node->prot & UFLAT_MEM_PROT_EXEC)) {
-        FLATTEN_LOG_ERROR("Failed to access code memory at %p - non-executable area", ptr);
+        FLATTEN_LOG_INFO("Failed to access code memory at %p - non-executable area", ptr);
         return false;
     }
 
     return true;
 }
 
-size_t uflat_test_string_len(const char* str) {
+size_t uflat_test_string_len(struct flat* flat, const char* str) {
 	size_t str_size, avail_size, test_size;
+    struct uflat* uflat = container_of(flat, struct uflat, flat);
 	
 	// 1. Fast-path. Check whether first 1000 bytes are maped
 	//  and look for null-terminator in there
-	avail_size = uflat_test_address((void*) str, 1000);
+	avail_size = uflat_test_address(uflat, (void*) str, 1000);
 	if(avail_size == 0)
 		return 0;
 
@@ -417,7 +437,7 @@ size_t uflat_test_string_len(const char* str) {
 		size_t partial_size;
 		size_t off = avail_size;
 
-		partial_size = uflat_test_address((char*)str + off, test_size);
+		partial_size = uflat_test_address(uflat, (char*)str + off, test_size);
 		if(partial_size == 0)
 			return avail_size;
 		avail_size += partial_size;
@@ -441,13 +461,13 @@ size_t flatten_func_to_name(char* name, size_t size, void* func_ptr) {
     
     rv = dladdr(func_ptr, &info);
     if(rv == 0) {
-        FLATTEN_LOG_ERROR("Failed to symbolize function at address %p - addr could not be matched to a shared object", func_ptr);
+        FLATTEN_LOG_INFO("Failed to symbolize function at address %p - addr could not be matched to a shared object", func_ptr);
         memset(name, 0, size);
         return 0;
     }
 
     if(info.dli_sname == NULL) {
-        FLATTEN_LOG_ERROR("Failed to symbolize function at address %p - missing debug info for target", func_ptr);
+        FLATTEN_LOG_INFO("Failed to symbolize function at address %p - missing debug info for target", func_ptr);
         memset(name, 0, size);
         return 0;
     }

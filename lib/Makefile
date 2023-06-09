@@ -90,7 +90,11 @@ UNFLAT_TARGET += libunflatten_$(ARCH)_dfsan.a
 endif
 
 all: $(UNFLAT_TARGET) $(FLAT_TARGET)
+
+.PHONY: uflat
 uflat: $(FLAT_TARGET)
+
+.PHONY: unflatten
 unflatten: $(UNFLAT_TARGET)
 
 .PHONY: clean

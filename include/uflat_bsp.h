@@ -38,19 +38,23 @@
 #undef LINEAR_MEMORY_ALLOCATOR
 #define LINEAR_MEMORY_ALLOCATOR					0
 
+#undef FLAT_MAX_TIME_NS
+#define FLAT_MAX_TIME_NS						(600 * NSEC_PER_SEC)
+
 /* Funcs decl */
+void uflat_info_log_print(const char* fmt, ...);
 void uflat_dbg_log_printf(const char* fmt, ...);
 void uflat_dbg_log_clear();
-bool uflat_test_address_range(void* ptr, size_t size);
-bool uflat_test_exec_range(void* ptr) ;
-size_t uflat_test_string_len(const char* str);
+bool uflat_test_address_range(struct flat*, void* ptr, size_t size);
+bool uflat_test_exec_range(struct flat*, void* ptr) ;
+size_t uflat_test_string_len(struct flat*, const char* str);
 
 
 /* Logging */
 #define uflat_fmt(fmt) 		            "uflat: " fmt "\n"
 
 #define FLATTEN_LOG_ERROR(fmt, ...)		fprintf(stderr, uflat_fmt(fmt), ##__VA_ARGS__)
-#define FLATTEN_LOG_INFO(fmt, ...)		printf(uflat_fmt(fmt), ##__VA_ARGS__)
+#define FLATTEN_LOG_INFO(fmt, ...)		uflat_info_log_print(uflat_fmt(fmt), ##__VA_ARGS__)
 #define FLATTEN_LOG_DEBUG(fmt, ...)		uflat_dbg_log_printf(fmt "\n", ##__VA_ARGS__)
 #define FLATTEN_LOG_CLEAR()             uflat_dbg_log_clear()
 
@@ -59,10 +63,10 @@ size_t uflat_test_string_len(const char* str);
 #define FLATTEN_BSP_FREE(PTR)           free(PTR)
 
 /* Memory validation */
-#define ADDR_VALID(PTR)				    uflat_test_address_range((void*) PTR, 1)
-#define ADDR_RANGE_VALID(PTR, SIZE)     uflat_test_address_range((void*) PTR, SIZE)
-#define TEXT_ADDR_VALID(PTR)		    uflat_test_exec_range(PTR)
-#define STRING_VALID_LEN(PTR)           uflat_test_string_len((const char*) PTR)
+#define ADDR_VALID(PTR)				    uflat_test_address_range(flat, (void*) PTR, 1)
+#define ADDR_RANGE_VALID(PTR, SIZE)     uflat_test_address_range(flat, (void*) PTR, SIZE)
+#define TEXT_ADDR_VALID(PTR)		    uflat_test_exec_range(flat, PTR)
+#define STRING_VALID_LEN(PTR)           uflat_test_string_len(flat, (const char*) PTR)
 
 /* Misc */
 #define EXPORT_FUNC(X)         
@@ -72,36 +76,34 @@ size_t uflat_test_string_len(const char* str);
 #define ALIGN(X, A)                     (((X) + (A - 1)) & ~(A -1))
 
 
-typedef long long int ktime_t;
-
-
+/* Time measurement */
 #define NSEC_PER_MSEC	1000L
 #define MSEC_PER_SEC	1000L
 #define NSEC_PER_SEC	1000000000L
 
+typedef long long int ktime_t;
+
 static __attribute__((used)) ktime_t ktime_get(void) {
-    ktime_t nsec_time;
-    struct timespec time;
-    
-    clock_gettime(CLOCK_MONOTONIC, &time);
-    nsec_time = time.tv_nsec + time.tv_sec * NSEC_PER_SEC;
-    return nsec_time;
+	ktime_t nsec_time;
+	struct timespec time;
+	
+	clock_gettime(CLOCK_MONOTONIC, &time);
+	nsec_time = time.tv_nsec + time.tv_sec * NSEC_PER_SEC;
+	return nsec_time;
 }
 
 /* List implementation */
 // From include/linux/list.h
 struct list_head {
-    struct list_head *next, *prev;
+	struct list_head *next, *prev;
 };
 
-static inline void INIT_LIST_HEAD(struct list_head *list)
-{
-	WRITE_ONCE(list->next, list);
-	WRITE_ONCE(list->prev, list);
+static inline void INIT_LIST_HEAD(struct list_head *list) {
+	list->next = list;
+	list->prev = list;
 }
 
-static inline int list_empty(const struct list_head *head)
-{
+static inline int list_empty(const struct list_head *head) {
 	return head->next == head;
 }
 
@@ -117,23 +119,26 @@ static inline int list_empty(const struct list_head *head)
 #define list_prev_entry(pos, member) \
 	list_entry((pos)->member.prev, typeof(*(pos)), member)
 
+#define list_last_entry(ptr, type, member) \
+	list_entry((ptr)->prev, type, member)
+
 #define list_entry_is_head(pos, head, member)				\
 	(&pos->member == (head))
 
 #define list_for_each_entry(pos, head, member)				\
 	for (pos = list_first_entry(head, typeof(*pos), member);	\
-	     !list_entry_is_head(pos, head, member);			\
-	     pos = list_next_entry(pos, member))
+		 !list_entry_is_head(pos, head, member);			\
+		 pos = list_next_entry(pos, member))
 
 #define list_for_each_entry_safe(pos, n, head, member)			\
 	for (pos = list_first_entry(head, typeof(*pos), member),	\
 		n = list_next_entry(pos, member);			\
-	     !list_entry_is_head(pos, head, member); 			\
-	     pos = n, n = list_next_entry(n, member))
+		 !list_entry_is_head(pos, head, member); 			\
+		 pos = n, n = list_next_entry(n, member))
 
 static inline void __list_del(struct list_head * prev, struct list_head * next) {
 	next->prev = prev;
-	WRITE_ONCE(prev->next, next);
+	prev->next = next;
 }
 
 
@@ -151,16 +156,15 @@ static inline void list_del(struct list_head *entry) {
 }
 
 static inline void __list_add(struct list_head *n,
-			      struct list_head *prev,
-			      struct list_head *next) {
+				  struct list_head *prev,
+				  struct list_head *next) {
 	next->prev = n;
 	n->next = next;
 	n->prev = prev;
-	WRITE_ONCE(prev->next, n);
+	prev->next = n;
 }
 
-static inline void list_add(struct list_head *n, struct list_head *head)
-{
+static inline void list_add(struct list_head *n, struct list_head *head) {
 	__list_add(n, head, head->next);
 }
 

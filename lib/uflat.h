@@ -23,7 +23,7 @@ extern "C" {
 // Flatten core engine
 #include "flatten.h"
 
-#define UFLAT_DEFAULT_OUTPUT_SIZE (5ULL * 1024 * 1024)
+#define UFLAT_DEFAULT_OUTPUT_SIZE (50ULL * 1024 * 1024)
 
 /*********************************
  * Exported types
