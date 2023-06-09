@@ -24,6 +24,7 @@ tools/executor
 tools/executor_32
 tools/output
 tools/kflattest
+tools/uflattest
 
 recipes/output
 
