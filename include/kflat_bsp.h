@@ -38,6 +38,8 @@ void kflat_dbg_printf(const char* fmt, ...);
 /* Memory allocation */
 #define FLATTEN_BSP_ZALLOC(SIZE)        kvzalloc(SIZE, GFP_KERNEL)
 #define FLATTEN_BSP_FREE(PTR)           kvfree(PTR)
+#define FLATTEN_BSP_VMA_ALLOC(SIZE)		vmalloc(SIZE)
+#define FLATTEN_BSP_VMA_FREE(PTR, SIZE) vfree(PTR)
 
 /* Memory validation */
 static __used bool _addr_range_valid(void* ptr, size_t size) {

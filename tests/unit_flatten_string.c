@@ -14,6 +14,7 @@ struct str_container {
 	char *sameAsFirst;
 	char *strNotTerminated;
 	char* strNotAligned;
+	char* strMiddleEnded;
 };
 
 struct self_str_container {
@@ -24,6 +25,7 @@ struct self_str_container {
 	char *sameAsFirst;
 	char *strNotTerminated;
 	char* strNotAligned;
+	char* strMiddleEnded;
 };
 
 /********************************/
@@ -39,6 +41,7 @@ FUNCTION_DEFINE_FLATTEN_STRUCT(str_container,
 	AGGREGATE_FLATTEN_STRING(sameAsFirst);
 	AGGREGATE_FLATTEN_STRING(strNotTerminated);
 	AGGREGATE_FLATTEN_STRING(strNotAligned);
+	AGGREGATE_FLATTEN_STRING(strMiddleEnded);
 );
 
 FUNCTION_DEFINE_FLATTEN_STRUCT_SELF_CONTAINED(self_str_container, sizeof(struct self_str_container),
@@ -49,12 +52,14 @@ FUNCTION_DEFINE_FLATTEN_STRUCT_SELF_CONTAINED(self_str_container, sizeof(struct 
 	AGGREGATE_FLATTEN_STRING_SELF_CONTAINED(0, offsetof(struct self_str_container, sameAsFirst));
 	AGGREGATE_FLATTEN_STRING_SELF_CONTAINED(0, offsetof(struct self_str_container, strNotTerminated));
 	AGGREGATE_FLATTEN_STRING_SELF_CONTAINED(0, offsetof(struct self_str_container, strNotAligned));
+	AGGREGATE_FLATTEN_STRING_SELF_CONTAINED(0, offsetof(struct self_str_container, strMiddleEnded));
 );
 
 static int kflat_flatten_string_unit_test(struct flat *flat) {
 	char *long_str = (char *)FLATTEN_BSP_ZALLOC(PAGE_SIZE * 2);
 	char *long_str2 = (char *)FLATTEN_BSP_ZALLOC(PAGE_SIZE * 2);
 	char* unterminated_str = (char *) FLATTEN_BSP_ZALLOC(PAGE_SIZE);
+	char* middle_ended_str = (char *) FLATTEN_BSP_ZALLOC(PAGE_SIZE * 10);
 
 	struct str_container str1 = {
 		.str = "Good morning!",
@@ -63,6 +68,7 @@ static int kflat_flatten_string_unit_test(struct flat *flat) {
 		.strInvalid = (char *)-1,
 		.strNotTerminated = unterminated_str,
 		.strNotAligned = long_str + 1,
+		.strMiddleEnded = middle_ended_str
 	};
 	struct self_str_container str2 = {
 		.str = "Good evening!",
@@ -71,6 +77,7 @@ static int kflat_flatten_string_unit_test(struct flat *flat) {
 		.strInvalid = (char *)-1,
 		.strNotTerminated = unterminated_str,
 		.strNotAligned = long_str2 + 1,
+		.strMiddleEnded = middle_ended_str
 	};
 
 	FLATTEN_SETUP_TEST(flat);
@@ -85,6 +92,14 @@ static int kflat_flatten_string_unit_test(struct flat *flat) {
 
 	for(size_t i = 0; i < PAGE_SIZE; i++)
 		unterminated_str[i] = 'A';
+
+	for(size_t i = 0; i < PAGE_SIZE * 10 - 1; i++) {
+		if(i == PAGE_SIZE * 5 + 17)
+			middle_ended_str[i] = '\0';
+		else
+			middle_ended_str[i] = 'A' + (i % 28);
+	}
+	middle_ended_str[PAGE_SIZE * 10 - 1] = '\0';
 
 	FOR_ROOT_POINTER(&str1,
 		FLATTEN_STRUCT(str_container, &str1);
@@ -129,6 +144,21 @@ static int kflat_flatten_string_validate(void *memory, size_t size, CUnflatten f
 	ASSERT(str1->strNotTerminated == str2->strNotTerminated);
 	for(size_t i = 0; i < 4096; i++)
 		ASSERT(str1->strNotTerminated[i] == 'A');
+
+	for(size_t i = 0; i < 4096 * 10 - 1; i++) {
+		if(i == 4096 * 5 + 17) {
+			ASSERT(str1->strMiddleEnded[i] == '\0');
+			ASSERT(str2->strMiddleEnded[i] == '\0');
+		} else if(i > 4096 * 5 + 17) {
+			ASSERT(str1->strMiddleEnded[i] != 'A' + (i % 28));
+			ASSERT(str2->strMiddleEnded[i] != 'A' + (i % 28));
+			break;
+		}
+		else {
+			ASSERT(str1->strMiddleEnded[i] == 'A' + (i % 28));
+			ASSERT(str2->strMiddleEnded[i] == 'A' + (i % 28));
+		}
+	}
 
 	return KFLAT_TEST_SUCCESS;
 }

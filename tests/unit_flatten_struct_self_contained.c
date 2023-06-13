@@ -37,7 +37,7 @@ static int kflat_flatten_struct_self_contained_unit_test(struct flat *flat) {
 	struct unit_sc_B str = { "CDF" };
 	struct unit_sc_A obj = { 0xCAFECAFE, &str };
 	struct unit_sc_A *pA = &obj;
-	struct unit_sc_Large *large = (struct unit_sc_Large *)FLATTEN_BSP_ZALLOC(4096);
+	struct unit_sc_Large *large = (struct unit_sc_Large *)FLATTEN_BSP_VMA_ALLOC(4096);
 
 	FLATTEN_SETUP_TEST(flat);
 
@@ -53,7 +53,7 @@ static int kflat_flatten_struct_self_contained_unit_test(struct flat *flat) {
 		FLATTEN_STRUCT_SELF_CONTAINED(unit_sc_Large, sizeof(struct unit_sc_Large), large);
 	);
 
-	FLATTEN_BSP_FREE(large);
+	FLATTEN_BSP_VMA_FREE(large, 4096);
 	return 0;
 }
 

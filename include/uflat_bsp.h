@@ -13,13 +13,14 @@
 #endif /* _GNU_SOURCE */
 
 #include <errno.h>
+#include <limits.h>
 #include <stdio.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdlib.h>
 #include <stdio.h>
-#include <limits.h>
 #include <string.h>
+#include <sys/mman.h>
 #include <time.h>
 #include <unistd.h>
 
@@ -61,6 +62,8 @@ size_t uflat_test_string_len(struct flat*, const char* str);
 /* Memory allocation */
 #define FLATTEN_BSP_ZALLOC(SIZE)        calloc(1, SIZE)
 #define FLATTEN_BSP_FREE(PTR)           free(PTR)
+#define FLATTEN_BSP_VMA_ALLOC(SIZE)		mmap(0, SIZE, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0)
+#define FLATTEN_BSP_VMA_FREE(PTR, SIZE) munmap(PTR, SIZE)
 
 /* Memory validation */
 #define ADDR_VALID(PTR)				    uflat_test_address_range(flat, (void*) PTR, 1)
