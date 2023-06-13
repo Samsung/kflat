@@ -342,7 +342,7 @@ int udump_dump_vma(struct udump_memory_map* mem) {
 
     while ((read = getline(&line, &len, fp)) != -1) {
         uint64_t start, end;
-        char prot[4];
+        char prot[5];
         
         if(read < 0)
             continue;
@@ -369,7 +369,7 @@ int udump_dump_vma(struct udump_memory_map* mem) {
 static size_t uflat_test_address(struct uflat* uflat, void* ptr, size_t size) {
     struct udump_memory_node* node;
 
-    node = memory_tree_iter_first(&uflat->udump_memory->imap_root, (uintptr_t)ptr, (uintptr_t)ptr);
+    node = memory_tree_iter_first(&uflat->udump_memory->imap_root, (uintptr_t)ptr, (uintptr_t)ptr + size);
     if(node == NULL)
         return 0;
     
