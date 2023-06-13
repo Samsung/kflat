@@ -76,7 +76,7 @@ endif
 
 
 clean:
-	rm -f *.o executor executor_32 kflattest \
+	rm -f *.o executor executor_32 kflattest uflattest \
 			$(PWD)/tests/*.o $(PWD)/tests/.*.o.cmd \
 			$(PWD)/tests/tests_list.h $(PWD)/tests/uflat_tests_list.h $(PWD)/tests/kflat_tests_list.h \
 			$(PWD)/tests/kflat/*.o $(PWD)/tests/kflat/.*.o.cmd \

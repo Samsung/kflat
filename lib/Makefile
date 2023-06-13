@@ -1,5 +1,5 @@
-CFLAGS = -Iinclude_priv/ -I../include/ -Wall -O3 -fPIC -flto
-LDFLAGS = --shared -fPIC -flto
+CFLAGS = -Iinclude_priv/ -I../include/ -Wall -O3 -fPIC
+LDFLAGS = --shared -fPIC
 UNFLAT_TARGET = 
 FLAT_TARGET = 
 
@@ -22,13 +22,13 @@ libunflatten_$(ARCH).so: unflatten.o rbtree.o
 	$(CXX) $(LDFLAGS) -o $@ $^
 
 libunflatten_$(ARCH).a: unflatten.o rbtree.o
-	ar rcs $@ $^
+	gcc-ar rcs $@ $^
 
 libuflat_$(ARCH).so: uflat.o flatten_impl.o rbtree.o unflatten.o
 	$(CXX) $(LDFLAGS) -ldl -o $@ $^
 
 libuflat_$(ARCH).a: uflat.o flatten_impl.o rbtree.o unflatten.o
-	ar rcs $@ $^
+	gcc-ar rcs $@ $^
 
 #
 # KLEE libraries

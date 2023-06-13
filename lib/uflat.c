@@ -247,7 +247,7 @@ INTERVAL_TREE_DEFINE(struct udump_memory_node, rb,
 			 static __attribute__((used)), memory_tree)
 
 static uint16_t udump_str_to_prot(char str[4]) {
-    uint16_t prot;
+    uint16_t prot = 0;
 
     if(str[0] == 'r')
         prot |= UFLAT_MEM_PROT_READ;
