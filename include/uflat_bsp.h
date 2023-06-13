@@ -1,7 +1,7 @@
 /**
  * @file uflat_bsp.h
  * @author Pawel Wieczorek (p.wieczorek@samsung.com)
- * @brief 
+ * @brief Platform specific code for UFLAT (userspace flattening) module
  * 
  */
 
@@ -92,8 +92,12 @@ static __attribute__((used)) ktime_t ktime_get(void) {
 	return nsec_time;
 }
 
-/* List implementation */
-// From include/linux/list.h
+/**************************
+ *  List implementation 
+ * From Linux opensource repository: include/linux/list.h
+ * on GPL-2.0 license
+ * adapted to work in userspace application
+ **************************/
 struct list_head {
 	struct list_head *next, *prev;
 };

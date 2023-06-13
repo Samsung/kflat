@@ -41,9 +41,15 @@ struct uflat {
 };
 
 enum uflat_options {
+    /* Print extra information on stdout */
     UFLAT_OPT_VERBOSE = 0,
+
+    /* Print A LOT OF debug information */
     UFLAT_OPT_DEBUG,
+
+    /* Set the maximum size of target flattened image */
     UFLAT_OPT_OUTPUT_SIZE,
+
 
     UFLAT_OPT_MAX
 };
@@ -55,7 +61,7 @@ enum uflat_options {
 /**
  * @brief Initialize Userspace FLAT (UFLAT) engine
  * 
- * @param path 
+ * @param path path to the output file
  * @return pointer to struct uflat or NULL in case of an error
  */
 struct uflat* uflat_init(const char* path) __attribute__ ((warn_unused_result));
@@ -78,11 +84,10 @@ int uflat_set_option(struct uflat* uflat, enum uflat_options option, unsigned lo
 void uflat_fini(struct uflat* uflat);
 
 /**
- * @brief 
+ * @brief Write flattened image to file
  * 
- * @param uflat 
- * @param path 
- * @return int 
+ * @param uflat pointer to uflat structure
+ * @return int 0 on success, error code otherwise
  */
 int uflat_write(struct uflat* uflat);
 

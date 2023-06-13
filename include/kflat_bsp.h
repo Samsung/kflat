@@ -1,8 +1,7 @@
 /**
  * @file kflat_bsp.h
  * @author Pawel Wieczorek (p.wieczorek@samsung.com)
- * @brief 
- * 
+ * @brief Platform specific code for KFLAT (Kernel Flattening) module
  * 
  */
 

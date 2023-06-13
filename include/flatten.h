@@ -1,7 +1,7 @@
 /**
  * @file flatten.h
  * @author Pawel Wieczorek (p.wieczorek@samsung.com)
- * @brief 
+ * @brief Header for feneric flattening code; base of both KFLAT and UFLAT
  * 
  */
 #ifndef _HEADER_FLATTEN_H
