@@ -176,6 +176,10 @@ int uflat_set_option(struct uflat* uflat, enum uflat_options option, unsigned lo
                 uflat->flat.size = uflat->out_size;
             }
             break;
+
+        case UFLAT_OPT_SKIP_MEM_FRAGMENTS:
+            uflat->flat.FLCTRL.mem_fragments_skip = value & 1;
+            break;
         
         default:
             FLATTEN_LOG_ERROR("Invalid option provided to uflat_set_option (%d)", option);

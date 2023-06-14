@@ -50,6 +50,10 @@ enum uflat_options {
     /* Set the maximum size of target flattened image */
     UFLAT_OPT_OUTPUT_SIZE,
 
+    /* Don't generate memory fragments information (smaller image, but only
+       load_continous is supported on such image) */
+    UFLAT_OPT_SKIP_MEM_FRAGMENTS,
+
 
     UFLAT_OPT_MAX
 };

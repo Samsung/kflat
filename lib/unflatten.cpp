@@ -242,9 +242,9 @@ private:
 	 *     1) After dumping memory, all pointers in flatten image are offsets in blob
 	 *     2) The first running instance of Unflatten library obtains O_WRLCK lock and opens
 	 *        file in OPEN_MMAP_WRITE mode. Next, it replaces all offsets in flatten image with
-	 *        valid pointer in current mapping and saves mapping base in flatten header (last_load_addr)
-	 *     3) The next running instances of Unflatten lib obtains O_RDLCK and maps flatten image
-	 *        at the same address as the first instance did - if they succeed, memory can be used
+	 *        valid pointers in current mapping and saves mapping base in flatten header (last_load_addr)
+	 *     3) The next running instance of Unflatten lib obtains O_RDLCK and maps flatten image
+	 *        at the same address as the first instance did - if it succeed, memory can be used
 	 *        without any further modifications (pointers are still valid), if not:
 	 *     4a) Try to lock O_WRLCK -> if success, repeat step 2)
 	 *     4b) Lock O_RDLCK, open file in OPEN_READ_COPY, copy it into local memory, fix locally 
@@ -773,6 +773,9 @@ public:
 			parse_fptrmap();
 		info(" #Unflattening done\n");
 		info(" #Image read time: %lfs\n", time_elapsed());
+
+		if(FLCTRL.HDR.mcount == 0)
+			continuous_mapping = true;
 
 		// Convert continous memory into chunked area
 		if(!continuous_mapping) {

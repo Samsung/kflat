@@ -62,8 +62,10 @@ struct FLCONTROL {
 	struct flatten_header	HDR;
 	struct root_addrnode* last_accessed_root;
 	size_t root_addr_count;
-	int debug_flag;
 	void* mem;
+
+	int debug_flag;
+	int mem_fragments_skip;
 };
 
 struct fixup_set_node {

@@ -1227,8 +1227,11 @@ static int flatten_write_internal(struct flat* flat, size_t* wcounter_p) {
     flat->FLCTRL.HDR.root_addr_count = root_addr_count(flat);
     flat->FLCTRL.HDR.root_addr_extended_count = root_addr_extended_count(flat);
     flat->FLCTRL.HDR.root_addr_extended_size = root_addr_extended_size(flat);
-    flat->FLCTRL.HDR.mcount = mem_fragment_index_count(flat);
     flat->FLCTRL.HDR.fptrmapsz = fixup_fptr_info_count(flat);
+    if(!flat->FLCTRL.mem_fragments_skip)
+        flat->FLCTRL.HDR.mcount = mem_fragment_index_count(flat);
+    else
+        flat->FLCTRL.HDR.mcount = 0;
     FLATTEN_WRITE_ONCE(&flat->FLCTRL.HDR, sizeof(struct flatten_header), wcounter_p);
 
 	list_for_each_entry(entry, &flat->FLCTRL.root_addr_head, head) {
@@ -1264,8 +1267,10 @@ static int flatten_write_internal(struct flat* flat, size_t* wcounter_p) {
 	if ((err = fixup_set_fptr_write(flat,wcounter_p))!=0) {
 		return err;
 	}
-	if ((err = mem_fragment_index_write(flat,wcounter_p))!=0) {
-		return err;
+	if(!flat->FLCTRL.mem_fragments_skip) {
+		if ((err = mem_fragment_index_write(flat,wcounter_p))!=0) {
+			return err;
+		}
 	}
 	if ((err = binary_stream_write(flat,wcounter_p))!=0) {
 		return err;
