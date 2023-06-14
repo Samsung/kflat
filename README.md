@@ -2,6 +2,8 @@
 
 **Kflat** is a Linux kernel implementation of the library for fast serialization of C structures. It works by making a copy of the kernel memory for indicated variables and structures. Such copy can be used to recreate the layout of kernel memory in userspace process, for instance in [Auto off-Target](https://github.com/Samsung/auto_off_target) project.
 
+**Uflat** is a userspace port of Kflat code, compiled as shared library and intended to be used as a fast serialization engine for Linux applications.
+
 Currently supported architectures are x86_64 and ARM64.
 
 ## Quick start guides
@@ -10,6 +12,8 @@ If you'd like to start using KFLAT, check out quick start guides available for:
 - Android (emulator) - [doc/Startup_Android.md](doc/Startup_Android.md)
 
 For more general desciption, refer to this README file.
+
+If you're interesting in UFLAT, checkout docs in (`lib/`)[lib/] directory.
 
 ## Building
 In order to build kflat framework you're gonna need:
@@ -45,9 +49,9 @@ Project directory presents as follow:
 ├── core            // Main implementation of kflat module
 ├── doc             // Project documentation
 ├── include         // Shared include files
-├── lib             // Userspace library for unflattening images
+├── lib             // Userspace library for (un)flattening images
 │   └── include
-├── recipes         // Collection of kflat recipes
+├── recipes         // Collection of example kflat recipes
 │   └── random_read
 ├── tests           // Examples and unit tests
 ├── tools           // Userspace tools used with kflat
