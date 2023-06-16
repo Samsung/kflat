@@ -14,7 +14,7 @@ extern "C" {
 /*************************************
  * DEFAULT CONFIGURATION
  *************************************/
-#define LINEAR_MEMORY_ALLOCATOR					0
+#define LINEAR_MEMORY_ALLOCATOR					1
 #define FLAT_LINEAR_MEMORY_INITIAL_POOL_SIZE	(256ULL * 1024 * 1024)
 #define DEFAULT_ITER_QUEUE_SIZE					(8ULL * 1024 * 1024)
 #define FLAT_PING_TIME_NS						(1 * NSEC_PER_SEC)

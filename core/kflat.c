@@ -19,6 +19,7 @@
 #include <linux/spinlock.h>
 #include <linux/stop_machine.h>
 #include <linux/uaccess.h>
+#include <linux/version.h>
 #include <linux/vmalloc.h>
 #include <linux/list.h>
 
@@ -495,7 +496,11 @@ static int kflat_mmap_flatten(struct kflat *kflat, struct vm_area_struct *vma) {
 	kflat->flat.area = area;
 	kflat->flat.size = alloc_size;
 	
+#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 3, 0)
 	vma->vm_flags |= VM_DONTEXPAND;
+#else
+	vm_flags_set(vma, VM_DONTEXPAND);
+#endif
 	for (off = 0; off < alloc_size; off += PAGE_SIZE) {
 		page = vmalloc_to_page(kflat->flat.area + off);
 		if (vm_insert_page(vma, vma->vm_start + off, page))

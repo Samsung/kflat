@@ -8,18 +8,19 @@
 #ifndef KFLAT_BSP_H
 #define KFLAT_BSP_H
 
+#include <linux/cpufreq.h>
+#include <linux/interval_tree_generic.h>
 #include <linux/kprobes.h>
+#include <linux/list.h>
 #include <linux/mm.h>
 #include <linux/random.h>
+#include <linux/rbtree.h>
 #include <linux/slab.h>
-#include <linux/timekeeping.h>
+#include <linux/smp.h>
 #include <linux/stop_machine.h>
 #include <linux/time.h>
-#include <linux/cpufreq.h>
-#include <linux/smp.h>
-#include <linux/list.h>
-#include <linux/rbtree.h>
-#include <linux/interval_tree_generic.h>
+#include <linux/timekeeping.h>
+#include <linux/vmalloc.h>
 
 #include "kdump.h"
 
