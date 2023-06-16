@@ -87,6 +87,7 @@ struct args {
     int debug;
     int stop_machine;
     int skip_function_body;
+    int run_recipe_now;
     const char* output;
     const char* recipe;
     const char* node;
@@ -103,6 +104,7 @@ static struct argp_option options[] = {
     {"debug", 'd', 0, 0, "Enable debug logs in kflat module"},
     {"stop_machine", 's', 0, 0, "Execute kflat recipe under kernel's stop_machine mode"},
     {"skip_funcion_body", 'n', 0, 0, "Do not execute target function body after flattening memory"},
+    {"run_recipe_now", 'f', 0, 0, "Execute KFLAT recipe directly from IOCTL without attaching to any kernel function"},
     { 0 }
 };
 
@@ -131,6 +133,10 @@ static error_t parse_opt(int key, char* arg, struct argp_state* state) {
 
         case 'n':
             options->skip_function_body = 1;
+            break;
+
+        case 'f':
+            options->run_recipe_now = 1;
             break;
         
         case ARGP_KEY_ARG:
@@ -247,6 +253,7 @@ void kflat_enable(int fd, struct args* opts) {
     enable.debug_flag = opts->debug;
     enable.use_stop_machine = opts->stop_machine;
     enable.skip_function_body = opts->skip_function_body;
+    enable.run_recipe_now = opts->run_recipe_now;
     strncpy(enable.target_name, opts->recipe, sizeof(enable.target_name));
 
     ret = ioctl(fd, KFLAT_PROC_ENABLE, &enable);
@@ -348,7 +355,7 @@ int main(int argc, char** argv, char** envp) {
 
     if(opts.recipe == NULL)
         log_abort("you need to specify the ID of target recipe");
-    else if(opts.node == NULL)
+    if(!opts.run_recipe_now && opts.node == NULL)
         log_abort("you need to specify the target file used by recipe");
     
     // In case of interface compat_ioctl we're deploying executor_32 app
@@ -373,16 +380,19 @@ int main(int argc, char** argv, char** envp) {
     atexit(governor_restore);
 
     kflat_enable(fd, &opts);
-    setup_sigalarm();
-    rd_fd = target_open(opts.node, opts.handler == interface_write);
 
-    /*
-     * Setup timeout and invoke handler
-     */
-    alarm(2);
-    ret = opts.handler(rd_fd);
-    log_info("%s on node %s returned %d - %s", opts.interface, opts.node, ret, strerror(errno));
-    close(rd_fd);
+    if(!opts.run_recipe_now) {
+        /*
+         * Setup timeout and invoke handler
+         */
+        setup_sigalarm();
+        alarm(2);
+        
+        rd_fd = target_open(opts.node, opts.handler == interface_write);
+        ret = opts.handler(rd_fd);
+        log_info("%s on node %s returned %d - %s", opts.interface, opts.node, ret, strerror(errno));
+        close(rd_fd);
+    }
 
     output_size = kflat_disable(fd, dump_size);
 

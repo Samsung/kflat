@@ -20,6 +20,7 @@ struct kflat_ioctl_enable {
 	int debug_flag;
 	int use_stop_machine;
 	int skip_function_body;
+	int run_recipe_now;
 };
 
 struct kflat_ioctl_disable {

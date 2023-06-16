@@ -391,11 +391,19 @@ static int kflat_ioctl_locked(struct kflat *kflat, unsigned int cmd,
 			kflat_recipe_put(kflat->recipe);
 		kflat->recipe = recipe;
 
-		ret = probing_arm(kflat, kflat->recipe->symbol, kflat->pid);
-		if(ret) {
-			kflat_recipe_put(kflat->recipe);
-			kflat->recipe = NULL;
-			return -EFAULT;
+		if(args.enable.run_recipe_now) {
+			// Run probing delegate here, instead of attaching kprobe
+			struct probe_regs regs = {0};
+			regs.kflat_ptr = (uint64_t) kflat;
+			kflat_get(kflat);	// kprobe handler would do this normally
+			probing_delegate(&regs);
+		} else {
+			ret = probing_arm(kflat, kflat->recipe->symbol, kflat->pid);
+			if(ret) {
+				kflat_recipe_put(kflat->recipe);
+				kflat->recipe = NULL;
+				return -EFAULT;
+			}
 		}
 
 		kflat->mode = KFLAT_MODE_ENABLED;

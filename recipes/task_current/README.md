@@ -24,11 +24,10 @@ aarch64-linux-gnu-g++ $CFLAGS -o task_current_client task_current_client.cpp ../
 
 ## Run
 
-Load modules `kflat_core.ko` and `task_current_recipe.ko`. Next, use tool `tools/executor` to
-invoke `random_read` handler.
+Load modules `kflat_core.ko` and `task_current_recipe.ko`. Next, use tool `tools/executor` to invoke recipe.
 
 ```bash
-$ tools/executor -i READ -o task_struct.bin -s -n read_null /dev/null
+$ tools/executor -o task_struct.bin -f -s task_struct_example
 ```
 
 Finally, execute `./task_current_client <output_file>` app to test flattening and display
