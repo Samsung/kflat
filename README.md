@@ -13,7 +13,7 @@ If you'd like to start using KFLAT, check out quick start guides available for:
 
 For more general desciption, refer to this README file.
 
-If you're interesting in UFLAT, checkout docs in (`lib/`)[lib/] directory.
+If you're interesting in UFLAT, checkout docs in [`lib/`](lib/) directory.
 
 ## Building
 In order to build kflat framework you're gonna need:
