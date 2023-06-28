@@ -25,6 +25,17 @@
 #include "kdump.h"
 
 
+/*************************************
+ * CUSTOMIZE CONFIGURATION FOR UFLAT
+ *************************************/
+#undef LINEAR_MEMORY_ALLOCATOR
+#define LINEAR_MEMORY_ALLOCATOR					1
+#undef FLAT_LINEAR_MEMORY_INITIAL_POOL_SIZE
+#define FLAT_LINEAR_MEMORY_INITIAL_POOL_SIZE	(512ULL * 1024 * 1024)
+#undef DEFAULT_ITER_QUEUE_SIZE
+#define DEFAULT_ITER_QUEUE_SIZE					(1ULL * 1024 * 1024)
+
+
 /* Logging */
 void kflat_dbg_buf_clear(void);
 void kflat_dbg_printf(const char* fmt, ...);
