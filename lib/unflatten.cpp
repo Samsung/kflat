@@ -277,11 +277,13 @@ private:
 		lock.l_whence = SEEK_SET;
 		lock.l_start = 0;
 
+#ifndef KLEE_SUPPORT
 		int ret = fcntl(fd, F_SETLKW, &lock);
 		if(ret < 0) {
 			info("Failed to obtain read-lock - fcntl returned: %s\n", strerror(errno));
 			throw std::runtime_error("Failed to acquire read-lock on input file");
 		}
+#endif
 
 		// At this point we've got read-lock, check header and try to mmap file
 		size_t size = fread(&FLCTRL.HDR, sizeof(struct flatten_header), 1, f);
@@ -298,6 +300,7 @@ private:
 			fcntl(fd, F_SETLK, &lock);
 			throw;
 		}
+#ifndef KLEE_SUPPORT
 		void* mmap_addr = (void*) FLCTRL.HDR.last_load_addr;
 		if(mmap_addr != NULL && support_mmap) {	
 			opened_mmap_addr = mmap(mmap_addr, opened_mmap_size, 
@@ -339,7 +342,7 @@ private:
 			info("Failed to obtain read-lock - fcntl returned: %s\n", strerror(errno));
 			throw std::runtime_error("Failed to acquire read-lock on input file");
 		}
-
+#endif
 		// Write-lock failed. The only thing left is to load whole image into memory
 		info("Opened file in copy mode\n");
 		open_mode = UNFLATTEN_OPEN_READ_COPY;
