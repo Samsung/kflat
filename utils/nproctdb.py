@@ -2684,7 +2684,7 @@ def main():
 		RG.generate_flatten_trigger(gv, out, additional_deps)
 		var_name = glob[2]
 		if glob[7] not in ['', 'vmlinux'] :
-			var_name += ':' + glob[7]
+			var_name = glob[7].replace('.ko', '') + ':' + var_name
 		globals_stream.write(RecipeGenerator.template_output_global_handler.format(
 			var_name, glob[6], glob[4], "\n".join(["\t\t\t"+x for x in out.getvalue().strip().split("\n")])))
 	deps|=set(additional_deps)
