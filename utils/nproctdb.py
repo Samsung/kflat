@@ -507,13 +507,13 @@ static void handler_{0}(struct kflat* kflat, struct probe_regs* regs) {{
 
 	template_kbuild_recipes = """# SPDX-License-Identifier: GPL-2.0
 
-%s_recipes-objs := \\
-%s
+{0}-objs := \\
+{1}
 
-ccflags-y := -Wno-undefined-internal -Wno-visibility -Wno-gcc-compat -Wno-unused-variable -I${PWD}/include/
+ccflags-y := -Wno-undefined-internal -Wno-visibility -Wno-gcc-compat -Wno-unused-variable -I${{PWD}}/include/
 
-obj-m = %s_recipes.o
-LINUXINCLUDE := ${LINUXINCLUDE}
+obj-m = {0}.o
+LINUXINCLUDE := ${{LINUXINCLUDE}}
 """
 
 	template_common_recipes = """#ifndef __COMMON_H__
@@ -2655,6 +2655,8 @@ def main():
 	parser.add_argument("-f", dest="func", action="store", help="", type=str)
 	parser.add_argument("-m", dest="common", action="store", help="path to the file that provides additional common code to be included in generated recipes", type=str)
 
+	parser.add_argument("--recipe-id", action="store", type=str, help="Recipe target")
+	parser.add_argument("--module-name", action="store", type=str, help="Name of the module to be generated")
 	parser.add_argument("--globals-list", action="store", type=str, help="File with list of hashes of globals that should be flattened")
 	parser.add_argument("--ignore-structs", action="store", help="Do not generate descriptions for the following structs (delimited by ',')")
 
@@ -2927,7 +2929,7 @@ def main():
 			if narg[0]==tp and narg[3]=='typedef':
 				func_args_stream.write(RecipeGenerator.template_output_struct_type_arg_handler.format(narg[7], narg[1], narg[6], -narg[4], narg[5], narg[2], "\n".join(["\t\t"+x for x in extra_info.split("\n")])))
 
-	recipe_register_stream.write(f"\tKFLAT_RECIPE(\"{args.func}\", handler_{args.func}),\n")
+	recipe_register_stream.write(f"\tKFLAT_RECIPE(\"{args.recipe_id if args.recipe_id else args.func}\", handler_{args.func}),\n")
 	recipe_handlers_stream.write(
 		RecipeGenerator.template_output_recipe_handler.format(args.func, func_args_stream.getvalue().strip(), 
 			globals_stream.getvalue().strip()))
@@ -2950,7 +2952,10 @@ def main():
 		))
 
 	with open(os.path.join(args.output,"Kbuild"),"w") as f:
-		f.write(RecipeGenerator.template_kbuild_recipes%(f"{args.func}"," \\\n".join(["    %s"%(x) for x in objs]), f"{args.func}"))
+		f.write(RecipeGenerator.template_kbuild_recipes.format(
+				args.module_name if args.module_name else args.func,
+				" \\\n".join(["    %s"%(x) for x in objs]))
+			)
 
 	for k,rL in drmap.items():
 		with open(os.path.join(args.output,"%s.c"%(k)),"w") as f:
