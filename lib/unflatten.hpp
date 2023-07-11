@@ -98,6 +98,17 @@ public:
 	 * @return generic pointer to named object or NULL in case of an error
 	 */
 	void* get_named_root(const char* name, size_t* size);
+
+	/**
+	 * @brief Replace all pointers to the provided memory range with a new variable. It can be
+	 * 	used to replace global variable from image with local copy
+	 * 
+	 * @param old_mem 	pointer to old memory	
+	 * @param new_mem 	pointer to new memory
+	 * @param size 		size of memory chunked to be replaced
+	 * @return ssize_t  number of chunkes replaced or negative value in case of an error
+	 */
+	ssize_t replace_variable(void* old_mem, void* new_mem, size_t size);
 	
 };
 
@@ -213,6 +224,18 @@ unsigned long unflatten_header_fragment_count(CUnflattenHeader header);
  * @return size_t 	size of the flatten memory
  */
 size_t unflatten_header_memory_size(CUnflattenHeader header);
+
+/**
+ * @brief Replace all pointers to the provided memory range with new variable. It can be
+ * 	used to replace global variable from image with local copy
+ * 
+ * @param flatten 	library instance
+ * @param old_mem 	pointer to old memory	
+ * @param new_mem 	pointer to new memory
+ * @param size 		size of memory chunked to be replaced
+ * @return ssize_t  number of chunkes replaced or negative value in case of an error
+ */
+ssize_t unflatten_replace_variable(CUnflatten flatten, void* old_mem, void* new_mem, size_t size);
 
 #ifdef __cplusplus
 }

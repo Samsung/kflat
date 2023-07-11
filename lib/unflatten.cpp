@@ -82,6 +82,7 @@ private:
 
 		struct rb_root_cached imap_root;
 		void* mem;
+		bool is_continous_mode;
 
 		ssize_t last_accessed_root;
 		std::vector<struct root_addr_node> root_addr;
@@ -569,6 +570,10 @@ private:
 
 			open_mode = UNFLATTEN_OPEN_MMAP;
 		}
+
+		// Update header to reflect modified memory base address
+		if(continuous_mapping)
+			FLCTRL.HDR.last_mem_addr = (uintptr_t) flatten_memory_start();
 	}
 
 
@@ -779,6 +784,7 @@ public:
 
 		if(FLCTRL.HDR.mcount == 0)
 			continuous_mapping = true;
+		FLCTRL.is_continous_mode = continuous_mapping;
 
 		// Convert continous memory into chunked area
 		if(!continuous_mapping) {
@@ -828,9 +834,6 @@ public:
 				}
 			}
 		}
-
-		if(!continuous_mapping)
-			release_mem();
 
 		// At this point mode UNFLATTEN_OPEN_READ_COPY copied all memory to local RAM
 		//  so there's no need to hold lock any longer
@@ -891,6 +894,49 @@ public:
 		if(need_unload)
 			unload();
 	}
+
+	ssize_t replace_variable(void* old_mem, void* new_mem, size_t size) {
+		ssize_t fixed = 0;
+		if(old_mem == NULL || new_mem == NULL || size == 0) {
+			info("Invalid arguments provided to .replace_variable (%p; %p; %zu)", 
+				old_mem, new_mem, size);
+			return -1;
+		}
+
+		assert(open_mode != UNFLATTEN_OPEN_MMAP_WRITE);
+		assert(FLCTRL.mem != NULL);
+		
+		for (size_t i = 0; i < FLCTRL.HDR.ptr_count; ++i) {
+			void* mem = flatten_memory_start();
+			size_t fix_loc = *((size_t*)FLCTRL.mem + i);
+			uintptr_t ptr = (uintptr_t)( *(void**)((char*)mem + fix_loc) ) - FLCTRL.HDR.last_mem_addr;
+
+			if(FLCTRL.is_continous_mode) {
+				void* target = (unsigned char*)mem + ptr;
+				if(target >= old_mem && target <= (unsigned char*)old_mem + size - 8) {
+					*(void**)((unsigned char*)mem + fix_loc) = (unsigned char*)new_mem + ((unsigned char*)target - (unsigned char*)old_mem);
+					fixed++;
+				}
+			} else {
+
+				struct interval_tree_node *node = interval_tree_iter_first(&FLCTRL.imap_root, fix_loc, fix_loc + 8);
+				assert(node != NULL);
+				size_t node_offset = fix_loc-node->start;
+
+				struct interval_tree_node *ptr_node = interval_tree_iter_first(&FLCTRL.imap_root, ptr, ptr + 8);
+				assert(ptr_node != NULL);
+				size_t ptr_node_offset = ptr-ptr_node->start;
+
+				void* target = (unsigned char*)ptr_node->mptr + ptr_node_offset;
+				if(target >= old_mem && target <= (unsigned char*)old_mem + size - 8) {
+					*((void**)((char*)node->mptr + node_offset)) = (unsigned char*)new_mem + ((unsigned char*)target - (unsigned char*)old_mem);
+					fixed++;
+				}
+			}
+		}
+
+		return fixed;
+	}
 };
 
 /********************************
@@ -926,6 +972,10 @@ void* Unflatten::get_seq_root(size_t idx) {
 
 void* Unflatten::get_named_root(const char* name, size_t* size) {
 	return engine->root_pointer_named(name, size);
+}
+
+ssize_t Unflatten::replace_variable(void* old_mem, void* new_mem, size_t size) {
+	return engine->replace_variable(old_mem, new_mem, size);
 }
 
 /********************************
@@ -1052,4 +1102,16 @@ unsigned long unflatten_header_fragment_count(CUnflattenHeader header) {
 
 size_t unflatten_header_memory_size(CUnflattenHeader header) {
 	return (unsigned long)((struct flatten_header*)header)->memory_size;
+}
+
+ssize_t unflatten_replace_variable(CUnflatten flatten, void* old_mem, void* new_mem, size_t size) {
+	try {
+		return ((UnflattenEngine*)flatten)->replace_variable(old_mem, new_mem, size);
+	} catch(std::exception& ex) {
+		fprintf(stderr, "[UnflattenLib] Failed to replace variable references - `%s`\n", ex.what());
+		return -1;
+	} catch(...) {
+		fprintf(stderr, "[UnflattenLib] Failed to replace variable references\n");
+		return -1;
+	}
 }
