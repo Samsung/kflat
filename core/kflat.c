@@ -1,6 +1,6 @@
 /**
  * @file kflat.c
- * @author Pawel Wieczorek (p.wieczorek@samsung.com)
+ * @author Samsung R&D Poland - Mobile Security Group (srpol.mb.sec@samsung.com)
  * @brief Collection of driver's entry points for userspace
  * 
  * File operations have been slightly inspired by Linux KCOV
@@ -603,7 +603,7 @@ static void __exit kflat_exit(void) {
 	kdump_exit();
 }
 
-MODULE_AUTHOR("Bartosz Zator, Pawel Wieczorek");
+MODULE_AUTHOR("Samsung R&D Poland - Mobile Security Group (srpol.mb.sec@samsung.com)");
 MODULE_DESCRIPTION("Kernel driver allowing user to dump kernel structures");
 MODULE_LICENSE("GPL");
 

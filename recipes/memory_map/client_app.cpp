@@ -1,6 +1,6 @@
 /**
  * @file client_app.c
- * @author Pawel Wieczorek (p.wieczorek@samsung.com)
+ * @author Samsung R&D Poland - Mobile Security Group (srpol.mb.sec@samsung.com)
  * @brief User application presenting the content of memory dump performed
  *      by memory_map_recipe.ko module
  */

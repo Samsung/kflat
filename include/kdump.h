@@ -1,6 +1,6 @@
 /**
  * @file kdump.h
- * @author Pawel Wieczorek (p.wieczorek@samsung.com)
+ * @author Samsung R&D Poland - Mobile Security Group (srpol.mb.sec@samsung.com)
  * @brief Structures and functions responsible of memory disovery
  *  and pointers validation
  * 

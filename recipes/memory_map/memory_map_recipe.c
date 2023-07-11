@@ -1,6 +1,6 @@
 /**
  * @file memory_map_recipe.c
- * @author Pawel Wieczorek (p.wieczorek@samsung.com)
+ * @author Samsung R&D Poland - Mobile Security Group (srpol.mb.sec@samsung.com)
  * @brief Example kflat recipe hooking into kflat itself and dumping
  *  kernel's memory map
  * 

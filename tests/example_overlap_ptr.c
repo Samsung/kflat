@@ -1,6 +1,6 @@
 /**
  * @file example_overlap_ptr.c
- * @author Samsung R&D Poland - Mobile Security Group
+ * @author Samsung R&D Poland - Mobile Security Group (srpol.mb.sec@samsung.com)
  */
 
 #include "common.h"

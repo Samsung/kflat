@@ -1,5 +1,5 @@
 /*
- * Samsung R&D Poland - Mobile Security Group
+ * Samsung R&D Poland - Mobile Security Group (srpol.mb.sec@samsung.com)
  */
 
 #include "common.h"

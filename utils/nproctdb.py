@@ -23,7 +23,7 @@ except ImportError:
 	sys.exit("Failed to import libftdb module. Make sure your PYTHONPATH"
 			 " env is pointing to the output directory of CAS repo")
 
-__authors__ = "Bartosz Zator, Pawel Wieczorek @ Samsung R&D Poland - Mobile Security Group"
+__authors__ = "Samsung R&D Poland - Mobile Security Group (srpol.mb.sec@samsung.com)"
 
 
 ##################################

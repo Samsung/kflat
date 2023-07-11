@@ -1,6 +1,6 @@
 /**
  * @file uflattest.c
- * @author Samsung R&D Poland - Mobile Security Group
+ * @author Samsung R&D Poland - Mobile Security Group (srpol.mb.sec@samsung.com)
  * @brief Cmdline tool for invoking userspace UFLAT tests
  */
 

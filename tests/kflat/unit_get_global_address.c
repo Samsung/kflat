@@ -1,6 +1,6 @@
 /**
  * @file unit_get_global_address.c
- * @author Samsung R&D Poland - Mobile Security Group
+ * @author Samsung R&D Poland - Mobile Security Group (srpol.mb.sec@samsung.com)
  * 
  */
 

@@ -1,6 +1,6 @@
 /**
  * @file uflat.h
- * @author Pawel Wieczorek (p.wieczorek@samsung.com)
+ * @author Samsung R&D Poland - Mobile Security Group (srpol.mb.sec@samsung.com)
  * @brief Userspace FLAT (UFLAT) main header file
  * 
  */

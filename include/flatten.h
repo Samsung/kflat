@@ -1,6 +1,6 @@
 /**
  * @file flatten.h
- * @author Pawel Wieczorek (p.wieczorek@samsung.com)
+ * @author Samsung R&D Poland - Mobile Security Group (srpol.mb.sec@samsung.com)
  * @brief Header for feneric flattening code; base of both KFLAT and UFLAT
  * 
  */

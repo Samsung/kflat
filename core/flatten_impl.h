@@ -1,6 +1,6 @@
 /**
  * @file flatten_impl.h
- * @author Pawel Wieczorek (p.wieczorek@samsung.com)
+ * @author Samsung R&D Poland - Mobile Security Group (srpol.mb.sec@samsung.com)
  * @brief 
  * @version 0.1
  * @date 2023-05-24

@@ -1,6 +1,6 @@
 /**
  * @file drm_client.c
- * @author Pawel Wieczorek (p.wieczorek@samsung.com)
+ * @author Samsung R&D Poland - Mobile Security Group (srpol.mb.sec@samsung.com)
  * @brief App presenting the content of dumped DRM framebuffer structures
  * 
  */

@@ -1,6 +1,6 @@
 /**
  * @file example_my_list_head.c
- * @author Samsung R&D Poland - Mobile Security Group
+ * @author Samsung R&D Poland - Mobile Security Group (srpol.mb.sec@samsung.com)
  * 
  */
 

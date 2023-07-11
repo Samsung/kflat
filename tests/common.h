@@ -1,6 +1,6 @@
 /**
  * @file common.h
- * @author Samsung R&D Poland - Mobile Security Group
+ * @author Samsung R&D Poland - Mobile Security Group (srpol.mb.sec@samsung.com)
  * @brief Common include header for all KFLAT & UFLAT tests. Sections
  *  marked __TESTER__ performs flattening of sample data, while sections
  *  __VALIDATOR__ restores and checks memory.

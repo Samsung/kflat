@@ -1,6 +1,6 @@
 /**
  * @file unit_flatten_string_ex.c
- * @author Samsung R&D Poland - Mobile Security Group
+ * @author Samsung R&D Poland - Mobile Security Group (srpol.mb.sec@samsung.com)
  * 
  */
 

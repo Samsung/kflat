@@ -1,6 +1,6 @@
 /**
  * @file flatten_image.h
- * @author Pawel Wieczorek (p.wieczorek@samsung.com)
+ * @author Samsung R&D Poland - Mobile Security Group (srpol.mb.sec@samsung.com)
  * @brief Definition of flatten image header
  * 
  */

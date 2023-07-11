@@ -1,6 +1,6 @@
 /**
  * @file kdump.c
- * @author Samsung R&D Poland - Mobile Security Group
+ * @author Samsung R&D Poland - Mobile Security Group (srpol.mb.sec@samsung.com)
  * @brief Collection of functions for testing kernel address and
  *   dumping virtual memory layout
  * 
