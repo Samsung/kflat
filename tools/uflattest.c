@@ -450,6 +450,9 @@ int main(int argc, char** argv) {
     
     sigaction(SIGSEGV, &sig_intercept, NULL);
     sigaction(SIGBUS, &sig_intercept, NULL);
+    sigaction(SIGFPE, &sig_intercept, NULL);
+    sigaction(SIGILL, &sig_intercept, NULL);
+    sigaction(SIGABRT, &sig_intercept, NULL);
 
     // Execute all tests requested by user
     struct tests_list* el = tests_list_tail;
