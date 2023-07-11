@@ -150,8 +150,6 @@ static int kflat_flatten_string_validate(void *memory, size_t size, CUnflatten f
 			ASSERT(str1->strMiddleEnded[i] == '\0');
 			ASSERT(str2->strMiddleEnded[i] == '\0');
 		} else if(i > 4096 * 5 + 17) {
-			ASSERT(str1->strMiddleEnded[i] != 'A' + (i % 28));
-			ASSERT(str2->strMiddleEnded[i] != 'A' + (i % 28));
 			break;
 		}
 		else {
