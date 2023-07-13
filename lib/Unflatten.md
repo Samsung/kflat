@@ -45,15 +45,15 @@ Unflatten::get_named_root(const char* name, size_t* size);
 
 ### C Interface
 
-Unflatten library exposes C binding for all available class methods. The usage and arguments are similar to those in C++ interface. Additionally, user must manually release class resources by invoking `flatten_deinit` method.
+Unflatten library exposes C binding for all available class methods. The usage and arguments are similar to those in C++ interface. Additionally, user must manually release class resources by invoking `unflatten_deinit` method.
 
 ```c
-CUnflatten flatten_init(int level);
-void flatten_deinit(CUnflatten flatten);
-int flatten_load(CUnflatten flatten, FILE* file, get_function_address_t gfa);
-void* flatten_root_pointer_next(CUnflatten flatten);
-void* flatten_root_pointer_seq(CUnflatten flatten, size_t idx);
-void* flatten_root_pointer_named(CUnflatten flatten, const char* name, size_t* idx);
+CUnflatten unflatten_init(int level);
+void unflatten_deinit(CUnflatten flatten);
+int unflatten_load(CUnflatten flatten, FILE* file, get_function_address_t gfa);
+void* unflatten_root_pointer_next(CUnflatten flatten);
+void* unflatten_root_pointer_seq(CUnflatten flatten, size_t idx);
+void* unflatten_root_pointer_named(CUnflatten flatten, const char* name, size_t* idx);
 ```
 
 Any exception thrown by underlying C++ code is caught and converted to `-1` or `NULL`, depending on the function return value type.
