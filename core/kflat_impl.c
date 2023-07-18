@@ -121,10 +121,6 @@ static bool _flatten_get_heap_obj(struct page* page, void* ptr, void** start, vo
 	if(offset < cache->useroffset || cache->useroffset + cache->usersize < offset)
 		return false;
 
-	printk(KERN_INFO "KFLAT DEBUG: ptr(%llx) offset(%llx) cache->useroffset(%llx) cache->usersize(%llx)",
-		ptr, offset, cache->useroffset, cache->usersize);
-	printk(KERN_INFO "KFLAT DEBUG: object_size(%llx)", object_size);
-
 	if(start)
 		*start = ptr - offset + cache->useroffset;
 	if(end)
