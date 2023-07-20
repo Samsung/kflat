@@ -686,7 +686,7 @@ struct flatten_pointer* FUNC_NAME(struct flat* flat, const void* ptr, uintptr_t 
 		({			\
 			void *__start, *__end;	\
 			bool rv = flatten_get_object(__ptr, &__start, &__end);	\
-			(rv)?(__end-__ptr+1):(__dEFAULT_size);	\
+			(rv && __end != __start)?(__end-__ptr+1):(__dEFAULT_size);	\
 		})
 
 /* The following dEFAULT macro argument implementation was based on https://stackoverflow.com/a/3048361 */

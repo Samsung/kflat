@@ -118,13 +118,16 @@ static bool _flatten_get_heap_obj(struct page* page, void* ptr, void** start, vo
 	if(object_size <= offset)
 		return false;
 
-	if(offset < cache->useroffset || cache->useroffset + cache->usersize < offset)
+	if(cache->usersize != 0)
+		object_size = cache->usersize;
+
+	if(offset < cache->useroffset || cache->useroffset + object_size < offset)
 		return false;
 
 	if(start)
 		*start = ptr - offset + cache->useroffset;
 	if(end)
-		*end = ptr - offset + cache->useroffset + cache->usersize;
+		*end = ptr - offset + cache->useroffset + object_size;
 	return true;
 }
 
@@ -176,10 +179,13 @@ static bool _flatten_get_heap_obj(struct slab* slab, void* ptr,
 	if(object_size <= offset)
 		return false;
 
+	if(cache->usersize != 0)
+		object_size = cache->usersize;
+
 	if(start)
 		*start = ptr - offset + cache->useroffset;
 	if(end)
-		*end = ptr - offset + cache->useroffset + cache->usersize;
+		*end = ptr - offset + cache->useroffset + object_size;
 	return true;
 }
 
