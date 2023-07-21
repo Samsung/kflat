@@ -326,7 +326,7 @@ AGGREGATE_FLATTEN_STRUCT_ARRAY_SELF_CONTAINED(list_head,{0},{1}.prev,{4},1);
 {{
 	struct {5}* __entry;
 	list_for_each_entry_from_offset(__entry, &OFFATTR(struct list_head,{2}), {6} ) {{
-		FOR_POINTER(struct {5}*,____entry,__entry,
+		FOR_POINTER(struct {5}*,____entry,&__entry,
 				FLATTEN_STRUCT_ARRAY_SELF_CONTAINED({5},{7},____entry,1);
 		);
 	}}
@@ -344,9 +344,7 @@ AGGREGATE_FLATTEN_STRUCT_ARRAY_SELF_CONTAINED(list_head,{0},{1}.prev,{4},1);
 	struct {2}* __entry;
 	struct list_head* __lhead = (struct list_head*){1};
 	list_for_each_entry_from_offset(__entry, __lhead, {3} ) {{
-		FOR_POINTER(struct {2}*,____entry,__entry,
-				FLATTEN_STRUCT_ARRAY_SELF_CONTAINED({2},{4},____entry,1);
-		);
+		FLATTEN_STRUCT_ARRAY_SELF_CONTAINED({2},{4},__entry,1);
 	}}
 }}"""
 
@@ -1002,6 +1000,7 @@ LINUXINCLUDE := ${{LINUXINCLUDE}}
 				return anonstruct_type_name
 			else:
 				if not nestedPtr:
+					assert rT.isunion is False or PTEoff==0, "Invalid shift size != 0 for union member"
 					recipe = indent(RecipeGenerator.template_flatten_struct_member_recipe.format(
 							"STRUCT" if rT.isunion is False else "UNION",
 							rT.str,
@@ -1032,14 +1031,15 @@ LINUXINCLUDE := ${{LINUXINCLUDE}}
 
 	def get_element_count(self,mStr):
 
-			# Normally we cannot know whether the pointer points to a single struct or an array of structs
-			# Try to conclude that from information in config file, otherwise assume there's a single pointed element there
-			record_count_tuple = [1,None,None,'','derived']
+			# Normally we cannot know whether the pointer points to a single struct or an array of structs (or other types)
+			# Try to conclude that from information in config file, otherwise we will try to detect it at runtime
+			# When the detection fails we will assume there's a single element pointed there (default value)
+			record_count_tuple = [1,None,None,'','default']
 			# [0] record_count (If this is None then the dereference expression gives us ambiguous results; more info in extra field)
 			# [1] record_count_expr (This is the code expression that yields the record count (exclusively used if not None))
 			# [2] record_count_extra
 			# [3] record_count_extra_kind (either 'deref', 'assign' or 'nested')
-			# [4] record_count_kind (either 'direct' or 'derived')
+			# [4] record_count_kind (either 'direct', 'derived' or 'default')
 			if 'ptr_config' in self.config:
 				haveCount = False
 				# First check if this information is given to us directly
@@ -1057,38 +1057,56 @@ LINUXINCLUDE := ${{LINUXINCLUDE}}
 				if not haveCount:
 					# Ok, so try to conclude this information from precomputed data
 					# First check if in dereference expression this member is never used with offset > 0 (or with any variables used in the offset expression)
-					#  or we don't have dereference information for this member
+					#  or we don't have dereference information for this member (meaning it was never used in dereference expressions)
 					deref_offset = 0
-					if 'deref_map' in self.config['ptr_config']:
+					if 'deref_map' in self.config['ptr_config'] and 'assign_list' in self.config['ptr_config']:
 						deref_map = self.config['ptr_config']['deref_map']
 						if mStr in deref_map:
 							dL = deref_map[mStr]
 							deref_offset = sum([x[0]+x[1] for x in dL])
-					if deref_offset>0:
-						# The conclusion gives us ambiguous results (either we use the member with non-zero offset at dereference expresion or other variables are involved)
-						record_count_tuple[0] = None
-						record_count_tuple[2] = dL
-						record_count_tuple[3] = 'deref'
-					else:
+						if deref_offset>0:
+							# The conclusion gives us ambiguous results (either we use the member with non-zero offset at dereference expresion or other variables are involved)
+							record_count_tuple[0] = None
+							record_count_tuple[2] = dL
+							record_count_tuple[3] = 'deref'
+							return record_count_tuple
 						# Now check if this member is not used in the right-hand side of any assignment expression
 						#  (otherwise we wouldn't be sure if the assigned value is not used at some other dereference expression somewhere else)
-						if 'assign_list' in self.config['ptr_config']:
-							assign_list = self.config['ptr_config']['assign_list']
-							if mStr in assign_list:
-								# Our member is on the right hand side of some assignment expression; we conclude ambiguously
-								record_count_tuple[0] = None
-								record_count_tuple[2] = assign_list[mStr]
-								record_count_tuple[3] = 'assign'
+						assign_list = self.config['ptr_config']['assign_list']
+						if mStr in assign_list:
+							# Our member is on the right hand side of some assignment expression; we conclude ambiguously
+							record_count_tuple[0] = None
+							record_count_tuple[2] = assign_list[mStr]
+							record_count_tuple[3] = 'assign'
+							return record_count_tuple
+						# Our pointer member is not used in any dereference expression with offset > 0
+						# Also it's not used at the right-hand side of any assignment expression
+						# Let's then assume that we point to a single element of a given type
+						extra_msg = "/* We've concluded that this pointer is not used in any dereference expression with offset > 0.\n\
+Also it's not used at the right-hand side of any assignment expression.\n\
+We then assume that this pointer is pointing to a single element of a given type */\n"
+						record_count_tuple = [1,None,None,'','derived']
 
 			return record_count_tuple
 
 
-	def construct_element_count_expression(self,record_count_tuple,refname,mStr):
+	def construct_element_count_expression(self,record_count_tuple,refname,mStr,refoffset,refsize,ptrLevel):
 		if record_count_tuple[1] is not None:
 			return (record_count_tuple[1],'')
 		else:
+			detect_element_count_expr = "\n  AGGREGATE_FLATTEN_DETECT_OBJECT_SIZE_SELF_CONTAINED(%s,%d,%d)/%s"%(ptrNestedRefName(refname,ptrLevel),refoffset//8,refsize//8,refsize//8)
 			if record_count_tuple[0] is not None:
-				return (str(record_count_tuple[0]),'')
+				if record_count_tuple[4]!='default':
+					return (str(record_count_tuple[0]),'')
+				else:
+					# We don't have information about the number of elements the pointer points to
+					# Try to detect the object size pointed to by this pointer and conclude the number
+					#  of elements based on that
+					# When it fails adhere to the simple default of single element
+					detect_extra_msg = "/* We couldn't find the number of elements this pointer is pointing to (also no direct information in config file exists).\n\
+   We'll try to detect the number of elements based on the object size pointed to by this pointer (assuming it's on the heap).\n\
+   When it fails we'll default to a single element pointed to by it */\n"
+					return (detect_element_count_expr,detect_extra_msg)
 			else:
 				if record_count_tuple[3]=='deref':
 					ambiguous_exprs = list()
@@ -1101,7 +1119,7 @@ LINUXINCLUDE := ${{LINUXINCLUDE}}
 								aexpr+="  | %d variables in offset expression"%(dT[1])
 							ambiguous_exprs.append(aexpr)
 					msg = "/* Couldn't conclude unambiguously the number of elements pointer points to.\n\
-   Member '{0}' was used in {1} dereference expressions and the ambiguous expressions were as follows:\n{2}\n */\n".format(
+   Member '{0}' was used in {1} dereference expressions and the ambiguous expressions were as follows:\n{2}\n".format(
   			"%s [%s]"%(refname,mStr),
   			len(record_count_tuple[2]),
   			"\n".join(ambiguous_exprs)
@@ -1111,13 +1129,14 @@ LINUXINCLUDE := ${{LINUXINCLUDE}}
 					for expr in record_count_tuple[2]:
 						ambiguous_exprs.append("     "+expr)
 					msg = "/* Couldn't conclude unambiguously the number of elements pointer points to.\n\
-   Member '{0}' was used on the right-hand side of the following assignment expressions:\n{1}\n */\n".format(
+   Member '{0}' was used on the right-hand side of the following assignment expressions:\n{1}\n".format(
   			"%s [%s]"%(refname,mStr),
   			"\n".join(ambiguous_exprs)
   	)
 				else:
-					msg = "/* Couldn't conclude the number of elements pointer points to as this was a nested pointer at higher level than 0 */\n"
-				return (str(1),msg)
+					msg = "/* Couldn't conclude the number of elements pointer points to as this was a nested pointer at higher level than 0\n"
+				msg += "   We will try to detect the array size at runtime. When it fails we will dump a single element pointed to by this pointer (default)\n */\n"
+				return (detect_element_count_expr,msg)
 
 	# out - 
 	# ptrT - type of the structure member being processed
@@ -1134,11 +1153,15 @@ LINUXINCLUDE := ${{LINUXINCLUDE}}
 	# ptrLevel -
 	def generate_flatten_pointer(self,out,ptrT,pteT,pteEXT,mStr,refname,refoffset,TRT,tab,TPDptrT=None,TPDpteT=None,ptrLevel=0):
 		if ptrLevel<=0:
-			record_count_tuple = self.get_element_count(mStr)
+			if pteEXT is not None and len(pteEXT)>4:
+				# 'container_of' chain - assume single pointed element
+				record_count_tuple = [1,None,None,'direct','']
+			else:
+				record_count_tuple = self.get_element_count(mStr)
 		else:
 			# Pointer at the higher level of nesting is ambiguous (cannot extract information from dereference expressions about its usage at this point)
-			record_count_tuple = [None,None,None,'nested']
-		element_count_expr,element_count_extra_msg = self.construct_element_count_expression(record_count_tuple,refname,mStr)
+			record_count_tuple = [None,None,None,'nested','']
+		element_count_expr,element_count_extra_msg = self.construct_element_count_expression(record_count_tuple,refname,mStr,refoffset,pteT.size,ptrLevel)
 		safe=record_count_tuple[1] is not None or record_count_tuple[0] is not None
 
 		pteEXTmsg = ""
@@ -1186,6 +1209,20 @@ LINUXINCLUDE := ${{LINUXINCLUDE}}
 			else:
 				if pteEXT[2]!='string':
 					# The pointer points to other type than the original type
+					tp_chain_msg = ""
+					if len(pteEXT)>4:
+						tp_chain_msg = "   It was further detected that the type the member points to was additionally embedded into more enclosing types accessed using \
+the 'container_of' invocation chain.\n   The invocation chain was as follows:\n{0}\n".format(
+					   		"\n".join(["     {0}@{1}: {2} -> {3} : {4} @ {5}".format(
+							            x[0].split("____")[1],
+							            x[0].split("____")[2],
+							            x[1]['tpargs'] if 'tpargs' in x[1] else x[1]['tpvars'] if 'tpvars' in x[1] else '',
+							            x[1]['tps'],
+							            x[1]['offset'],
+							            x[1]['expr']
+					        ) for x in pteEXT[4]])
+   	)
+
 					pteEXTmsg = "/* It was detected that the member\n\
      '{0}'\n\
    points to the other type than specified in the member type specification.\n\
@@ -1194,12 +1231,13 @@ LINUXINCLUDE := ${{LINUXINCLUDE}}
    with offset {4} and we concluded that using {2}.\n\
    The expression(s)/custom info we concluded it from was:\n\
      {3}\n\
-  */\n".format(
+{5} */\n".format(
 	 		"%s [%s]"%(refname,mStr),
 	 		self.ftdb.types[pteEXT[0]].hash,
 	 		ptenfo[0],
 	 		ptenfo[1],
-	 		pteEXT[1]
+	 		pteEXT[1],
+	 		tp_chain_msg
 	 	)
 				else:
 		 			# We have a c-string member
@@ -1445,11 +1483,7 @@ LINUXINCLUDE := ${{LINUXINCLUDE}}
 		return "struct %s"%(T.str)
 
 	def generate_flatten_pointer_trigger(self,out,T,TPD,gvname,tab=0,ptrLevel=0,arrsize=1):
-		TPD = None
-		if T.classname=="typedef":
-			TPD = T
-			T = self.walkTPD(T)
-		
+
 		if T.classname=="attributed" and "__attribute__((noderef))" in T.attrcore:
 			# Global variable points to user memory
 			return None
@@ -1647,7 +1681,7 @@ LINUXINCLUDE := ${{LINUXINCLUDE}}
 										have_lh_head = True
 										extra_info += "\nWe have resolved this 'list_head' variable to define a list of '{0}' elements (of size {1}) each having its 'list_head' anchor at the offset {2}".format(
 											'struct %s'%(containerT.str) if containerT.classname=='record' else containerT.name,
-											containerT.size,
+											containerT.size//8,
 											rnfo[1]
 										)
 								else:
@@ -1961,7 +1995,7 @@ LINUXINCLUDE := ${{LINUXINCLUDE}}
 				results.add((type.id, type.str))
 			return results
 		# TRT - the underlying record type for which the harness is generated
-		# TRTTPD - 
+		# TRTTPD - if the underlying type is a typedef this is this typedef type
 		TRTTPD = None
 		if T.classname=='typedef':
 			TRTTPD = T
@@ -1987,8 +2021,6 @@ LINUXINCLUDE := ${{LINUXINCLUDE}}
 				real_refs = list()
 				ignore_count=0
 				mVTree = IntervalTree()
-				allowSpecs = TRT.str in self.allowed_members
-				specs = self.allowed_members.get(TRT.str, set())
 				# As of the current quirk of dbjson when there's anonymous record inside a structure followed by a name we will have two entries in "refs"
 				#  but only single entry in "memberoffsets"
 				#	struct X { ... };       // ignore "__!recorddecl__" from refs/refnames/usedrefs (present in decls)
@@ -2005,7 +2037,7 @@ LINUXINCLUDE := ${{LINUXINCLUDE}}
 					erfnLst = []
 					if TRT.refnames[i]!='__!anonrecord__':
 						erfnLst.append(TRT.refnames[i])
-					real_refs.append( (Ts,TRT,TRTTPD,TRT.refs[i],TRT.refnames[i],TRT.usedrefs[i],TRT.memberoffsets[i-ignore_count],[],[],[],False) )
+					real_refs.append( (Ts,TRT,TRTTPD,TRT.refs[i],TRT.refnames[i],TRT.usedrefs[i],TRT.memberoffsets[i-ignore_count],[],[],[],[],False) )
 			except Exception as e:
 				print(json.dumps(TRT.json(),indent=4))
 				raise e
@@ -2025,16 +2057,25 @@ LINUXINCLUDE := ${{LINUXINCLUDE}}
 				# mOff: member_offset
 				# mOffLst: list of member offsets in the member chain of enclosed structure types (that allows to compute the final offset for nested member)
 				# rfnLst: list of member names in the member chain of enclosed structure types
+				# allowSpecLst: list of allowed access specification in the member chain of enclosed structure types
 				# erfnLst: refname list of members chain in the outermost enclosing type (for anonymous records and anchor types)
-				# anchorMember: if this is True we have a member who is an anchor and its internal member were already processed
+				# anchorMember: if this is True we have a member who is an anchor and its internal members were already processed
 				#  (you can do some additional processing for recipe generation)
-				Ts,eT,eTPD,mID,mName,mURef,mOff,mOffLst,rfnLst,erfnLst,anchorMember = real_refs.pop(0)
+				Ts,eT,eTPD,mID,mName,mURef,mOff,mOffLst,rfnLst,allowSpecLst,erfnLst,anchorMember = real_refs.pop(0)
 				refname = ".".join(rfnLst+[mName])
 				erfn = ".".join(erfnLst+[mName])
 				moffset = sum(mOffLst+[mOff])
 				mStr = "s:%s:%s"%(eT.str,erfn) if eT.str!='' else "t:%s:%s"%(eTPD.name,erfn) if eTPD is not None else "%s:%s"%(Ts,erfn)
 				eStr = "s:%s"%(eT.str) if eT.str!='' else "t:%s"%(eTPD.name) if eTPD is not None else "%s:%s"%(Ts,erfn)
-
+				refaccess = True
+				if len(erfnLst)>0:
+					refbase = ".".join(erfnLst)
+					if Ts in self.allowed_members and refbase not in self.allowed_members.get(Ts, set()):
+						refaccess = False
+				else:
+					if Ts in self.allowed_members and mName not in self.allowed_members.get(Ts, set()):
+						refaccess = False
+				
 				self.member_count+=1
 				# RT - type of the structure member being processed
 				# TPD - if structure member is a typedef this is the original typedef type otherwise it's None
@@ -2127,7 +2168,7 @@ LINUXINCLUDE := ${{LINUXINCLUDE}}
 										if len(containerT_L)==1:
 											extra_info += "\nWe have resolved this 'list_head' member to define a list of '{0}' elements (of size {1}) each having its 'list_head' anchor at the offset {2}".format(
 												'struct %s'%(containerT_L[0].str),
-												containerT_L[0].size,
+												containerT_L[0].size//8,
 												offset
 											)
 											containerT = containerT_L[0]
@@ -2199,6 +2240,7 @@ LINUXINCLUDE := ${{LINUXINCLUDE}}
 						else:
 							member_list = list()
 							emember_list = list()
+							allowspec_list = list()
 							if mName=="__!anonrecord__":
 								eTs,eRT,eRTTPD = Ts,eT,eTPD
 							else: # mName!="__!anonrecord__"
@@ -2206,17 +2248,18 @@ LINUXINCLUDE := ${{LINUXINCLUDE}}
 									eTs,eRT,eRTTPD = Ts,eT,eTPD
 									emember_list.append(mName)
 								else:
-									eTs,eRT,eRTTPD = None,RT,TPD
+									eTs,eRT,eRTTPD = "t:%s"%(TPD.name) if TPD is not None else "s:%s"%(RT.str),RT,TPD
 									erfnLst.clear()
 								member_list.append(mName)
+								allowspec_list.append(refaccess)
 							internal_real_refs.append( (eTs,eRT,eRTTPD,RT.refs[i],RT.refnames[i],RT.usedrefs[i],RT.memberoffsets[i-ignore_count],
-								mOffLst+[mOff],rfnLst+member_list,erfnLst+emember_list,False) )
-					internal_real_refs.append( (Ts,eT,eTPD,mID,mName,mURef,mOff,mOffLst,rfnLst,erfnLst,True) )
+								mOffLst+[mOff],rfnLst+member_list,allowSpecLst+allowspec_list,erfnLst+emember_list,False) )
+					internal_real_refs.append( (Ts,eT,eTPD,mID,mName,mURef,mOff,mOffLst,rfnLst,allowSpecLst,erfnLst,True) )
 					real_refs = internal_real_refs+real_refs
 					continue
 
 				# Check whether fields in this structure haven't been restricted by config file
-				if allowSpecs and erfn not in specs:
+				if not (all(allowSpecLst) and refaccess is True):
 					proc_members.append(("/* flattening member '%s' was restricted by a config file */\n"%(refname),None))
 					continue
 
@@ -2237,7 +2280,7 @@ LINUXINCLUDE := ${{LINUXINCLUDE}}
 						proc_members.append(("/* member '%s' was not used [call graph] */\n"%(refname),None))
 						continue
 
-				proc_members.append((eT,eTPD,mID,mName,mURef,mOff,mOffLst,rfnLst,erfnLst,refname,erfn,moffset,mStr,eStr))
+				proc_members.append((eT,eTPD,mID,mName,mURef,mOff,mOffLst,rfnLst,allowSpecLst,erfnLst,refname,erfn,moffset,mStr,eStr,refaccess))
 
 				moffEnd = moffset
 				if RT.size<=0:
@@ -2251,6 +2294,7 @@ LINUXINCLUDE := ${{LINUXINCLUDE}}
 
 			mi = -1
 			outv = list()
+			proc_members_to_process_num = len([x for x in proc_members if len(x)>2])
 			for item in proc_members:
 				if len(item)==2:
 					# We have precomputed member information already
@@ -2263,7 +2307,7 @@ LINUXINCLUDE := ${{LINUXINCLUDE}}
 						outv.append(item[0])
 					continue
 				else:
-					eT,eTPD,mID,mName,mURef,mOff,mOffLst,rfnLst,erfnLst,refname,erfn,moffset,mStr,eStr = item
+					eT,eTPD,mID,mName,mURef,mOff,mOffLst,rfnLst,allowSpecLst,erfnLst,refname,erfn,moffset,mStr,eStr,refaccess = item
 				
 				mi+=1
 				RT = self.ftdb.types[mID]
@@ -2286,8 +2330,10 @@ LINUXINCLUDE := ${{LINUXINCLUDE}}
 					# [3] extra
 					#		for 'container_of' this is the container_of expression; in case of ambiguity this is the full container_of_map entry list
 					#		for 'pvoid' this is a list of 'void*' cast expressions; in case of ambiguity this is full pvoid_map entry list
-					#   for 'string' this is a list of call expressions passed to the c-string parameters (no ambiguity possible)
+					#		for 'string' this is a list of call expressions passed to the c-string parameters (no ambiguity possible)
 					#		for 'custom' this is the custom info from config file (no ambiguity)
+					# [4] more extra
+					#       for 'pvoid' this is 'container_of_parm_map' element information of 'container_of' calling functions in the surrounding type chain
 
 					# Handle overlapping members
 					if 'OT_info' in self.config and 'overlapping_members' in self.config['OT_info']:
@@ -2320,8 +2366,8 @@ LINUXINCLUDE := ${{LINUXINCLUDE}}
 							TTstr = PTE.hash
 						print ("struct %s (%s)[%s]"%(self.ftdb.types[eT.id].str,erfn,TTstr))
 					
-					# Check if the member pointer points to different type than specified in the structure
-					#  (either throught the use of 'container_of' macro or source type casting constructs)
+					# Check if the member pointer points to a different type than specified in the structure
+					#  (either through the use of 'container_of' macro or source type casting constructs)
 					#  (or we point to the type directly through the config file)
 					if 'ptr_config' in self.config:
 						havePte = False
@@ -2365,12 +2411,69 @@ LINUXINCLUDE := ${{LINUXINCLUDE}}
 								if len(vM)==1:
 									tp = self.ftdb.types[int(list(vM.keys())[0])]
 									if tp.classname=='pointer':
-										PTEExt = (int(list(vM.keys())[0]),0,'pvoid',list(set(list(vM.values())[0])))
+										PTEExt = (tp.refs[0],0,'pvoid',list(set(list(vM.values())[0])))
 										PTE = self.ftdb.types[tp.refs[0]]
 									else:
 										PTEExt = (-1,0,'pvoid',vM)
 								else:
 									PTEExt = (-1,0,'pvoid',vM)
+
+						if (PTEExt is None and (PTE.classname=="record" or PTE.classname=="record_forward" or (PTE.classname=="typedef" and self.walkTPD(PTE).classname=="record"))) or\
+							(PTEExt is not None and PTEExt[2]!='custom' and PTEExt[2]!='string'):
+							# Now check if our pointer member points to inside of an even larger type
+							# Do this by walking the 'container_of_(l/p)arm_map' to check whether any argument
+							#  passed to the 'container_of' invoking function (or 'container_of' on local variable)
+							#  had the type our pointer points to
+							# If so recompute the offset of our pointer inside the larger type
+							if 'container_of_parm_map' in self.config['ptr_config'] and 'container_of_local_map' in self.config['ptr_config']:
+								cpM = self.config['ptr_config']['container_of_parm_map']
+								clM = self.config['ptr_config']['container_of_local_map']
+								tp_chain = list()
+								if PTEExt is None:
+									cPTE = PTE.id
+								else:
+									cPTE = PTEExt[0]
+								while True:
+									nPTE = None
+									for fkey,cinfo in cpM.items():
+										if len(cinfo)>1:
+											# Omit ambiguous entries
+											continue
+										tpargid = self.ftdb.types.entry_by_id(cinfo[0]['tpargid'])
+										if tpargid.classname=='pointer' and tpargid.refs[0]==cPTE:
+											# We look for exactly one match
+											if nPTE is not None:
+												nPTE = None
+												break
+											nPTE = (fkey,cinfo[0])
+									else:
+										if nPTE is None:
+											for fkey,cinfo in clM.items():
+												if len(cinfo)>1:
+													# Omit ambiguous entries
+													continue
+												tpvarid = self.ftdb.types.entry_by_id(cinfo[0]['tpvarid'])
+												if tpvarid.classname=='pointer' and tpvarid.refs[0]==cPTE:
+													# We look for exactly one match
+													if nPTE is not None:
+														nPTE = None
+														break
+													nPTE = (fkey,cinfo[0])
+									if nPTE:
+										# We've found unambiguous entry, save it a look further until no more entries are found
+										tp_chain.append(nPTE)
+										cPTE = nPTE[1]['tpid']
+									else:
+										break
+								if len(tp_chain)>0:
+									if PTEExt is None:
+										ext_kind = 'container_of'
+										ext_msg = 'N/A'
+									else:
+										ext_kind = PTEExt[2]
+										ext_msg = PTEExt[3]
+									PTEExt = (tp_chain[-1][1]['tpid'],sum([x[1]['offset'] for x in tp_chain]),ext_kind,ext_msg,tp_chain)
+									PTE = self.ftdb.types[tp_chain[-1][1]['tpid']]
 						
 					# Now try to generate some recipes
 					TPDE = None
@@ -2412,7 +2515,7 @@ LINUXINCLUDE := ${{LINUXINCLUDE}}
 						except Exception as e:
 							# Here we can have a constant array of size 0 (cause the underlying type is empty struct of size 0)
 							sz = 0
-						if RT.classname=="const_array":
+						if RT.classname=="const_array" or sz==0:
 							if sz>0:
 								if not TPDAT:
 									if AT.str=="":
@@ -2422,7 +2525,9 @@ LINUXINCLUDE := ${{LINUXINCLUDE}}
 											sz,
 											anonstruct_type_name,
 											refname,
-											self.safeInfo(False)
+											moffset//8,
+											self.safeInfo(False),
+											AT.size//8
 										),0)+"\n")
 										self.struct_deps.add((AT.id,anonstruct_type_name))
 									else:
@@ -2457,8 +2562,8 @@ LINUXINCLUDE := ${{LINUXINCLUDE}}
 									self.struct_deps.add((TPDAT.id,TPDAT.name))
 									self.record_typedefs.add((TPDAT.name,AT.str,AT.id))
 							else:
-								# const array of size 0; if it's the last member in the record generate recipe for flexible array member
-								if (mi+1>=len(proc_members)):
+								# const/incomplete array of size 0; if it's the last member in the record generate recipe for flexible array member
+								if (mi+1>=proc_members_to_process_num):
 									if not TPDAT:
 										if AT.str=="":
 											anonstruct_type_name = self.get_anonstruct_typename(AT)
@@ -2501,7 +2606,7 @@ LINUXINCLUDE := ${{LINUXINCLUDE}}
 										self.record_typedefs.add((TPDAT.name,AT.str,AT.id))
 									self.flexible_array_members.append((TPD,TRT,refname))
 								else:
-									iout.write("/* TODO: member '%s' is a const array of size 0; looks like flexible array member but it's not a last member in the record (what is this then?) */\n"%(refname))
+									iout.write("/* TODO: member '%s' is a const/incomplete array of size 0; looks like flexible array member but it's not a last member in the record (what is it then?) */\n"%(refname))
 									self.complex_members.append((TPD,TRT,refname))
 								self.simple = False
 						else:
@@ -2686,7 +2791,7 @@ def main():
 		RG.generate_flatten_trigger(gv, out, additional_deps)
 		var_name = glob[2]
 		if glob[7] not in ['', 'vmlinux'] :
-			var_name = glob[7].replace('.ko', '') + ':' + var_name
+			var_name = glob[7].replace('.ko', '').replace('-', '_') + ':' + var_name
 		globals_stream.write(RecipeGenerator.template_output_global_handler.format(
 			var_name, glob[6], glob[4], "\n".join(["\t\t\t"+x for x in out.getvalue().strip().split("\n")])))
 	deps|=set(additional_deps)
@@ -2908,13 +3013,20 @@ def main():
 				narg[3] = tp.classname
 				narg[4] = e["offset"]
 				narg[5] = tp.str if tp.classname == 'record' else tp.name
-				extra_info += "/* It was detected that the function argument no. {0} of the original type '{1}' is a part of a larger type '{2}' at offset {3}. We concluded that from the 'container_of' expression at the following location:\n  {4} */".format(
+				extra_info += "/* It was detected that the function argument no. {0} of the original type '{1}' is a part of a larger type '{2}' at offset {3}. We concluded that from the 'container_of' expression at the following location:\n  {4}".format(
 					narg[1],
 					narg[7],
 					"struct %s"%(narg[5]) if tp.classname == 'record' else narg[5],
 					narg[4],
 					e["expr"]
 				)
+				if "call_id" in e:
+					extra_info += "\n   The conclusion was made based on a call deeper down in the call graph. The first function called was '{0}' */".format(
+						RG.ftdb.funcs.entry_by_id(e["call_id"]).name,
+
+					)
+				else:
+					extra_info += " */"
 		for tp in record_type_list:
 			if narg[0]==tp[0] and narg[3]=='record':
 					# 0 - full type of argument

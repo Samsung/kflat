@@ -256,6 +256,14 @@ struct flatten_pointer* FUNC_NAME(struct flat* flat, const void* ptr, uintptr_t 
 /*******************************
  * AGGREGATE macros
  *******************************/
+#define AGGREGATE_FLATTEN_ASSERT(__expr,__err)	\
+do {	\
+	if (!(__expr)) {	\
+		FLAT_ACCESSOR->error = __err;	\
+		DBGS("flatten assertion failed on: [" #__expr "]");	\
+	}	\
+} while(0)
+
 /* AGGREGATE_*_STORAGE */
 #define AGGREGATE_FLATTEN_GENERIC_STORAGE(FULL_TYPE,SIZE,TARGET,_off,n,CUSTOM_VAL)		\
 	do {	\
@@ -447,8 +455,13 @@ struct flatten_pointer* FUNC_NAME(struct flat* flat, const void* ptr, uintptr_t 
 #define AGGREGATE_FLATTEN_STRUCT_ARRAY_SELF_CONTAINED_SHIFTED(T,N,f,_off,n,_shift)	\
 	AGGREGATE_FLATTEN_GENERIC(struct T, flatten_struct_array_##T, N,f,_off,n,0,0,0,_shift)
 
-/* Macro AGGREGATE_FLATTEN_UNION_ARRAY_SELF_CONTAINED_SHIFTED doesn't have much sense in case of union
- as we cannot point to the middle of the union with a pointer */
+/* Please note that macro AGGREGATE_FLATTEN_UNION_ARRAY_SELF_CONTAINED_SHIFTED doesn't have much sense in case of a union
+    as we cannot point to the middle of the union with a pointer
+   Let's keep it here for consistency but don't allow to provide a shift value different than 0
+ */
+#define AGGREGATE_FLATTEN_UNION_ARRAY_SELF_CONTAINED_SHIFTED(T,N,f,_off,n,_shift)	\
+	AGGREGATE_FLATTEN_ASSERT(_shift==0,EINVAL);	\
+	AGGREGATE_FLATTEN_GENERIC(struct T, flatten_union_array_##T, N,f,_off,n,0,0,0,0)
 
 #define AGGREGATE_FLATTEN_STRUCT_TYPE_ARRAY_SELF_CONTAINED_SHIFTED(T,N,f,_off,n,_shift)	\
 	AGGREGATE_FLATTEN_GENERIC(T, flatten_struct_type_array_##T, N,f,_off,n,0,0,0,_shift)

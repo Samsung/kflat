@@ -81,9 +81,7 @@ static int kflat_global_list_for_each_entry_test(struct flat *flat) {
 		{
 			struct intnodeg* __entry;
 			list_for_each_entry(__entry, &gvec, link ) {
-				FOR_POINTER(struct intnode*,____entry,__entry,
-					FLATTEN_STRUCT(intnodeg,____entry);
-				);
+				FLATTEN_STRUCT(intnodeg,__entry);
 			}
 		}
 	);
@@ -93,9 +91,7 @@ static int kflat_global_list_for_each_entry_test(struct flat *flat) {
 		{
 			struct intnodeg* __entry;
 			list_for_each_entry_from_offset(__entry, &gvec2, offsetof(struct intnodeg,link) ) {
-				FOR_POINTER(struct intnode*,____entry,__entry,
-					FLATTEN_STRUCT_SELF_CONTAINED(intnodeg,sizeof(struct intnodeg),____entry);
-				);
+				FLATTEN_STRUCT_SELF_CONTAINED(intnodeg,sizeof(struct intnodeg),__entry);
 			}
 		}
 	);
