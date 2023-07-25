@@ -385,8 +385,10 @@ do {	\
 /* AGGREGATE_* */
 #define AGGREGATE_FLATTEN_GENERIC(FULL_TYPE,TARGET,N,f,_off,n,CUSTOM_VAL,pre_f,post_f,_shift)	\
 	do {	\
-		DBGM5(AGGREGATE_FLATTEN_GENERIC,FULL_TYPE,N,f,_off,n);	\
-		DBGS("FULL_TYPE [%lx:%zu -> %lx]\n",(uintptr_t)_ptr,(size_t)_off,(uintptr_t)OFFATTRN(_off,_shift));	\
+		DBGS("AGGREGATE_FLATTEN_GENERIC(%s, %s, N:0x%zu, off:0x%zu, n:0x%zu)\n", #FULL_TYPE, #f, N, _off, n);	\
+		DBGS("  \\-> FULL_TYPE [%lx:%zu -> %lx]\n",(uintptr_t)_ptr,(size_t)_off,(uintptr_t)OFFATTRN(_off,_shift));	\
+		if((pre_f) || (post_f))	\
+			DBGS("  \\-> PRE_F[%llx]; POST_F[%llx]\n",(uintptr_t)pre_f, (uintptr_t) post_f);	\
 		flatten_aggregate_generic(FLAT_ACCESSOR, __q, _ptr, N, n, CUSTOM_VAL, _off, _shift, TARGET, pre_f, post_f); \
 	} while(0)
 
@@ -552,8 +554,8 @@ do {	\
 
 #define AGGREGATE_FLATTEN_COMPOUND_TYPE_ARRAY_SELF_CONTAINED(T,N,f,_off,n)	\
 	do {  \
-		DBGM5(AGGREGATE_FLATTEN_COMPOUND_TYPE_ARRAY_SELF_CONTAINED,T,N,f,_off,n);	\
-		DBGS("AGGREGATE_FLATTEN_COMPOUND_TYPE_ARRAY_SELF_CONTAINED[%lx]\n",(uintptr_t)OFFATTR(void*,_off));	\
+		DBGS("AGGREGATE_FLATTEN_COMPOUND_TYPE_ARRAY_SELF_CONTAINED(%s, %s, N:0x%zu, off:0x%zu, n:0x%zu)\n", #T, #f, N, _off, n);	\
+		DBGS("  \\->OFFATTR[%lx]\n",(uintptr_t)OFFATTR(void*,_off));	\
         if ((!FLAT_ACCESSOR->error)&&(ADDR_RANGE_VALID(OFFATTR(void*,_off), (n) * (N)))) {   \
         	struct flat_node *__node = interval_tree_iter_first(&FLAT_ACCESSOR->FLCTRL.imap_root, (uint64_t)_ptr+_off,\
 					(uint64_t)_ptr+_off+sizeof(T*)-1);    \
@@ -699,6 +701,7 @@ do {	\
 		({			\
 			void *__start, *__end;	\
 			bool rv = flatten_get_object(__ptr, &__start, &__end);	\
+			DBGS("FLATTEN_DETECT_OBJECT_SIZE(%llx, %lld) -> (rv: %d)[from: %llx; to: %llx]\n", __ptr, __dEFAULT_size, rv, __start, __end); \
 			(rv && __end != __start)?(__end-__ptr+1):(__dEFAULT_size);	\
 		})
 

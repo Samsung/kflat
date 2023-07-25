@@ -349,7 +349,7 @@ struct fixup_set_node *fixup_set_search(struct flat* flat, uintptr_t v) {
 			node = node->rb_right;
 		}
 		else {
-			DBGS("fixup_set_search(%lx): (%lx:%zu,%lx)\n",v,(unsigned long)data->inode,data->offset,(unsigned long)data->ptr);
+			DBGS(" fixup_set_search(%lx): (%lx:%zu,%lx)\n",v,(unsigned long)data->inode,data->offset,(unsigned long)data->ptr);
 			return data;
 		}
 	}
@@ -405,7 +405,7 @@ int fixup_set_reserve(struct flat* flat, struct flat_node* node, size_t offset) 
 	struct fixup_set_node *data;
 	struct rb_node **new_node, *parent;
 
-	DBGS("fixup_set_reserve(%lx,%zu)\n",(uintptr_t)node,offset);
+	DBGS(" fixup_set_reserve(%lx,%zu)\n",(uintptr_t)node,offset);
 
 	if (node==0) {
 		return EINVAL;
@@ -449,7 +449,7 @@ int fixup_set_update(struct flat* flat, struct flat_node* node, size_t offset, s
 
 	struct fixup_set_node* inode;
 
-	DBGS("fixup_set_update(%lx[%lx:%zu],%zu,%lx)\n",(uintptr_t)node,
+	DBGS(" fixup_set_update(%lx[%lx:%zu],%zu,%lx)\n",(uintptr_t)node,
 			(node)?(node->start):0,(node)?(node->last-node->start+1):0,
 			offset,(uintptr_t)ptr);
 
@@ -484,7 +484,7 @@ int fixup_set_insert(struct flat* flat, struct flat_node* node, size_t offset, s
 	struct fixup_set_node *data;
 	struct rb_node **new_node, *parent;
 
-	DBGS("fixup_set_insert(%lx[%lx:%zu],%zu,%lx)\n",(uintptr_t)node,
+	DBGS(" fixup_set_insert(%lx[%lx:%zu],%zu,%lx)\n",(uintptr_t)node,
 			(node)?(node->start):0,(node)?(node->last-node->start+1):0,
 			offset,(uintptr_t)ptr);
 
@@ -563,7 +563,7 @@ int fixup_set_insert_force_update(struct flat* flat, struct flat_node* node, siz
 	struct fixup_set_node *data;
 	struct rb_node **new_node, *parent;
 
-	DBGS("fixup_set_insert_force_update(%lx[%lx:%zu],%zu,%lx)\n",(uintptr_t)node,
+	DBGS(" fixup_set_insert_force_update(%lx[%lx:%zu],%zu,%lx)\n",(uintptr_t)node,
 			(node)?(node->start):0,(node)?(node->last-node->start+1):0,
 			offset,(uintptr_t)ptr);
 
@@ -631,7 +631,7 @@ int fixup_set_insert_force_update(struct flat* flat, struct flat_node* node, siz
 	rb_link_node(&data->node, parent, new_node);
 	rb_insert_color(&data->node, &flat->FLCTRL.fixup_set_root.rb_root);
 
-	DBGS("fixup_set_insert_force_update(...): 0\n");
+	DBGS(" fixup_set_insert_force_update(...): 0\n");
 
 	return 0;
 }
@@ -643,7 +643,7 @@ int fixup_set_insert_fptr(struct flat* flat, struct flat_node* node, size_t offs
 	struct fixup_set_node *data;
 	struct rb_node **new_node, *parent;
 
-	DBGS("fixup_set_insert_fptr(%lx[%lx:%zu],%zu,%lx)\n",(uintptr_t)node,
+	DBGS(" fixup_set_insert_fptr(%lx[%lx:%zu],%zu,%lx)\n",(uintptr_t)node,
 			(node)?(node->start):0,(node)?(node->last-node->start+1):0,
 			offset,fptr);
 
@@ -703,7 +703,7 @@ int fixup_set_insert_fptr_force_update(struct flat* flat, struct flat_node* node
 	struct fixup_set_node *data;
 	struct rb_node **new_node, *parent;
 
-	DBGS("fixup_set_insert_fptr_force_update(%lx[%lx:%zu],%zu,%lx)\n",(uintptr_t)node,
+	DBGS(" fixup_set_insert_fptr_force_update(%lx[%lx:%zu],%zu,%lx)\n",(uintptr_t)node,
 			(node)?(node->start):0,(node)?(node->last-node->start+1):0,
 			offset,fptr);
 
@@ -1498,7 +1498,6 @@ void flatten_aggregate_generic(struct flat* flat, void* q, const void* _ptr,
 		_p = pre_f(_p);
 	if (_p)
 		_fp = (const void*) ( (char*)_p+_shift);
-	DBGTNFOMF(AGGREGATE_FLATTEN_GENERIC,"", el_size,f,"%lx:%zu",_fp,(size_t)_off,pre_f,post_f);
 
 	if (flat->error || !ADDR_RANGE_VALID(_fp, el_size * count)) {
 		DBGS("AGGREGATE_FLATTEN_GENERIC: error(%d), ADDR(%lx)\n", flat->error, (uintptr_t)OFFATTR(void**,_off));

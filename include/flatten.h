@@ -211,8 +211,8 @@ static inline void destroy_flatten_pointer(struct flatten_pointer* fp) {
 /*************************************
  * LOGGING
  *************************************/
-#define flat_errs(fmt,...) 		do { FLATTEN_LOG_ERROR(fmt, ##__VA_ARGS__); FLATTEN_LOG_DEBUG(fmt, ##__VA_ARGS__); } while(0)
-#define flat_infos(fmt,...) 	do { FLATTEN_LOG_INFO(fmt, ##__VA_ARGS__); FLATTEN_LOG_DEBUG(fmt, ##__VA_ARGS__); } while(0)
+#define flat_errs(fmt,...) 		do { FLATTEN_LOG_ERROR(fmt, ##__VA_ARGS__); FLATTEN_LOG_DEBUG("[ERROR] " fmt "\n", ##__VA_ARGS__); } while(0)
+#define flat_infos(fmt,...) 	do { FLATTEN_LOG_INFO(fmt, ##__VA_ARGS__); FLATTEN_LOG_DEBUG("[INFO] " fmt, ##__VA_ARGS__); } while(0)
 #define flat_dbg(fmt, ...)		do { if (FLAT_ACCESSOR->FLCTRL.debug_flag & 1) FLATTEN_LOG_DEBUG(fmt, ##__VA_ARGS__); } while(0)
 
 #define DBGS(M, ...)						flat_dbg(M, ##__VA_ARGS__)
