@@ -181,6 +181,18 @@ get_function_address_t get_test_gfa(const char* name) {
 	return NULL;
 }
 
+enum flat_test_flags get_test_flags(const char* name) {
+    size_t tests_count;
+    struct kflat_test_case** tests;
+    tests_count = get_tests_section(&tests);
+
+	for(size_t i = 0; i < tests_count; i++) {
+		if(!strcmp(name, tests[i]->name))
+			return tests[i]->flags;
+	}
+	return 0;
+}
+
 int run_test(struct args* args, const char* name) {
     int ret;
     FILE* file;
@@ -262,7 +274,7 @@ int run_test(struct args* args, const char* name) {
             rewind(file);
         }
 
-        if (args->continuous) {
+        if (args->continuous || get_test_flags(name) & KFLAT_TEST_FORCE_CONTINOUS) {
             ret = unflatten_load_continuous(flatten, file, get_test_gfa(name));
         }
         else {

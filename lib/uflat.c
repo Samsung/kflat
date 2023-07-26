@@ -378,7 +378,7 @@ static size_t uflat_test_address(struct uflat* uflat, void* ptr, size_t size) {
         return 0;
     
     ssize_t remaining = (uintptr_t)node->end - (uintptr_t)ptr + 1;
-    return remaining;
+    return (remaining < (ssize_t) size) ? remaining : size;
 }
 
 bool uflat_test_address_range(struct flat* flat, void* ptr, size_t size) {
@@ -419,7 +419,7 @@ bool uflat_test_exec_range(struct flat* flat, void* ptr) {
     return true;
 }
 
-size_t uflat_test_string_len(struct flat* flat, const char* str) {
+__attribute__((no_sanitize("address"))) size_t uflat_test_string_len(struct flat* flat, const char* str) {
 	size_t str_size, avail_size, test_size;
     struct uflat* uflat = container_of(flat, struct uflat, flat);
 	

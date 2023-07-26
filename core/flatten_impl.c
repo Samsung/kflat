@@ -100,30 +100,27 @@ static struct blstream* binary_stream_insert_back(struct flat* flat, const void*
 }
 
 
-static int binary_stream_calculate_index(struct flat* flat) {
-	struct blstream *ptr = NULL;
+int binary_stream_calculate_index(struct flat* flat) {
+	struct blstream *ptr = NULL, *v;
 	size_t index = 0;
+	unsigned char padding[128] = {0};
 
 	list_for_each_entry(ptr, &flat->FLCTRL.storage_head, head) {
 		size_t align = 0;
-		if (ptr->alignment) {
-			struct blstream* v;
-			unsigned char* padding = (unsigned char*) flat_zalloc(flat, ptr->alignment, 1);
-			if (!padding) {
-				return ENOMEM;
+		if (ptr->alignment && index != 0) {
+			if(ptr->alignment > 128) {
+				flat_errs("Invalid ptr->alignment(%zu) in blstream node", ptr->alignment);
+				return EINVAL;
 			}
-			if (index==0) {
-				align = ptr->alignment;
+
+			align = -index & (ptr->alignment - 1);
+			if (align != 0) {
+				v = binary_stream_insert_front(flat, padding, align, ptr);
+				if (!v)
+					return ENOMEM;
+				v->index = index;
+				index += v->size;
 			}
-			else if (index % ptr->alignment) {
-				align = ptr->alignment - (index % ptr->alignment);
-			}
-			v = binary_stream_insert_front(flat, padding, align, ptr);
-			if (!v)
-				return ENOMEM;
-			flat_free(padding);
-			v->index = index;
-			index += v->size;
 		}
 
 		ptr->index = index;
@@ -1099,11 +1096,13 @@ size_t root_addr_extended_count(struct flat* flat) {
 
 size_t root_addr_extended_size(struct flat* flat) {
 	struct root_addrnode *entry = NULL;
-	size_t size = 0;
+	size_t size = 0, name_len, padding;
 
 	list_for_each_entry(entry, &flat->FLCTRL.root_addr_head, head) {
 		if (entry->name) {
-			size += 3 * sizeof(size_t) + strlen(entry->name);
+			name_len = strlen(entry->name);
+			padding = -name_len & 7;
+			size += 3 * sizeof(size_t) + name_len + padding;
 		}
 	}
 
@@ -1254,8 +1253,13 @@ static int flatten_write_internal(struct flat* flat, size_t* wcounter_p) {
 	list_for_each_entry(entry, &flat->FLCTRL.root_addr_head, head) {
 		if (entry->name) {
 			size_t name_size = strlen(entry->name);
-			FLATTEN_WRITE_ONCE(&name_size, sizeof(size_t), wcounter_p);
+			size_t padding = -name_size & 7;
+			size_t size_with_padding = name_size + padding;
+			char padding_source[8] = {0};
+
+			FLATTEN_WRITE_ONCE(&size_with_padding, sizeof(size_t), wcounter_p);
 			FLATTEN_WRITE_ONCE(entry->name, name_size, wcounter_p);
+			FLATTEN_WRITE_ONCE(padding_source, padding, wcounter_p);	// Align index to 8bytes
 			FLATTEN_WRITE_ONCE(&entry->index, sizeof(size_t), wcounter_p);
 			FLATTEN_WRITE_ONCE(&entry->size, sizeof(size_t), wcounter_p);
 		}
@@ -1327,7 +1331,7 @@ struct flat_node* flatten_acquire_node_for_ptr(struct flat* flat, const void* _p
 	struct flat_node* head_node = 0;
 	if (node) {
 		uintptr_t p = (uintptr_t)_ptr;
-    	struct flat_node *prev;
+    	struct flat_node *prev = NULL;
     	while(node) {
 			if (node->start>p) {
 				struct flat_node* nn;

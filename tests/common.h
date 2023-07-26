@@ -112,7 +112,8 @@ typedef int (*flat_test_case_handler_t)(struct flat* flat);
 typedef int (*flat_test_case_validator_t)(void* memory, size_t size, CUnflatten flatten);
 
 enum flat_test_flags {
-    KFLAT_TEST_ATOMIC   = 1 << 1,
+    KFLAT_TEST_ATOMIC           = 1 << 1,
+    KFLAT_TEST_FORCE_CONTINOUS  = 1 << 2,
 };
 
 struct kflat_test_case {

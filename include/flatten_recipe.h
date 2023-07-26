@@ -88,9 +88,10 @@ struct flatten_pointer* FUNC_NAME(struct flat* flat, const void* ptr, size_t n, 
 			\
 struct flatten_pointer* FUNC_NAME(struct flat* flat, const void* ptr, uintptr_t __cval, unsigned long __index, struct bqueue* __q) {    \
             \
+	static const short align_array[] = {8, 1, 2, 1, 4, 1, 2, 1}; \
 	struct flat_node *__node;		\
 	typedef FULL_TYPE _container_type __attribute__((unused)); \
-	size_t _alignment = 0;  \
+	size_t _alignment = align_array[(uintptr_t) ptr % 8];  \
 	struct flatten_pointer* r = 0;	\
 	size_t _node_offset;	\
 	const FULL_TYPE* _ptr = (const FULL_TYPE*) ptr;	\
