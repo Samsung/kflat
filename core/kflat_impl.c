@@ -14,6 +14,8 @@
 
 
 #ifdef KFLAT_GET_OBJ_SUPPORT
+#include <linux/sched/task_stack.h>
+
 /* Nasty include, but we need some of the macros that for whatever
  *  reasons are stored in header files located outside of include/ dir */
 #include "../../mm/slab.h"
@@ -127,7 +129,7 @@ static bool _flatten_get_heap_obj(struct page* page, void* ptr, void** start, vo
 	if(start)
 		*start = ptr - offset + cache->useroffset;
 	if(end)
-		*end = ptr - offset + cache->useroffset + object_size;
+		*end = ptr - offset + cache->useroffset + object_size - 1;
 	return true;
 }
 
@@ -185,7 +187,7 @@ static bool _flatten_get_heap_obj(struct slab* slab, void* ptr,
 	if(start)
 		*start = ptr - offset + cache->useroffset;
 	if(end)
-		*end = ptr - offset + cache->useroffset + object_size;
+		*end = ptr - offset + cache->useroffset + object_size - 1;
 	return true;
 }
 
@@ -212,24 +214,59 @@ static void* flatten_find_heap_object(void* ptr) {
  *   `end` to &tab[31].
  *  Returns false, when pointer does not point to valid heap memory location
  */
-bool flatten_get_object(void* ptr, void** start, void** end) {
+bool flatten_get_object(struct flat* flat, void* ptr, void** start, void** end) {
 	void* obj;
+	struct page* head;
 
-	if(!is_vmalloc_addr(ptr) && virt_addr_valid(ptr)) {
-		obj = flatten_find_heap_object(ptr);
-		if(obj != NULL)
-			return _flatten_get_heap_obj(obj, ptr, start, end);
-	} 
-	/* xxx this could be an extension of this function that supports 
-	       vmalloc as well. However, the problem is that kernel allocates
-		   stack with vmalloc, so we cannot distinguish between stack memory
-		   and intentionally allocated additional data 
-	else if (is_vmalloc_addr(ptr)) {
+#ifdef CONFIG_ARM64
+	static void* kernel_start = NULL;
+	static void* kernel_end = NULL;
+	static void* modules_start = NULL;
+	static void* modules_end = NULL;
+
+	if(kernel_start == NULL) {
+		kernel_start = flatten_global_address_by_name("_stext");
+		DBGS("flatten_get_object - discovered kernel start at %llx\n", kernel_start);
+	}
+	if(kernel_end == NULL) {
+		kernel_end = flatten_global_address_by_name("_end");
+		DBGS("flatten_get_object - discovered kernel start at %llx\n", kernel_end);
+	}
+	if(modules_start == NULL) {
+		u64* tmp = flatten_global_address_by_name("module_alloc_base");
+		if(tmp != NULL) {
+			modules_start = (void*) *tmp;
+			modules_end = (void*)((uintptr_t)modules_start + MODULES_VSIZE);
+			DBGS("flatten_get_object - discovered modules memory region at %llx - %llx\n", modules_start, modules_end);
+		}
+	}
+
+	// Is it pointing to kernel binary (.text or .data sections)?
+	if(kernel_start != kernel_end && ptr >= kernel_start && ptr <= kernel_end) {
+		DBGS("flatten_get_object - ptr(%llx) is pointing to kernel image (KIMAGE)\n", ptr);
+		return false;
+	}
+
+	// Is it pointing to modules section?
+	if(ptr >= modules_start && ptr <= modules_end) {
+		DBGS("flatten_get_object - ptr(%llx) is pointing to modules section\n", ptr);
+		return false;
+	}
+#endif
+
+	if(object_is_on_stack(ptr)) {
+		DBGS("flatten_get_object - ptr(%llx) is on stack\n", ptr);
+		return false;
+	}
+
+	if(is_vmalloc_addr(ptr)) {
 		size_t size = kdump_test_address(ptr, INT_MAX);
 		if(size == 0)
 			    return false;
+		
+		DBGS("flatten_get_object - ptr (%llx) is a valid vmalloc object\n", ptr);
 		if(end)
-			   *end = ptr + size;
+			   *end = ptr + size - 1;
 		
 		// Search for the start of memory
 		if(start) {
@@ -242,12 +279,39 @@ bool flatten_get_object(void* ptr, void** start, void** end) {
 			*start = (void*)p + PAGE_SIZE;
 		}
 		return true;
-	}*/
+	}
+
+	// Vmalloc is not a valid virt_addr according to this macro
+	if(!virt_addr_valid(ptr)) {
+		DBGS("flatten_get_object - invalid virt ptr(%llx)\n", ptr);
+		return false;
+	} 
+
+	obj = flatten_find_heap_object(ptr);
+	if(obj != NULL) {
+		DBGS("flatten_get_object - ptr (%llx) is a valid SLAB object\n", ptr);
+		return _flatten_get_heap_obj(obj, ptr, start, end);
+	}
+
+	// Try retrieving object size from compound_page (used by kmalloc_large)
+	head = virt_to_head_page(ptr);
+	if(head != NULL) {
+		DBGS("flatten_get_object - ptr (%llx) is a compound_page\n", ptr);
+		if(start)
+			*start = page_address(head);
+		if(end) {
+			unsigned int order = compound_order(head);
+			size_t size = ((size_t) PAGE_SIZE) << order;
+			*end = (void*) (((uintptr_t)*start) + size - 1);
+		}
+		return true;
+	}
 	
+	DBGS("flatten_get_object - failed to detect ptr(%llx) allocation method (is it global var?)\n", ptr);
 	return false;
 }
 #else /* KFLAT_GET_OBJ_SUPPORT */
-bool flatten_get_object(void* ptr, void** start, void** end) {
+bool flatten_get_object(struct flat* flat, void* ptr, void** start, void** end) {
 	return false;
 }
 #endif /* KFLAT_GET_OBJ_SUPPORT */

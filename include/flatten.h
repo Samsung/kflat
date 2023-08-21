@@ -47,6 +47,7 @@ struct flatten_pointer {
 
 struct blstream {
 	struct list_head head;
+	const void* source;
 	void* data;
 	size_t size;
 	size_t index;

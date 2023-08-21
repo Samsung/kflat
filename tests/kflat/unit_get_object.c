@@ -45,7 +45,7 @@ static int kflat_get_object_unit_test(struct flat *flat) {
 
 	// Look for 200 kmalloc object on heap
 	buffer = kmalloc(200, GFP_KERNEL);
-	ret = flatten_get_object(buffer + 10, &start, &end);
+	ret = flatten_get_object(flat, buffer + 10, &start, &end);
 	if (!ret) {
 		flat_errs("get_object test: flatten_get_object failed to locate heap object");
 	} else if (start != buffer || end >= buffer + 1024 || end < buffer + 200) {
@@ -56,21 +56,21 @@ static int kflat_get_object_unit_test(struct flat *flat) {
 	kfree(buffer);
 
 	// Check NULL handling
-	ret = flatten_get_object(&ret, NULL, NULL);
+	ret = flatten_get_object(flat, &ret, NULL, NULL);
 	if (ret)
 		flat_errs("get_object test: flatten_get_object accepted object from stack");
 	else
 		results.test_stack_pass = true;
 
 	// Check globals handling
-	ret = flatten_get_object(&iarr, NULL, NULL);
+	ret = flatten_get_object(flat, &iarr, NULL, NULL);
 	if (ret)
 		flat_errs("get_object test: flatten_get_object accepted global object");
 	else
 		results.test_globals_pass = true;
 
 	// Check code section handling
-	ret = flatten_get_object(kflat_get_object_unit_test, NULL, NULL);
+	ret = flatten_get_object(flat, kflat_get_object_unit_test, NULL, NULL);
 	if (ret)
 		flat_errs("get_object test: flatten_get_object accepted pointer to code section");
 	else
@@ -78,16 +78,16 @@ static int kflat_get_object_unit_test(struct flat *flat) {
 
 	// Check vmalloc memory
 	buffer = vmalloc(PAGE_SIZE);
-	ret = flatten_get_object(buffer, &start, &end);
-	if (ret)
-		flat_errs("get_object test: flatten_get_object accepted pointer to vmalloc area");
+	ret = flatten_get_object(flat, buffer, &start, &end);
+	if (!ret)
+		flat_errs("get_object test: flatten_get_object ignored pointer to vmalloc area");
 	else
 		results.test_vmalloc_pass = true;
 	vfree(buffer);
 
 	// Check access to the last byte of allocated memory
 	buffer = kmalloc(17, GFP_KERNEL);
-	ret = flatten_get_object(buffer + 16, &start, &end);
+	ret = flatten_get_object(flat, buffer + 16, &start, &end);
 	if (!ret)
 		flat_errs("get_object test: flatten_get_object failed to locate heap(17) object");
 	else if (start != buffer || end >= buffer + 256 || end < buffer + 17)

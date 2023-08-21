@@ -70,12 +70,13 @@ class NoFunctionException(Exception):
 # Recipes generator
 ##################################
 class RecipeBase(object):
-	def __init__(self,recipe,simple,to_check,check_union,to_fix):
+	def __init__(self,recipe,simple,to_check,check_union,to_fix,have_flexible_member):
 		self.recipe = recipe
 		self.simple = simple
 		self.to_check = to_check
 		self.check_union = check_union
 		self.to_fix = to_fix
+		self.have_flexible_member = have_flexible_member
 
 	def __attrs__(self):
 		s=""
@@ -94,8 +95,8 @@ class RecipeBase(object):
 
 class RecordRecipe(RecipeBase):
 	# Flatten struct recipe
-	def __init__(self,T,RT,recipe,include,loc,simple,to_check,check_union,to_fix):
-		super(RecordRecipe, self).__init__(recipe,simple,to_check,check_union,to_fix)
+	def __init__(self,T,RT,recipe,include,loc,simple,to_check,check_union,to_fix,have_flexible_member):
+		super(RecordRecipe, self).__init__(recipe,simple,to_check,check_union,to_fix,have_flexible_member)
 		self.RT = RT
 		self.include = include # Can be None
 		self.loc = loc
@@ -106,8 +107,8 @@ class RecordRecipe(RecipeBase):
 
 class TypenameRecipe(RecipeBase):
 	# Flatten struct_type recipe with auto-generated typename
-	def __init__(self,typename,RT,recipe,simple,to_check,check_union,to_fix):
-		super(TypenameRecipe, self).__init__(recipe,simple,to_check,check_union,to_fix)
+	def __init__(self,typename,RT,recipe,simple,to_check,check_union,to_fix,have_flexible_member):
+		super(TypenameRecipe, self).__init__(recipe,simple,to_check,check_union,to_fix,have_flexible_member)
 		self.typename = typename
 		self.RT = RT
 	def __str__(self):
@@ -117,8 +118,8 @@ class TypenameRecipe(RecipeBase):
 
 class RecordTypeRecipe(RecipeBase):
 	# Flatten struct_type recipe
-	def __init__(self,TPD,RT,recipe,includes,simple,to_check,check_union,to_fix):
-		super(RecordTypeRecipe, self).__init__(recipe,simple,to_check,check_union,to_fix)
+	def __init__(self,TPD,RT,recipe,includes,simple,to_check,check_union,to_fix,have_flexible_member):
+		super(RecordTypeRecipe, self).__init__(recipe,simple,to_check,check_union,to_fix,have_flexible_member)
 		self.TPD = TPD
 		self.RT = RT
 		self.includes = includes # Can be None
@@ -150,6 +151,20 @@ class RecipeGenerator(object):
 	# 3 - extra type definition
 	template_flatten_struct_type_recipe = """{3}FUNCTION_DEFINE_FLATTEN_STRUCT_TYPE_SELF_CONTAINED({0},{1},
 {2}
+);"""
+
+	# 0 - struct tag
+	# 1 - internal recipe string
+	# 2 - extra type definition
+	template_flatten_define_struct_flexible_recipe = """{2}FUNCTION_DEFINE_FLATTEN_STRUCT_FLEXIBLE({0},
+{1}
+);"""
+
+	# 0 - typename
+	# 1 - internal recipe string
+	# 2 - extra type definition
+	template_flatten_define_struct_type_flexible_recipe = """{2}FUNCTION_DEFINE_FLATTEN_STRUCT_TYPE_FLEXIBLE({0},
+{1}
 );"""
 
 	# 0 - STRUCT/UNION
@@ -326,8 +341,8 @@ AGGREGATE_FLATTEN_STRUCT_ARRAY_SELF_CONTAINED(list_head,{0},{1}.prev,{4},1);
 {{
 	struct {5}* __entry;
 	list_for_each_entry_from_offset(__entry, &OFFATTR(struct list_head,{2}), {6} ) {{
-		FOR_POINTER(struct {5}*,____entry,&__entry,
-				FLATTEN_STRUCT_ARRAY_SELF_CONTAINED({5},{7},____entry,1);
+		FOR_VIRTUAL_POINTER(__entry,
+				FLATTEN_STRUCT_ARRAY_SELF_CONTAINED({5},{7},__entry,1);
 		);
 	}}
 }}"""
@@ -1446,11 +1461,14 @@ the 'container_of' invocation chain.\n   The invocation chain was as follows:\n{
 				self.builtin_pointers.append((TPDptrT,TRT,refname))
 				return pteT.str+"*"
 
-	def generate_flatten_record_trigger(self,out,T,TPD,refname,tab=0):
+	def generate_flatten_record_trigger(self,out,T,TPD,refname,handle_flexible_size=False,tab=0):
 		if TPD:
+			__type_size = TPD.size//8
+			if handle_flexible_size and TPD.name in self.RTRMap and self.RTRMap[TPD.name].have_flexible_member:
+				__type_size = "__FLEX_OBJSIZE__(%s)"%(refname)
 			recipe = indent(RecipeGenerator.template_flatten_struct_type_array_pointer_self_contained.format(
 				TPD.name,
-				TPD.size//8,
+				__type_size,
 				refname,
 				str(1)
 			),tab)
@@ -1458,9 +1476,12 @@ the 'container_of' invocation chain.\n   The invocation chain was as follows:\n{
 			return TPD.name
 		if T.str=="":
 			anonstruct_type_name = self.get_anonstruct_typename(T)
+			__type_size = T.size//8
+			if handle_flexible_size and anonstruct_type_name in self.TRMap and self.TRMap[anonstruct_type_name].have_flexible_member:
+				__type_size = "__FLEX_OBJSIZE__(%s)"%(refname)
 			recipe = indent(RecipeGenerator.template_flatten_struct_type_array_pointer_self_contained.format(
 				anonstruct_type_name,
-				T.size//8,
+				__type_size,
 				refname,
 				str(1)
 			),tab)
@@ -1472,24 +1493,28 @@ the 'container_of' invocation chain.\n   The invocation chain was as follows:\n{
 			if len(RL) <= 0:
 				return None
 			T = RL[0]
+		
+		__type_size = T.size//8
+		if handle_flexible_size and T.str in self.RRMap and self.RRMap[T.str].have_flexible_member:
+			__type_size = "__FLEX_OBJSIZE__(%s)"%(refname)
 		recipe = indent(RecipeGenerator.template_flatten_struct_array_pointer_self_contained.format(
 			"STRUCT" if T.isunion is False else "UNION",
 			T.str,
-			T.size//8,
+			__type_size,
 			refname,
 			str(1)
 		),tab)
 		out.write(recipe+"\n")
 		return "struct %s"%(T.str)
 
-	def generate_flatten_pointer_trigger(self,out,T,TPD,gvname,tab=0,ptrLevel=0,arrsize=1):
+	def generate_flatten_pointer_trigger(self,out,T,TPD,gvname,handle_flexible_size=False,tab=0,ptrLevel=0,arrsize=1):
 
 		if T.classname=="attributed" and "__attribute__((noderef))" in T.attrcore:
 			# Global variable points to user memory
 			return None
 		if T.classname=="record" or T.classname=="record_forward":
 			# pointer to struct
-			rtp = self.generate_flatten_record_trigger(out,T,TPD,ptrNestedRefName(gvname,ptrLevel))
+			rtp = self.generate_flatten_record_trigger(out,T,TPD,ptrNestedRefName(gvname,ptrLevel),handle_flexible_size)
 			if rtp is None:
 				return None
 			else:
@@ -1505,7 +1530,7 @@ the 'container_of' invocation chain.\n   The invocation chain was as follows:\n{
 				TPDE = PTE
 				PTE = self.walkTPD(PTE)
 			ptrout = io.StringIO()
-			ptrtp = self.generate_flatten_pointer_trigger(ptrout,PTE,TPDE,gvname,tab+1,ptrLevel+1)
+			ptrtp = self.generate_flatten_pointer_trigger(ptrout,PTE,TPDE,gvname,handle_flexible_size,tab+1,ptrLevel+1)
 			out.write(RecipeGenerator.template_flatten_pointer_array_recipe.format(
 				ptrtp,
 				ptrNestedRefName(gvname,ptrLevel+1),
@@ -1589,7 +1614,7 @@ the 'container_of' invocation chain.\n   The invocation chain was as follows:\n{
 			return T.str+"*"
 
 
-	def generate_flatten_trigger(self,gv,out,additional_deps):
+	def generate_flatten_trigger(self,gv,out,additional_deps,handle_flexible_size=False):
 		TID = gv.type
 		gvname = gv.name
 		T = self.ftdb.types[TID]
@@ -1631,7 +1656,7 @@ the 'container_of' invocation chain.\n   The invocation chain was as follows:\n{
 						out.write(trigger+"\n")
 						return "enum %s*"%(T.str)
 			elif T.classname=="pointer":
-				ptrtp = self.generate_flatten_pointer_trigger(out,T,TPD,gvname)
+				ptrtp = self.generate_flatten_pointer_trigger(out,T,TPD,gvname,handle_flexible_size)
 				if not ptrtp:
 					self.complex_triggers.append((T,TPD))
 				return ptrtp
@@ -1749,12 +1774,15 @@ the 'container_of' invocation chain.\n   The invocation chain was as follows:\n{
 									recipe_out += "/* INFO: %s */\n"%(extra_info)
 							if have_lh_head:
 								# Generate the list head recipe
+								__container_size = container_size//8
+								if handle_flexible_size and container_str in self.RRMap and self.RRMap[container_str].have_flexible_member:
+									__container_size = "__FLEX_OBJSIZE__(__entry)"
 								recipe = indent(RecipeGenerator.template_flatten_list_head_struct_member_recipe.format(
 									T.size//8,
 									"__root_ptr",
 									container_str,
 									offset,
-									container_size//8,
+									__container_size,
 									"/* %s */\n"%(extra_info)
 								),2)
 								recipe_out += recipe+"\n"
@@ -1762,9 +1790,12 @@ the 'container_of' invocation chain.\n   The invocation chain was as follows:\n{
 								additional_deps.append((containerT.id,container_str))
 								return "struct list_head*"
 				if TPD:
+					__type_size = T.size//8
+					if handle_flexible_size and TPD.name in self.RTRMap and self.RTRMap[TPD.name].have_flexible_member:
+						__type_size = "__FLEX_OBJSIZE__(__root_ptr)"
 					trigger = RecipeGenerator.template_flatten_struct_type_array_pointer_self_contained.format(
 						TPD.name,
-						T.size//8,
+						__type_size,
 						"__root_ptr",
 						str(1)
 					)
@@ -1774,9 +1805,12 @@ the 'container_of' invocation chain.\n   The invocation chain was as follows:\n{
 				else:
 					if T.str=="":
 						anonstruct_type_name = self.get_anonstruct_typename(T)
+						__type_size = T.size//8
+						if handle_flexible_size and anonstruct_type_name in self.TRMap and self.TRMap[anonstruct_type_name].have_flexible_member:
+							__type_size = "__FLEX_OBJSIZE__(__root_ptr)"
 						trigger = RecipeGenerator.template_flatten_struct_type_array_pointer_self_contained.format(
 							anonstruct_type_name,
-							T.size//8,
+							__type_size,
 							"__root_ptr",
 							str(1)
 						)
@@ -1784,10 +1818,13 @@ the 'container_of' invocation chain.\n   The invocation chain was as follows:\n{
 						out.write(recipe_out)
 						return "%s*"%(anonstruct_type_name)
 					else:
+						__type_size = T.size//8
+						if handle_flexible_size and T.str in self.RRMap and self.RRMap[T.str].have_flexible_member:
+							__type_size = "__FLEX_OBJSIZE__(__root_ptr)"
 						trigger = RecipeGenerator.template_flatten_struct_array_pointer_self_contained.format(
 									"STRUCT" if T.isunion is False else "UNION",
 									T.str,
-									T.size//8,
+									__type_size,
 									"__root_ptr",
 									str(1)
 								)
@@ -1824,7 +1861,7 @@ the 'container_of' invocation chain.\n   The invocation chain was as follows:\n{
 							out.write(trigger+"\n")
 							return "enum %s*"%(AT.str)
 				elif AT.classname=="pointer":
-					ptrtp = self.generate_flatten_pointer_trigger(out,AT,ATPD,gvname,0,0,T.size//AT.size)
+					ptrtp = self.generate_flatten_pointer_trigger(out,AT,ATPD,gvname,handle_flexible_size,0,0,T.size//AT.size)
 					return ptrtp
 				elif AT.classname=="record":
 					if ATPD:
@@ -2016,6 +2053,7 @@ the 'container_of' invocation chain.\n   The invocation chain was as follows:\n{
 				to_fix = False
 				do_recipes = False
 				self.structs_blacklisted.add((TRT.str,TRT.isunion))
+		have_flexible_member = False
 		if do_recipes:
 			try:
 				real_refs = list()
@@ -2576,6 +2614,7 @@ the 'container_of' invocation chain.\n   The invocation chain was as follows:\n{
 												self.safeInfo(False)
 											),0)+"\n")
 											self.struct_deps.add((AT.id,anonstruct_type_name))
+											have_flexible_member = True
 										else:
 											if AT.isunion is False:
 												iout.write(indent(RecipeGenerator.template_flatten_struct_flexible_recipe.format(
@@ -2594,6 +2633,7 @@ the 'container_of' invocation chain.\n   The invocation chain was as follows:\n{
 													self.safeInfo(False)
 												),0)+"\n")
 											self.struct_deps.add((AT.id,AT.str))
+											have_flexible_member = True
 									else:
 										iout.write(indent(RecipeGenerator.template_flatten_struct_type_flexible_recipe.format(
 											TPDAT.name,
@@ -2604,6 +2644,7 @@ the 'container_of' invocation chain.\n   The invocation chain was as follows:\n{
 										),0)+"\n")
 										self.struct_deps.add((TPDAT.id,TPDAT.name))
 										self.record_typedefs.add((TPDAT.name,AT.str,AT.id))
+										have_flexible_member = True
 									self.flexible_array_members.append((TPD,TRT,refname))
 								else:
 									iout.write("/* TODO: member '%s' is a const/incomplete array of size 0; looks like flexible array member but it's not a last member in the record (what is it then?) */\n"%(refname))
@@ -2642,36 +2683,59 @@ the 'container_of' invocation chain.\n   The invocation chain was as follows:\n{
 					include,loc = self.resolve_struct_location(T)
 					if include is not None:
 						self.includes.add(include)
-						recipe_str = RecipeGenerator.template_flatten_struct_recipe.format(
-								"STRUCT" if TRT.isunion is False else "UNION",
-								T.str,
-								TRT.size//8,
-								indent(out.getvalue().strip()),
-								"/* Type definition:\n%s */\n"%(TRT.defstring)
-						)
-						self.record_recipes.append(RecordRecipe(T,TRT,recipe_str,include,loc,self.simple,to_check,check_union,to_fix))
+						if have_flexible_member:
+							assert TRT.isunion is False, "ERROR: Flexible array members in union?"
+							recipe_str = RecipeGenerator.template_flatten_define_struct_flexible_recipe.format(
+									T.str,
+									indent(out.getvalue().strip()),
+									"/* Type definition:\n%s */\n"%(TRT.defstring)
+							)
+						else:
+							recipe_str = RecipeGenerator.template_flatten_struct_recipe.format(
+									"STRUCT" if TRT.isunion is False else "UNION",
+									T.str,
+									TRT.size//8,
+									indent(out.getvalue().strip()),
+									"/* Type definition:\n%s */\n"%(TRT.defstring)
+							)
+						self.record_recipes.append(RecordRecipe(T,TRT,recipe_str,include,loc,self.simple,to_check,check_union,to_fix,have_flexible_member))
 					else:
 						self.unresolved_struct_includes.append((T.str,loc))
-						recipe_str = RecipeGenerator.template_flatten_struct_recipe.format(
-								"STRUCT" if TRT.isunion is False else "UNION",
-								T.str,
-								TRT.size//8,
-								indent(out.getvalue().strip()),
-								"/* Type definition:\n%s */\n"%(TRT.defstring)
-						)
-						self.record_recipes.append(RecordRecipe(T,TRT,recipe_str,None,loc,self.simple,to_check,check_union,to_fix))
+						if have_flexible_member:
+							assert TRT.isunion is False, "ERROR: Flexible array members in union?"
+							recipe_str = RecipeGenerator.template_flatten_define_struct_flexible_recipe.format(
+									T.str,
+									indent(out.getvalue().strip()),
+									"/* Type definition:\n%s */\n"%(TRT.defstring)
+							)
+						else:
+							recipe_str = RecipeGenerator.template_flatten_struct_recipe.format(
+									"STRUCT" if TRT.isunion is False else "UNION",
+									T.str,
+									TRT.size//8,
+									indent(out.getvalue().strip()),
+									"/* Type definition:\n%s */\n"%(TRT.defstring)
+							)
+						self.record_recipes.append(RecordRecipe(T,TRT,recipe_str,None,loc,self.simple,to_check,check_union,to_fix,have_flexible_member))
 					self.structs_done.append((T.str,loc))
 					self.structs_done_match.add((T.str,T.isunion))
 					self.gen_count+=1
 			else:
 				if typename not in self.struct_types_done_match:
-					recipe_str = RecipeGenerator.template_flatten_struct_type_recipe.format(
-							typename,
-							TRT.size//8,
-							indent(out.getvalue().strip()),
-							"/* Type definition:\n%s */\n"%(TRT.defstring)
-					)
-					self.typename_recipes.append(TypenameRecipe(typename,TRT,recipe_str,self.simple,to_check,check_union,to_fix))
+					if have_flexible_member:
+						recipe_str = RecipeGenerator.template_flatten_define_struct_type_flexible_recipe.format(
+								typename,
+								indent(out.getvalue().strip()),
+								"/* Type definition:\n%s */\n"%(TRT.defstring)
+						)
+					else:
+						recipe_str = RecipeGenerator.template_flatten_struct_type_recipe.format(
+								typename,
+								TRT.size//8,
+								indent(out.getvalue().strip()),
+								"/* Type definition:\n%s */\n"%(TRT.defstring)
+						)
+					self.typename_recipes.append(TypenameRecipe(typename,TRT,recipe_str,self.simple,to_check,check_union,to_fix,have_flexible_member))
 					self.struct_types_done.append((typename,""))
 					self.struct_types_done_match.add(typename)
 					self.gen_count+=1
@@ -2679,22 +2743,36 @@ the 'container_of' invocation chain.\n   The invocation chain was as follows:\n{
 			if T.name not in self.struct_types_done_match:
 				new_includes = RG.resolve_struct_type_location(T.id,self.includes)
 				if not new_includes:
-					recipe_str = RecipeGenerator.template_flatten_struct_type_recipe.format(
-							T.name,
-							TRT.size//8,
-							indent(out.getvalue().strip()),
-							"/* Type definition:\n%s */\n"%(TRT.defstring)
-					)
-					self.record_type_recipes.append(RecordTypeRecipe(T,TRT,recipe_str,None,self.simple,to_check,check_union,to_fix))
+					if have_flexible_member:
+						recipe_str = RecipeGenerator.template_flatten_define_struct_type_flexible_recipe.format(
+								T.name,
+								indent(out.getvalue().strip()),
+								"/* Type definition:\n%s */\n"%(TRT.defstring)
+						)
+					else:
+						recipe_str = RecipeGenerator.template_flatten_struct_type_recipe.format(
+								T.name,
+								TRT.size//8,
+								indent(out.getvalue().strip()),
+								"/* Type definition:\n%s */\n"%(TRT.defstring)
+						)
+					self.record_type_recipes.append(RecordTypeRecipe(T,TRT,recipe_str,None,self.simple,to_check,check_union,to_fix,have_flexible_member))
 					self.unresolved_struct_type_includes.append((T.name,T.location,T.id))
 				else:
-					recipe_str = RecipeGenerator.template_flatten_struct_type_recipe.format(
-							T.name,
-							TRT.size//8,
-							indent(out.getvalue().strip()),
-							"/* Type definition:\n%s */\n"%(TRT.defstring)
-					)
-					self.record_type_recipes.append(RecordTypeRecipe(T,TRT,recipe_str,new_includes,self.simple,to_check,check_union,to_fix))
+					if have_flexible_member:
+						recipe_str = RecipeGenerator.template_flatten_define_struct_type_flexible_recipe.format(
+								T.name,
+								indent(out.getvalue().strip()),
+								"/* Type definition:\n%s */\n"%(TRT.defstring)
+						)
+					else:
+						recipe_str = RecipeGenerator.template_flatten_struct_type_recipe.format(
+								T.name,
+								TRT.size//8,
+								indent(out.getvalue().strip()),
+								"/* Type definition:\n%s */\n"%(TRT.defstring)
+						)
+					self.record_type_recipes.append(RecordTypeRecipe(T,TRT,recipe_str,new_includes,self.simple,to_check,check_union,to_fix,have_flexible_member))
 				self.struct_types_done.append((T.name,T.location,T.id))
 				self.struct_types_done_match.add(T.name)
 				self.record_typedefs.add((T.name,TRT.str,TRT.id))
@@ -2742,6 +2820,22 @@ the 'container_of' invocation chain.\n   The invocation chain was as follows:\n{
 		inclues|=new_includes
 		return new_includes
 
+	def compute_recipe_maps(self):
+		self.RRMap = {}
+		for RR in RG.record_recipes:
+			if RR.RT.str in self.RRMap:
+				print ("WARNING: Multiple record recipes for structure '%s'"%(RR.RT.str))
+			self.RRMap[RR.RT.str] = RR
+		self.TRMap = {}
+		for TR in RG.typename_recipes:
+			if TR.typename in self.TRMap:
+				print ("WARNING: Multiple typename recipes for typename '%s'"%(TR.typename))
+			self.TRMap[TR.typename] = TR
+		self.RTRMap = {}
+		for RTR in RG.record_type_recipes:
+			if RTR.TPD.name in self.RTRMap:
+				print ("WARNING: Multiple record type recipes for typedef '%s'"%(RTR.TPD.name))
+			self.RTRMap[RTR.TPD.name] = RTR
 
 ####################################
 # Program Entry point
@@ -2783,17 +2877,12 @@ def main():
 		print(f'EE- No structures to generate recipes for')
 		exit(1)
 
-	globals_stream = io.StringIO()
+	# First pass of generating global triggers just to catch additional dependencies
 	additional_deps = list()
 	for glob in globals_to_dump:
 		out = io.StringIO()
 		gv = RG.ftdb.globals[glob[5]]
 		RG.generate_flatten_trigger(gv, out, additional_deps)
-		var_name = glob[2]
-		if glob[7] not in ['', 'vmlinux'] :
-			var_name = glob[7].replace('.ko', '').replace('-', '_') + ':' + var_name
-		globals_stream.write(RecipeGenerator.template_output_global_handler.format(
-			var_name, glob[6], glob[4], "\n".join(["\t\t\t"+x for x in out.getvalue().strip().split("\n")])))
 	deps|=set(additional_deps)
 
 	print(f"--- Generating recipes for {len(deps)} structures ...")
@@ -2828,6 +2917,22 @@ def main():
 	len([x for x in RG.record_recipes+RG.typename_recipes+RG.record_type_recipes if x.to_check is True]),
 	len([x for x in RG.record_recipes+RG.typename_recipes+RG.record_type_recipes if x.to_fix is True]),len(RG.structs_missing),
 	RG.member_count,RG.member_recipe_count,RG.not_safe_count,RG.not_used_count,RG.user_count))
+
+	# Create maps to quickly access the generated recipes information for a given structure
+	RG.compute_recipe_maps()
+
+	# Now do a second pass, this time insert proper size detection when generating trigger for structure types containing flexible array member
+	globals_stream = io.StringIO()
+	additional_deps = list()
+	for glob in globals_to_dump:
+		out = io.StringIO()
+		gv = RG.ftdb.globals[glob[5]]
+		RG.generate_flatten_trigger(gv, out, additional_deps, True)
+		var_name = glob[2]
+		if glob[7] not in ['', 'vmlinux'] :
+			var_name = glob[7].replace('.ko', '').replace('-', '_') + ':' + var_name
+		globals_stream.write(RecipeGenerator.template_output_global_handler.format(
+			var_name, glob[6], glob[4], "\n".join(["\t\t\t"+x for x in out.getvalue().strip().split("\n")])))
 
 	def print_TT_member(TT,rlogf):
 		if TT[0] is not None:

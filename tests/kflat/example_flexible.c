@@ -45,32 +45,34 @@ struct flex_G {
 /********************************/
 
 FUNCTION_DEFINE_FLATTEN_STRUCT(flex_B);
-FUNCTION_DEFINE_FLATTEN_STRUCT(flex_A,
+FUNCTION_DEFINE_FLATTEN_STRUCT_FLEXIBLE(flex_A,
 	AGGREGATE_FLATTEN_STRUCT_FLEXIBLE(flex_B, arr);
 );
 
-FUNCTION_DEFINE_FLATTEN_STRUCT(flex_C,
+FUNCTION_DEFINE_FLATTEN_STRUCT_FLEXIBLE(flex_C,
 	AGGREGATE_FLATTEN_STRING(name);
 	AGGREGATE_FLATTEN_TYPE_ARRAY_FLEXIBLE(unsigned long, arr);
 );
 
 FUNCTION_DEFINE_FLATTEN_STRUCT_TYPE(flex_D);
-FUNCTION_DEFINE_FLATTEN_STRUCT(flex_E,
+FUNCTION_DEFINE_FLATTEN_STRUCT_FLEXIBLE(flex_E,
 	AGGREGATE_FLATTEN_STRUCT_TYPE_FLEXIBLE(flex_D, arr);
 );
 
 FUNCTION_DEFINE_FLATTEN_UNION(flex_F);
-FUNCTION_DEFINE_FLATTEN_STRUCT(flex_G,
+FUNCTION_DEFINE_FLATTEN_STRUCT_FLEXIBLE(flex_G,
 	AGGREGATE_FLATTEN_UNION_FLEXIBLE(flex_F, arr);
 );
 
 static int kflat_flexible_test(struct flat *flat) {
+	int get_obj_supported;
 	struct flex_A *a;
 	struct flex_C *c;
 	struct flex_E *e;
 	struct flex_G *g;
 
 	FLATTEN_SETUP_TEST(flat);
+	get_obj_supported = IS_ENABLED(KFLAT_GET_OBJ_SUPPORT);
 
 	a = kmalloc(sizeof(struct flex_A) + 3 * sizeof(struct flex_B), GFP_KERNEL);
 	a->get_obj_supported = IS_ENABLED(KFLAT_GET_OBJ_SUPPORT);
@@ -98,6 +100,11 @@ static int kflat_flexible_test(struct flat *flat) {
 	g->arr[1].field = 0xddeeaa;
 	g->arr[2].field = 0xf01dab1e;
 
+	FOR_ROOT_POINTER(&get_obj_supported,
+		FLATTEN_TYPE(int, &get_obj_supported);
+	);
+
+#ifdef KFLAT_GET_OBJ_SUPPORT
 	FOR_ROOT_POINTER(a,
 		FLATTEN_STRUCT(flex_A, a);
     );
@@ -113,6 +120,7 @@ static int kflat_flexible_test(struct flat *flat) {
     FOR_ROOT_POINTER(g,
 		FLATTEN_STRUCT(flex_G, g);
     );
+#endif
 
 	kfree(a);
 	kfree(c);
@@ -127,11 +135,20 @@ static int kflat_flexible_test(struct flat *flat) {
 /********************************/
 
 static int kflat_flexible_validate(void *memory, size_t size, CUnflatten flatten) {
-	struct flex_A *pA = (struct flex_A*)unflatten_root_pointer_seq(flatten, 0);
-	struct flex_C *pC = (struct flex_C*)unflatten_root_pointer_seq(flatten, 1);
-	struct flex_E *pE = (struct flex_E*)unflatten_root_pointer_seq(flatten, 2);
-	struct flex_G *pG = (struct flex_G*)unflatten_root_pointer_seq(flatten, 3);
-	
+	int* get_obj_supported = (int*)unflatten_root_pointer_seq(flatten, 0);
+	struct flex_A *pA;
+	struct flex_C *pC;
+	struct flex_E *pE;
+	struct flex_G *pG;
+
+	if(get_obj_supported == NULL || *get_obj_supported == false)
+		return KFLAT_TEST_UNSUPPORTED;
+
+	pA = (struct flex_A*)unflatten_root_pointer_seq(flatten, 1);
+	pC = (struct flex_C*)unflatten_root_pointer_seq(flatten, 2);
+	pE = (struct flex_E*)unflatten_root_pointer_seq(flatten, 3);
+	pG = (struct flex_G*)unflatten_root_pointer_seq(flatten, 4);
+
 	if(!pA->get_obj_supported)
 		return KFLAT_TEST_UNSUPPORTED;
 

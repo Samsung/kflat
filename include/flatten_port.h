@@ -50,6 +50,6 @@
  * DECLs FOR EXTERNAL FUNCS
  *************************************/
 size_t flatten_func_to_name(char* name, size_t size, void* func_ptr);
-bool flatten_get_object(void* ptr, void** start, void** end);
+bool flatten_get_object(struct flat* flat, void* ptr, void** start, void** end);
 
 #endif /* FLATTEN_PORT_H */

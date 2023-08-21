@@ -55,8 +55,8 @@ FUNCTION_DEFINE_FLATTEN_STRUCT(ivec,
 	{
 		struct intnode* __entry;
 		list_for_each_entry(__entry, &ATTR(head), link ) {
-			FOR_POINTER(struct intnode*,____entry,&__entry,
-				FLATTEN_STRUCT(intnode,____entry);
+			FOR_VIRTUAL_POINTER(__entry,
+				FLATTEN_STRUCT(intnode,__entry);
 			);
 		}
 	}
@@ -90,8 +90,8 @@ FUNCTION_DEFINE_FLATTEN_STRUCT_SELF_CONTAINED_SPECIALIZE(self_contained, ivec, s
 	{
 		struct intnode* __entry;
 		list_for_each_entry_from_offset(__entry, &OFFATTR(struct list_head,offsetof(struct ivec,head)), offsetof(struct intnode,link) ) {
-			FOR_POINTER(struct intnode*,____entry,&__entry,
-				FLATTEN_STRUCT_SELF_CONTAINED(intnode,sizeof(struct intnode),____entry);
+			FOR_VIRTUAL_POINTER(__entry,
+				FLATTEN_STRUCT_SELF_CONTAINED(intnode,sizeof(struct intnode),__entry);
 			);
 		}
 	}

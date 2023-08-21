@@ -126,7 +126,7 @@ void kflat_get(struct kflat *kflat);
 void kflat_put(struct kflat *kflat);
 
 extern unsigned long (*kflat_lookup_kallsyms_name)(const char* name);
-bool flatten_get_object(void* ptr, void** start, void** end);
+bool flatten_get_object(struct flat* flat, void* ptr, void** start, void** end);
 void* flatten_global_address_by_name(const char* name);
 
 

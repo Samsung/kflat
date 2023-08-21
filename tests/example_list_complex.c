@@ -58,8 +58,8 @@ FUNCTION_DEFINE_FLATTEN_STRUCT(cvec,
 	{
 		struct complexnode* __entry;
 		list_for_each_entry(__entry, &ATTR(head), link ) {
-			FOR_POINTER(struct complexnode*,____entry,&__entry,
-				FLATTEN_STRUCT(complexnode,____entry);
+			FOR_VIRTUAL_POINTER(__entry,
+				FLATTEN_STRUCT(complexnode,__entry);
 			);
 		}
 	}
@@ -93,8 +93,8 @@ FUNCTION_DEFINE_FLATTEN_STRUCT_SELF_CONTAINED_SPECIALIZE(self_contained, cvec, s
 	{
 		struct complexnode* __entry;
 		list_for_each_entry_from_offset(__entry, &OFFATTR(struct list_head,offsetof(struct cvec,head)), offsetof(struct complexnode,link) ) {
-			FOR_POINTER(struct complexnode*,____entry,&__entry,
-				FLATTEN_STRUCT_SELF_CONTAINED(complexnode,sizeof(struct complexnode),____entry);
+			FOR_VIRTUAL_POINTER(__entry,
+				FLATTEN_STRUCT_SELF_CONTAINED(complexnode,sizeof(struct complexnode),__entry);
 			);
 		}
 	}

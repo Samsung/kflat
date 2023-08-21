@@ -544,6 +544,8 @@ private:
 
 				/* Make the fix */
 				size_t ptr_node_offset = ptr-ptr_node->start;
+				size_t mptr_size = node->last - node->start + 1;
+				assert(node_offset <= mptr_size - 8);
 				*((void**)((char*)node->mptr + node_offset)) = (char*)ptr_node->mptr + ptr_node_offset;
 
 				debug("%lx <- %lx (%hhx)\n", fix_loc, ptr, *(unsigned char*)((char*)ptr_node->mptr + ptr_node_offset));

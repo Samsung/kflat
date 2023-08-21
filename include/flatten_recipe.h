@@ -31,6 +31,24 @@ struct flatten_pointer* FUNC_NAME(struct flat* flat, const void* ptr, size_t n, 
 	return _fp_first;				\
 }
 
+/* We assume that when we have an array to structure type that contains flexible array members we cannot have more than single element of this array
+ * When such situation happens, complain and force to write a custom recipe
+ */
+#define FUNCTION_DEFINE_FLATTEN_GENERIC_ARRAY_FLEXIBLE(FUNC_NAME, TARGET_FUNC, FULL_TYPE)	\
+struct flatten_pointer* FUNC_NAME(struct flat* flat, const void* ptr, size_t n, uintptr_t custom_val, unsigned long index, struct bqueue* __q) {    \
+	const FULL_TYPE* _ptr = (const FULL_TYPE*) ptr;			\
+	void* _fp = NULL;	\
+	if (n!=1) {	\
+		DBGS("ERROR: Multiple elements in an array of structure type with flexible array members: [ " #FULL_TYPE " ]\n");	\
+		flat->error = EFAULT;	\
+		return NULL;	\
+	}	\
+	DBGS("%s(%lx,%zu)\n", __func__, (uintptr_t)_ptr, n);		\
+	_fp = (void*)TARGET_FUNC(flat, (FULL_TYPE*)((unsigned char*)_ptr), custom_val, index, __q);	\
+	if (flat->error) 				\
+		return NULL;				\
+	return _fp;				\
+}
 
 #define FUNCTION_DEFINE_FLATTEN_STRUCT_ARRAY(FLTYPE)	\
 	FUNCTION_DEFINE_FLATTEN_GENERIC_ARRAY(flatten_struct_array_##FLTYPE, flatten_struct_##FLTYPE, struct FLTYPE, sizeof(struct FLTYPE))
@@ -38,10 +56,22 @@ struct flatten_pointer* FUNC_NAME(struct flat* flat, const void* ptr, size_t n, 
 #define FUNCTION_DECLARE_FLATTEN_STRUCT_ARRAY(FLTYPE)	\
 	extern struct flatten_pointer* flatten_struct_array_##FLTYPE(struct flat* flat, const void* ptr, size_t n, uintptr_t __cval, unsigned long __index, struct bqueue* __q);
 
+#define FUNCTION_DEFINE_FLATTEN_STRUCT_ARRAY_FLEXIBLE(FLTYPE)	\
+	FUNCTION_DEFINE_FLATTEN_GENERIC_ARRAY_FLEXIBLE(flatten_struct_array_##FLTYPE, flatten_struct_##FLTYPE, struct FLTYPE)
+
+#define FUNCTION_DECLARE_FLATTEN_STRUCT_ARRAY_FLEXIBLE(FLTYPE)	\
+	extern struct flatten_pointer* flatten_struct_array_##FLTYPE(struct flat* flat, const void* ptr, size_t n, uintptr_t __cval, unsigned long __index, struct bqueue* __q);
+
 #define FUNCTION_DEFINE_FLATTEN_STRUCT_TYPE_ARRAY(FLTYPE)	\
 	FUNCTION_DEFINE_FLATTEN_GENERIC_ARRAY(flatten_struct_type_array_##FLTYPE, flatten_struct_type_##FLTYPE, FLTYPE, sizeof(FLTYPE))
 
 #define FUNCTION_DECLARE_FLATTEN_STRUCT_TYPE_ARRAY(FLTYPE)	\
+	extern struct flatten_pointer* flatten_struct_type_array_##FLTYPE(struct flat* flat, const void* ptr, size_t n, uintptr_t __cval, unsigned long __index, struct bqueue* __q);
+
+#define FUNCTION_DEFINE_FLATTEN_STRUCT_TYPE_ARRAY_FLEXIBLE(FLTYPE)	\
+	FUNCTION_DEFINE_FLATTEN_GENERIC_ARRAY_FLEXIBLE(flatten_struct_type_array_##FLTYPE, flatten_struct_type_##FLTYPE, FLTYPE)
+
+#define FUNCTION_DECLARE_FLATTEN_STRUCT_TYPE_ARRAY_FLEXIBLE(FLTYPE)	\
 	extern struct flatten_pointer* flatten_struct_type_array_##FLTYPE(struct flat* flat, const void* ptr, size_t n, uintptr_t __cval, unsigned long __index, struct bqueue* __q);
 
 #define FUNCTION_DEFINE_FLATTEN_UNION_ARRAY(FLTYPE) \
@@ -55,6 +85,24 @@ struct flatten_pointer* FUNC_NAME(struct flat* flat, const void* ptr, size_t n, 
 
 #define FUNCTION_DECLARE_FLATTEN_STRUCT_ARRAY_SPECIALIZE(TAG,FLTYPE)	\
 	extern struct flatten_pointer* flatten_struct_array_##FLTYPE##_##TAG(struct flat* flat, const void* ptr, size_t n, uintptr_t __cval, unsigned long __index, struct bqueue* __q);
+
+#define FUNCTION_DEFINE_FLATTEN_STRUCT_ARRAY_FLEXIBLE_SPECIALIZE(TAG,FLTYPE)	\
+	FUNCTION_DEFINE_FLATTEN_GENERIC_ARRAY_FLEXIBLE(flatten_struct_array_##FLTYPE##_##TAG, flatten_struct_##FLTYPE##_##TAG, struct FLTYPE)
+
+#define FUNCTION_DECLARE_FLATTEN_STRUCT_ARRAY_FLEXIBLE_SPECIALIZE(TAG,FLTYPE)	\
+	extern struct flatten_pointer* flatten_struct_array_##FLTYPE##_##TAG(struct flat* flat, const void* ptr, size_t n, uintptr_t __cval, unsigned long __index, struct bqueue* __q);
+
+#define FUNCTION_DEFINE_FLATTEN_STRUCT_TYPE_ARRAY_SPECIALIZE(TAG,FLTYPE)	\
+	FUNCTION_DEFINE_FLATTEN_GENERIC_ARRAY(flatten_struct_type_array_##FLTYPE##_##TAG, flatten_struct_type_##FLTYPE##_##TAG, FLTYPE, sizeof(FLTYPE))
+
+#define FUNCTION_DECLARE_FLATTEN_STRUCT_TYPE_ARRAY_SPECIALIZE(TAG,FLTYPE)	\
+	extern struct flatten_pointer* flatten_struct_type_array_##FLTYPE##_##TAG(struct flat* flat, const void* ptr, size_t n, uintptr_t __cval, unsigned long __index, struct bqueue* __q);
+
+#define FUNCTION_DEFINE_FLATTEN_STRUCT_TYPE_ARRAY_FLEXIBLE_SPECIALIZE(TAG,FLTYPE)	\
+	FUNCTION_DEFINE_FLATTEN_GENERIC_ARRAY_FLEXIBLE(flatten_struct_type_array_##FLTYPE##_##TAG, flatten_struct_type_##FLTYPE##_##TAG, FLTYPE)
+
+#define FUNCTION_DECLARE_FLATTEN_STRUCT_TYPE_ARRAY_FLEXIBLE_SPECIALIZE(TAG,FLTYPE)	\
+	extern struct flatten_pointer* flatten_struct_type_array_##FLTYPE##_##TAG(struct flat* flat, const void* ptr, size_t n, uintptr_t __cval, unsigned long __index, struct bqueue* __q);
 
 #define FUNCTION_DEFINE_FLATTEN_STRUCT_ARRAY_SELF_CONTAINED(FLTYPE,FLSIZE)	\
 	FUNCTION_DEFINE_FLATTEN_GENERIC_ARRAY(flatten_struct_array_##FLTYPE, flatten_struct_##FLTYPE, struct FLTYPE, FLSIZE)
@@ -95,9 +143,15 @@ struct flatten_pointer* FUNC_NAME(struct flat* flat, const void* ptr, uintptr_t 
 	struct flatten_pointer* r = 0;	\
 	size_t _node_offset;	\
 	const FULL_TYPE* _ptr = (const FULL_TYPE*) ptr;	\
+	size_t type_size = FLSIZE;	\
+	if (type_size==SIZE_MAX) {	\
+		DBGS("ERROR: failed to detect flexible array size @ %lx\n",ptr);	\
+		flat->error = EFAULT;	\
+		return 0;	\
+	}	\
         \
-	DBGS("%s(%lx): [%zu]\n", __func__, (uintptr_t)_ptr, FLSIZE);	\
-	__node = flatten_acquire_node_for_ptr(FLAT_ACCESSOR, (void*) ptr, FLSIZE);	\
+	DBGS("%s(%lx): [%zu]\n", __func__, (uintptr_t)_ptr, type_size);	\
+	__node = flatten_acquire_node_for_ptr(FLAT_ACCESSOR, (void*) ptr, type_size);	\
 	\
 	__VA_ARGS__ \
 	if (flat->error) {   \
@@ -135,6 +189,14 @@ struct flatten_pointer* FUNC_NAME(struct flat* flat, const void* ptr, uintptr_t 
 	FUNCTION_DEFINE_FLATTEN_GENERIC_BASE(flatten_struct_##FLTYPE, struct FLTYPE, FLSIZE, __VA_ARGS__) \
 	FUNCTION_DEFINE_FLATTEN_STRUCT_ARRAY_SELF_CONTAINED(FLTYPE,FLSIZE)
 
+#define FUNCTION_DEFINE_FLATTEN_STRUCT_FLEXIBLE(FLTYPE,...)  	\
+	FUNCTION_DEFINE_FLATTEN_GENERIC_BASE(flatten_struct_##FLTYPE, struct FLTYPE, FLATTEN_DETECT_OBJECT_SIZE((void*)ptr,SIZE_MAX), __VA_ARGS__)	\
+	FUNCTION_DEFINE_FLATTEN_STRUCT_ARRAY_FLEXIBLE(FLTYPE)
+
+#define FUNCTION_DECLARE_FLATTEN_STRUCT_FLEXIBLE(FLTYPE)	\
+	extern struct flatten_pointer* flatten_struct_##FLTYPE(struct flat* flat, const void*, uintptr_t __cval, unsigned long __index, struct bqueue*);	\
+	FUNCTION_DECLARE_FLATTEN_STRUCT_ARRAY_FLEXIBLE(FLTYPE)
+
 #define FUNCTION_DEFINE_FLATTEN_STRUCT_TYPE(FLTYPE,...)  \
 	FUNCTION_DEFINE_FLATTEN_GENERIC_BASE(flatten_struct_type_##FLTYPE, FLTYPE, sizeof(FLTYPE), __VA_ARGS__) \
 	FUNCTION_DEFINE_FLATTEN_STRUCT_TYPE_ARRAY(FLTYPE)
@@ -146,6 +208,14 @@ struct flatten_pointer* FUNC_NAME(struct flat* flat, const void* ptr, uintptr_t 
 #define FUNCTION_DEFINE_FLATTEN_STRUCT_TYPE_SELF_CONTAINED(FLTYPE,FLSIZE,...)  \
 	FUNCTION_DEFINE_FLATTEN_GENERIC_BASE(flatten_struct_type_##FLTYPE, FLTYPE, FLSIZE, __VA_ARGS__)	\
 	FUNCTION_DEFINE_FLATTEN_STRUCT_TYPE_ARRAY_SELF_CONTAINED(FLTYPE,FLSIZE)
+
+#define FUNCTION_DEFINE_FLATTEN_STRUCT_TYPE_FLEXIBLE(FLTYPE,...)  \
+	FUNCTION_DEFINE_FLATTEN_GENERIC_BASE(flatten_struct_type_##FLTYPE, FLTYPE, FLATTEN_DETECT_OBJECT_SIZE((void*)ptr,SIZE_MAX), __VA_ARGS__) \
+	FUNCTION_DEFINE_FLATTEN_STRUCT_TYPE_ARRAY_FLEXIBLE(FLTYPE)
+
+#define FUNCTION_DECLARE_FLATTEN_STRUCT_TYPE_FLEXIBLE(FLTYPE)	\
+	extern struct flatten_pointer* flatten_struct_type_##FLTYPE(struct flat* flat, const void*, uintptr_t __cval, unsigned long __index, struct bqueue*);	\
+	FUNCTION_DECLARE_FLATTEN_STRUCT_TYPE_ARRAY_FLEXIBLE(FLTYPE)
 
 #define FUNCTION_DEFINE_FLATTEN_UNION(FLTYPE,...)  \
 	FUNCTION_DEFINE_FLATTEN_GENERIC_BASE(flatten_union_##FLTYPE, union FLTYPE, sizeof(union FLTYPE), __VA_ARGS__)	\
@@ -167,12 +237,36 @@ struct flatten_pointer* FUNC_NAME(struct flat* flat, const void* ptr, uintptr_t 
 	extern struct flatten_pointer* flatten_struct_##FLTYPE##_##TAG(struct flat* flat, const void*, uintptr_t __cval, unsigned long __index, struct bqueue*);	\
 	FUNCTION_DECLARE_FLATTEN_STRUCT_ARRAY_SPECIALIZE(TAG,FLTYPE)
 
+#define FUNCTION_DEFINE_FLATTEN_STRUCT_FLEXIBLE_SPECIALIZE(TAG,FLTYPE,...)  \
+	FUNCTION_DEFINE_FLATTEN_GENERIC_BASE(flatten_struct_##FLTYPE##_##TAG, struct FLTYPE, FLATTEN_DETECT_OBJECT_SIZE((void*)ptr,SIZE_MAX), __VA_ARGS__)	\
+	FUNCTION_DEFINE_FLATTEN_STRUCT_ARRAY_FLEXIBLE_SPECIALIZE(TAG,FLTYPE)
+
+#define FUNCTION_DECLARE_FLATTEN_STRUCT_FLEXIBLE_SPECIALIZE(TAG,FLTYPE)	\
+	extern struct flatten_pointer* flatten_struct_##FLTYPE##_##TAG(struct flat* flat, const void*, uintptr_t __cval, unsigned long __index, struct bqueue*);	\
+	FUNCTION_DECLARE_FLATTEN_STRUCT_ARRAY_FLEXIBLE_SPECIALIZE(TAG,FLTYPE)
+
 #define FUNCTION_DEFINE_FLATTEN_STRUCT_SELF_CONTAINED_SPECIALIZE(TAG,FLTYPE,FLSIZE,...)  \
 	FUNCTION_DEFINE_FLATTEN_GENERIC_BASE(flatten_struct_##FLTYPE##_##TAG, struct FLTYPE, FLSIZE, __VA_ARGS__)	\
 	FUNCTION_DEFINE_FLATTEN_STRUCT_ARRAY_SELF_CONTAINED_SPECIALIZE(TAG,FLTYPE,FLSIZE)
 
 #define FUNCTION_DECLARE_FLATTEN_STRUCT_SELF_CONTAINED_SPECIALIZE(TAG,FLTYPE,FLSIZE)	\
 	FUNCTION_DECLARE_FLATTEN_STRUCT_SPECIALIZE(TAG,FLTYPE)
+
+#define FUNCTION_DEFINE_FLATTEN_STRUCT_TYPE_SPECIALIZE(TAG,FLTYPE,...)  \
+	FUNCTION_DEFINE_FLATTEN_GENERIC_BASE(flatten_struct_type_##FLTYPE##_##TAG, FLTYPE, sizeof(FLTYPE), __VA_ARGS__)	\
+	FUNCTION_DEFINE_FLATTEN_STRUCT_TYPE_ARRAY_SPECIALIZE(TAG,FLTYPE)
+
+#define FUNCTION_DECLARE_FLATTEN_STRUCT_TYPE_SPECIALIZE(TAG,FLTYPE)	\
+	extern struct flatten_pointer* flatten_struct_type_##FLTYPE##_##TAG(struct flat* flat, const void*, uintptr_t __cval, unsigned long __index, struct bqueue*);	\
+	FUNCTION_DECLARE_FLATTEN_STRUCT_TYPE_ARRAY_SPECIALIZE(TAG,FLTYPE)
+
+#define FUNCTION_DEFINE_FLATTEN_STRUCT_TYPE_FLEXIBLE_SPECIALIZE(TAG,FLTYPE,...)  \
+	FUNCTION_DEFINE_FLATTEN_GENERIC_BASE(flatten_struct_type_##FLTYPE##_##TAG, FLTYPE, FLATTEN_DETECT_OBJECT_SIZE((void*)ptr,SIZE_MAX), __VA_ARGS__)	\
+	FUNCTION_DEFINE_FLATTEN_STRUCT_TYPE_ARRAY_FLEXIBLE_SPECIALIZE(TAG,FLTYPE)
+
+#define FUNCTION_DECLARE_FLATTEN_STRUCT_TYPE_FLEXIBLE_SPECIALIZE(TAG,FLTYPE)	\
+	extern struct flatten_pointer* flatten_struct_type_##FLTYPE##_##TAG(struct flat* flat, const void*, uintptr_t __cval, unsigned long __index, struct bqueue*);	\
+	FUNCTION_DECLARE_FLATTEN_STRUCT_TYPE_ARRAY_FLEXIBLE_SPECIALIZE(TAG,FLTYPE)
 
 /*******************************
  * FLATTEN macros
@@ -184,36 +278,170 @@ struct flatten_pointer* FUNC_NAME(struct flat* flat, const void* ptr, uintptr_t 
 	DBGM3(FLATTEN_STRUCT_ARRAY,T,p,n);	\
 	FLATTEN_GENERIC(p, sizeof(struct T), n, 0, flatten_struct_array_##T, 0)
 
+#define FLATTEN_STRUCT_ARRAY_FLEXIBLE(T,p,n)	\
+	do {	\
+		size_t type_size;	\
+		DBGM3(FLATTEN_STRUCT_ARRAY_FLEXIBLE,T,p,n);	\
+		if (n!=1) {	\
+			DBGS("ERROR: Multiple elements in an array of structure type with flexible array members: [ " #T " ]\n");	\
+			flat->error = EFAULT;	\
+			break;	\
+		}	\
+		type_size = FLATTEN_DETECT_OBJECT_SIZE((void*)p,SIZE_MAX);	\
+		if (type_size==SIZE_MAX) {	\
+			DBGS("ERROR: failed to detect flexible array size @ %lx\n",p);	\
+			flat->error = EFAULT;	\
+			break;	\
+		}	\
+		FLATTEN_GENERIC(p, type_size, n, 0, flatten_struct_array_##T, 0);	\
+	} while(0)
+
 #define FLATTEN_STRUCT(T,p)	\
 	FLATTEN_STRUCT_ARRAY(T,p,1)
+
+#define FLATTEN_STRUCT_FLEXIBLE(T,p)	\
+	FLATTEN_STRUCT_ARRAY_FLEXIBLE(T,p,1)
 
 #define FLATTEN_STRUCT_ARRAY_SHIFTED(T,p,n,s)	\
 	DBGM4(FLATTEN_STRUCT_ARRAY_SHIFTED,T,p,n,s);	\
 	FLATTEN_GENERIC(p, sizeof(struct T), n, 0, flatten_struct_array_##T, s)
 
+#define FLATTEN_STRUCT_ARRAY_SHIFTED_FLEXIBLE(T,p,n,s)	\
+	do {	\
+		size_t type_size;	\
+		DBGM3(FLATTEN_STRUCT_ARRAY_SHIFTED_FLEXIBLE,T,p,n);	\
+		if (n!=1) {	\
+			DBGS("ERROR: Multiple elements in an array of structure type with flexible array members: [ " #T " ]\n");	\
+			flat->error = EFAULT;	\
+			break;	\
+		}	\
+		type_size = FLATTEN_DETECT_OBJECT_SIZE((void*)p,SIZE_MAX);	\
+		if (type_size==SIZE_MAX) {	\
+			DBGS("ERROR: failed to detect flexible array size @ %lx\n",p);	\
+			flat->error = EFAULT;	\
+			break;	\
+		}	\
+		FLATTEN_GENERIC(p, type_size, n, 0, flatten_struct_array_##T, s);	\
+	} while(0)
+
 #define FLATTEN_STRUCT_SHIFTED(T,p,s)	\
 	FLATTEN_STRUCT_ARRAY_SHIFTED(T,p,1,s)
+
+#define FLATTEN_STRUCT_SHIFTED_FLEXIBLE(T,p,s)	\
+	FLATTEN_STRUCT_ARRAY_SHIFTED_FLEXIBLE(T,p,1,s)
 
 #define FLATTEN_STRUCT_ARRAY_SPECIALIZE(TAG,T,p,n)	\
 	DBGM3(FLATTEN_STRUCT_ARRAY_SPECIALIZE,T,p,n);	\
 	FLATTEN_GENERIC(p, sizeof(struct T), n, 0, flatten_struct_array_##T##_##TAG, 0)
 
+#define FLATTEN_STRUCT_ARRAY_SPECIALIZE_FLEXIBLE(TAG,T,p,n)	\
+	do {	\
+		size_t type_size;	\
+		DBGM3(FLATTEN_STRUCT_ARRAY_SPECIALIZE_FLEXIBLE,T,p,n);	\
+		if (n!=1) {	\
+			DBGS("ERROR: Multiple elements in an array of structure type with flexible array members: [ " #T " ]\n");	\
+			flat->error = EFAULT;	\
+			break;	\
+		}	\
+		type_size = FLATTEN_DETECT_OBJECT_SIZE((void*)p,SIZE_MAX);	\
+		if (type_size==SIZE_MAX) {	\
+			DBGS("ERROR: failed to detect flexible array size @ %lx\n",p);	\
+			flat->error = EFAULT;	\
+			break;	\
+		}	\
+		FLATTEN_GENERIC(p, type_size, n, 0, flatten_struct_array_##T##_##TAG, 0);	\
+	} while(0)
+
 #define FLATTEN_STRUCT_SPECIALIZE(TAG,T,p)	\
 	FLATTEN_STRUCT_ARRAY_SPECIALIZE(TAG,T,p,1)
+
+#define FLATTEN_STRUCT_SPECIALIZE_FLEXIBLE(TAG,T,p)	\
+	FLATTEN_STRUCT_ARRAY_SPECIALIZE_FLEXIBLE(TAG,T,p,1)
 
 #define FLATTEN_STRUCT_TYPE_ARRAY(T,p,n)	\
 	DBGM3(FLATTEN_STRUCT_TYPE_ARRAY,T,p,n);	\
 	FLATTEN_GENERIC(p, sizeof(T), n, 0, flatten_struct_type_array_##T, 0)
 
+#define FLATTEN_STRUCT_TYPE_ARRAY_FLEXIBLE(T,p,n)	\
+	do {	\
+		size_t type_size;	\
+		DBGM3(FLATTEN_STRUCT_TYPE_ARRAY_FLEXIBLE,T,p,n);	\
+		if (n!=1) {	\
+			DBGS("ERROR: Multiple elements in an array of structure type with flexible array members: [ " #T " ]\n");	\
+			flat->error = EFAULT;	\
+			break;	\
+		}	\
+		type_size = FLATTEN_DETECT_OBJECT_SIZE((void*)p,SIZE_MAX);	\
+		if (type_size==SIZE_MAX) {	\
+			DBGS("ERROR: failed to detect flexible array size @ %lx\n",p);	\
+			flat->error = EFAULT;	\
+			break;	\
+		}	\
+		FLATTEN_GENERIC(p, type_size, n, 0, flatten_struct_type_array_##T, 0);	\
+	} while(0)
+
 #define FLATTEN_STRUCT_TYPE(T,p)	\
 	FLATTEN_STRUCT_TYPE_ARRAY(T,p,1)
+
+#define FLATTEN_STRUCT_TYPE_FLEXIBLE(T,p)	\
+	FLATTEN_STRUCT_TYPE_ARRAY_FLEXIBLE(T,p,1)
 
 #define FLATTEN_STRUCT_TYPE_ARRAY_SHIFTED(T,p,n,s)	\
 	DBGM4(FLATTEN_STRUCT_TYPE_ARRAY_SHIFTED,T,p,n,s);	\
 	FLATTEN_GENERIC(p, sizeof(T), n, 0, flatten_struct_type_array_##T, s)
 
+#define FLATTEN_STRUCT_TYPE_ARRAY_SHIFTED_FLEXIBLE(T,p,n,s)	\
+	do {	\
+		size_t type_size;	\
+		DBGM3(FLATTEN_STRUCT_TYPE_ARRAY_SHIFTED_FLEXIBLE,T,p,n);	\
+		if (n!=1) {	\
+			DBGS("ERROR: Multiple elements in an array of structure type with flexible array members: [ " #T " ]\n");	\
+			flat->error = EFAULT;	\
+			break;	\
+		}	\
+		type_size = FLATTEN_DETECT_OBJECT_SIZE((void*)p,SIZE_MAX);	\
+		if (type_size==SIZE_MAX) {	\
+			DBGS("ERROR: failed to detect flexible array size @ %lx\n",p);	\
+			flat->error = EFAULT;	\
+			break;	\
+		}	\
+		FLATTEN_GENERIC(p, type_size, n, 0, flatten_struct_type_array_##T, s);	\
+	} while(0)
+
 #define FLATTEN_STRUCT_TYPE_SHIFTED(T,p,s)	\
 	FLATTEN_STRUCT_TYPE_ARRAY_SHIFTED(T,p,1,s)
+
+#define FLATTEN_STRUCT_TYPE_SHIFTED_FLEXIBLE(T,p,s)	\
+	FLATTEN_STRUCT_TYPE_ARRAY_SHIFTED_FLEXIBLE(T,p,1,s)
+
+
+#define FLATTEN_STRUCT_TYPE_ARRAY_SPECIALIZE(TAG,T,p,n)	\
+	DBGM3(FLATTEN_STRUCT_TYPE_ARRAY_SPECIALIZE,T,p,n);	\
+	FLATTEN_GENERIC(p, sizeof(T), n, 0, flatten_struct_type_array_##T##_##TAG, 0)
+
+#define FLATTEN_STRUCT_TYPE_ARRAY_SPECIALIZE_FLEXIBLE(TAG,T,p,n)	\
+	do {	\
+		size_t type_size;	\
+		DBGM3(FLATTEN_STRUCT_TYPE_ARRAY_SPECIALIZE_FLEXIBLE,T,p,n);	\
+		if (n!=1) {	\
+			DBGS("ERROR: Multiple elements in an array of structure type with flexible array members: [ " #T " ]\n");	\
+			flat->error = EFAULT;	\
+			break;	\
+		}	\
+		type_size = FLATTEN_DETECT_OBJECT_SIZE((void*)p,SIZE_MAX);	\
+		if (type_size==SIZE_MAX) {	\
+			DBGS("ERROR: failed to detect flexible array size @ %lx\n",p);	\
+			flat->error = EFAULT;	\
+			break;	\
+		}	\
+		FLATTEN_GENERIC(p, type_size, n, 0, flatten_struct_type_array_##T##_##TAG, 0);	\
+	} while(0)
+
+#define FLATTEN_STRUCT_TYPE_SPECIALIZE(TAG,T,p)	\
+	FLATTEN_STRUCT_TYPE_ARRAY_SPECIALIZE(TAG,T,p,1)
+
+#define FLATTEN_STRUCT_TYPE_SPECIALIZE_FLEXIBLE(TAG,T,p)	\
+	FLATTEN_STRUCT_TYPE_ARRAY_SPECIALIZE_FLEXIBLE(TAG,T,p,1)
 
 #define FLATTEN_STRUCT_ARRAY_SELF_CONTAINED(T,N,p,n)	\
 	DBGM4(FLATTEN_STRUCT_ARRAY_SELF_CONTAINED,T,N,p,n);	\
@@ -269,7 +497,7 @@ do {	\
 #define AGGREGATE_FLATTEN_GENERIC_STORAGE(FULL_TYPE,SIZE,TARGET,_off,n,CUSTOM_VAL)		\
 	do {	\
 		DBGM3(AGGREGATE_FLATTEN_GENERIC_STORAGE,FULL_TYPE,_off,n);	\
-		DBGS("FULL_TYPE [%lx:%zu -> %lx]\n",(uintptr_t)_ptr,(size_t)_off,(uintptr_t)((const FULL_TYPE*)((unsigned char*)(_ptr)+_off)));	\
+		DBGS("FULL_TYPE [%lx:%zu -> %lx], size(%zu), n(%ld)\n",(uintptr_t)_ptr,(size_t)_off,(uintptr_t)((const FULL_TYPE*)((unsigned char*)(_ptr)+_off)),SIZE,n);	\
 		flatten_aggregate_generic_storage(FLAT_ACCESSOR, __q, _ptr, SIZE, n, (uintptr_t)(CUSTOM_VAL), _off, TARGET); \
     } while(0)
 
@@ -278,7 +506,8 @@ do {	\
 		void* start, *end;					\
 		size_t el_cnt;						\
 											\
-		bool rv = flatten_get_object((void*)_ptr, &start, &end);	\
+		bool rv = flatten_get_object(FLAT_ACCESSOR, (void*)_ptr, &start, &end);	\
+		DBGS("flatten_get_object(): %d, start(%lx), end(%lx), size(%zu)\n",rv,start,end,end-start);	\
 		if(!rv)								\
 			break;							\
 											\
@@ -294,7 +523,7 @@ do {	\
 		size_t el_cnt;						\
 		const T* __p;						\
 											\
-		bool rv = flatten_get_object((void*)_ptr, &start, &end);	\
+		bool rv = flatten_get_object(FLAT_ACCESSOR, (void*)_ptr, &start, &end);	\
 		if(!rv)								\
 			break;							\
 											\
@@ -388,7 +617,7 @@ do {	\
 	do {	\
 		DBGS("AGGREGATE_FLATTEN_GENERIC(%s, %s, N:0x%zu, off:0x%zu, n:0x%zu)\n", #FULL_TYPE, #f, N, _off, n);	\
 		DBGS("  \\-> FULL_TYPE [%lx:%zu -> %lx]\n",(uintptr_t)_ptr,(size_t)_off,(uintptr_t)OFFATTRN(_off,_shift));	\
-		if((pre_f) || (post_f))	\
+		if(((uintptr_t)(pre_f) != 0) || ((uintptr_t)(post_f) != 0))	\
 			DBGS("  \\-> PRE_F[%llx]; POST_F[%llx]\n",(uintptr_t)pre_f, (uintptr_t) post_f);	\
 		flatten_aggregate_generic(FLAT_ACCESSOR, __q, _ptr, N, n, CUSTOM_VAL, _off, _shift, TARGET, pre_f, post_f); \
 	} while(0)
@@ -532,7 +761,7 @@ do {	\
 
 #define AGGREGATE_FLATTEN_TYPE_ARRAY(T,f,n)	\
 	do {  \
-		DBGM3(AGGREGATE_FLATTEN_TYPE_ARRAY,T,f,n);	\
+		DBGS("AGGREGATE_FLATTEN_TYPE_ARRAY(%s, %s, n:0x%zu)\n", #T, #f, n);	\
         if ((!FLAT_ACCESSOR->error)&&(ADDR_RANGE_VALID(ATTR(f), (n) * sizeof(T)))) {   \
         	size_t _off = offsetof(_container_type,f);	\
         	struct flat_node *__node = interval_tree_iter_first(&FLAT_ACCESSOR->FLCTRL.imap_root, (uint64_t)_ptr+_off,\
@@ -650,6 +879,21 @@ do {	\
 #define FOR_POINTER(PTRTYPE, v, p, ...)	\
 	FOREACH_POINTER(PTRTYPE, v, p, 1, __VA_ARGS__)
 
+#define FOR_VIRTUAL_POINTER(p, ...)	\
+	do {	\
+		DBGM1(FOR_VIRTUAL_POINTER,p);	\
+		if ((!FLAT_ACCESSOR->error)&&(ADDR_VALID(p))) {	\
+			struct flatten_pointer* __fptr = make_flatten_pointer(FLAT_ACCESSOR,0,0);	\
+			if (__fptr) {	\
+				__VA_ARGS__;	\
+				flat_free(__fptr);	\
+			}	\
+			else {	\
+				FLAT_ACCESSOR->error = ENOMEM;	\
+			}	\
+		}	\
+	} while(0)
+
 
 /*******************************
  * FLATTEN entry point
@@ -666,7 +910,7 @@ do {	\
 		}	\
 		__q = &bq;	\
 					\
-		DBGM3(FOR_EXTENDED_ROOT_POINTER,p,__name,__size);	\
+		DBGS("FOR_EXTENDED_ROOT_POINTER(%s[%llx], %s, %llx)\n", #p, (uintptr_t)p, __name, __size); \
 		if ((!FLAT_ACCESSOR->error)&&(ADDR_VALID(p))) {	\
 			struct flatten_pointer* __fptr = make_flatten_pointer(FLAT_ACCESSOR,0,0);	\
 			const void* __root_ptr __attribute__((unused)) = (const void*) p;       \
@@ -701,9 +945,11 @@ do {	\
 #define FLATTEN_DETECT_OBJECT_SIZE(__ptr,__dEFAULT_size) \
 		({			\
 			void *__start, *__end;	\
-			bool rv = flatten_get_object(__ptr, &__start, &__end);	\
+			size_t __deduced_size;	\
+			bool rv = flatten_get_object(FLAT_ACCESSOR, __ptr, &__start, &__end);	\
 			DBGS("FLATTEN_DETECT_OBJECT_SIZE(%llx, %lld) -> (rv: %d)[from: %llx; to: %llx]\n", __ptr, __dEFAULT_size, rv, __start, __end); \
-			(rv && __end != __start)?(__end-__ptr+1):(__dEFAULT_size);	\
+			__deduced_size = (uintptr_t)__end - (uintptr_t)__ptr + 1;	\
+			(rv)?(__deduced_size):(__dEFAULT_size);	\
 		})
 
 /* The following dEFAULT macro argument implementation was based on https://stackoverflow.com/a/3048361 */

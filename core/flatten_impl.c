@@ -74,6 +74,7 @@ struct blstream* binary_stream_append(struct flat* flat, const void* data, size_
 	struct blstream* v = create_binary_stream_element(flat, size);
 	if (!v)
 		return 0;
+	v->source = data;
 	memcpy(v->data,data,size);
 	list_add_tail(&v->head, &flat->FLCTRL.storage_head);
 	return v;
@@ -84,6 +85,7 @@ static struct blstream* binary_stream_insert_front(struct flat* flat, const void
 	struct blstream* v = create_binary_stream_element(flat, size);
 	if (!v)
 		return 0;
+	v->source = data;
 	memcpy(v->data, data, size);
 	list_add_tail(&v->head, &where->head);
 	return v;
@@ -94,6 +96,7 @@ static struct blstream* binary_stream_insert_back(struct flat* flat, const void*
 	struct blstream* v = create_binary_stream_element(flat, size);
 	if (!v)
 		return 0;
+	v->source = data;
 	memcpy(v->data,data,size);
 	list_add(&v->head, &where->head);
 	return v;
@@ -107,19 +110,23 @@ int binary_stream_calculate_index(struct flat* flat) {
 
 	list_for_each_entry(ptr, &flat->FLCTRL.storage_head, head) {
 		size_t align = 0;
+		struct blstream* prev = list_prev_entry(ptr, head);
 		if (ptr->alignment && index != 0) {
 			if(ptr->alignment > 128) {
 				flat_errs("Invalid ptr->alignment(%zu) in blstream node", ptr->alignment);
 				return EINVAL;
 			}
 
-			align = -index & (ptr->alignment - 1);
-			if (align != 0) {
-				v = binary_stream_insert_front(flat, padding, align, ptr);
-				if (!v)
-					return ENOMEM;
-				v->index = index;
-				index += v->size;
+			// Don't pad memory chunks that will be merged into one memory fragment
+			if((uintptr_t)prev->source + prev->size < (uintptr_t) ptr->source) {
+				align = -index & (ptr->alignment - 1);
+				if (align != 0) {
+					v = binary_stream_insert_front(flat, padding, align, ptr);
+					if (!v)
+						return ENOMEM;
+					v->index = index;
+					index += v->size;
+				}
 			}
 		}
 
