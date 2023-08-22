@@ -484,5 +484,5 @@ int main(int argc, char** argv) {
                     OUTPUT_COLOR(LOG_INFO_COLOR), OUTPUT_COLOR(LOG_DEFAULT_COLOR));
     }
 
-    return 0;
+    return success < count;
 }

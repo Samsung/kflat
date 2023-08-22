@@ -52,6 +52,7 @@ library:
 .PHONY: uflat
 uflat:
 	$(MAKE) -C $(PWD)/lib uflat
+	$(MAKE) -C $(PWD)/tools uflattest
 
 .PHONY: clean
 clean:

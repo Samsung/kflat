@@ -8,6 +8,13 @@ CFLAGS += -isystem /usr/aarch64-linux-gnu/include
 endif
 
 #
+# Generate lists of available tests for uflat and kflat test apps
+#
+../tests/uflat_tests_list.h: Makefile
+	@echo "** Generating list of UFLAT tests **"
+	$(shell M=$(PWD) ../tests/tests_list_gen.sh)
+
+#
 # Test files from tests/ directory
 #
 TEST_SRCS = $(wildcard $(PWD)/tests/*.c)
@@ -57,7 +64,7 @@ executor: executor.c common.o
 kflattest: kflattest.c common.o $(TEST_OBJS) $(KFLAT_TEST_OBJS)
 	$(CC) $(CFLAGS) $(EXTRA_CFLAGS) --static -o $@ $^ $(PWD)/lib/libunflatten_$(ARCH).a -lstdc++ -lm -D__VALIDATOR__
 
-uflattest: uflattest.c common.o $(UFLAT_COMMON_TEST_OBJS) $(UFLAT_SPEC_TEST_OBJS)
+uflattest: uflattest.c common.o $(UFLAT_COMMON_TEST_OBJS) $(UFLAT_SPEC_TEST_OBJS) ../tests/uflat_tests_list.h
 	$(CC) $(CFLAGS) $(EXTRA_CFLAGS) --static -o $@ $^ $(PWD)/lib/libuflat_$(ARCH).a -lstdc++ -lm -ldl -I$(PWD)/lib/include_priv -D__VALIDATOR__ -D__TESTER__
 
 # ARM specific targets
