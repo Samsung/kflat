@@ -373,8 +373,8 @@ int udump_dump_vma(struct udump_memory_map* mem) {
 static size_t uflat_test_address(struct uflat* uflat, void* ptr, size_t size) {
     struct udump_memory_node* node;
 
-    node = memory_tree_iter_first(&uflat->udump_memory->imap_root, (uintptr_t)ptr, (uintptr_t)ptr + size);
-    if(node == NULL)
+    node = memory_tree_iter_first(&uflat->udump_memory->imap_root, (uintptr_t)ptr, (uintptr_t)ptr + size - 1);
+    if(node == NULL || !(node->prot & UFLAT_MEM_PROT_READ))
         return 0;
     
     ssize_t remaining = (uintptr_t)node->end - (uintptr_t)ptr + 1;
@@ -408,8 +408,17 @@ bool uflat_test_exec_range(struct flat* flat, void* ptr) {
     struct uflat* uflat = container_of(flat, struct uflat, flat);
 
     node = memory_tree_iter_first(&uflat->udump_memory->imap_root, (uintptr_t)ptr, (uintptr_t)ptr);
-    if (node == NULL)
-        return false;
+    if (node == NULL) {
+        // Check if there are any new mapping
+        udump_destroy(uflat->udump_memory);
+        udump_dump_vma(uflat->udump_memory);
+
+        node = memory_tree_iter_first(&uflat->udump_memory->imap_root, (uintptr_t)ptr, (uintptr_t)ptr);
+        if(node == NULL) {
+            FLATTEN_LOG_INFO("Failed to access memory at %lx - access violation", (uintptr_t) ptr);
+            return false;
+        }
+    }
 
     if(!(node->prot & UFLAT_MEM_PROT_EXEC)) {
         FLATTEN_LOG_INFO("Failed to access code memory at %p - non-executable area", ptr);
