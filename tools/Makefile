@@ -65,7 +65,7 @@ kflattest: kflattest.c common.o $(TEST_OBJS) $(KFLAT_TEST_OBJS)
 	$(CC) $(CFLAGS) $(EXTRA_CFLAGS) --static -o $@ $^ $(PWD)/lib/libunflatten_$(ARCH).a -lstdc++ -lm -D__VALIDATOR__
 
 uflattest: uflattest.c common.o $(UFLAT_COMMON_TEST_OBJS) $(UFLAT_SPEC_TEST_OBJS) ../tests/uflat_tests_list.h
-	$(CC) $(CFLAGS) $(EXTRA_CFLAGS) --static -o $@ $^ $(PWD)/lib/libuflat_$(ARCH).a -lstdc++ -lm -ldl -I$(PWD)/lib/include_priv -D__VALIDATOR__ -D__TESTER__
+	$(CC) $(CFLAGS) $(EXTRA_CFLAGS) --static -o $@ $(filter-out %.h,$^) $(PWD)/lib/libuflat_$(ARCH).a -lstdc++ -lm -ldl -I$(PWD)/lib/include_priv -D__VALIDATOR__ -D__TESTER__
 
 # ARM specific targets
 common_32.o: common.c
