@@ -5,6 +5,9 @@ KDIR ?= $(KERNEL_DIR)
 CCDIR ?= $(CLANG_DIR)
 OPTS ?= $(KFLAT_OPTS)
 
+WARN_DEFAULT_ARCH := false
+WARN_DEFAULT_KDIR := false
+
 ifneq ($(RECIPE_DIRS),)
   export RECIPE_DIRS
 endif
@@ -13,7 +16,7 @@ endif
 
 ifeq ($(KDIR),)
   KDIR := /lib/modules/$(shell uname -r)/build
-  $(info KDIR is not specified, defaulting to current kernel headers - $(KDIR))
+	WARN_DEFAULT_KDIR := true
 endif
 
 ifeq ($(CCDIR),)
@@ -25,7 +28,7 @@ endif
 
 ifeq ($(ARCH),)
   export ARCH := $(shell arch)
-  $(info Architecture not specified, defaulting to $(ARCH))
+  WARN_DEFAULT_ARCH := true
 endif
 
 ifeq ($(ARCH),arm64)
@@ -40,6 +43,12 @@ endif
 
 
 default:
+ifeq ($(WARN_DEFAULT_ARCH), true)
+	$(info Architecture not specified, defaulting to $(ARCH))
+endif
+ifeq ($(WARN_DEFAULT_KDIR), true)
+	$(info KDIR is not specified, defaulting to current kernel headers - $(KDIR))
+endif
 	$(MAKE) -C $(KDIR) M=$(PWD)/core CC=$(CC) LD=$(LD) CFLAGS=$(CFLAGS) OPTS=$(KFLAT_OPTS) modules
 	$(MAKE) -C $(KDIR) M=$(PWD)/recipes CC=$(CC) LD=$(LD) CFLAGS=$(CFLAGS) modules
 	$(MAKE) -C $(PWD)/lib KLEE_LIBCXX_INSTALL=$(KLEE_LIBCXX_INSTALL) all
@@ -56,7 +65,10 @@ uflat:
 
 .PHONY: clean
 clean:
+ifneq ($(wildcard $(KDIR)),)
+# Clean kernel module only when KDIR is valid
 	$(MAKE) -C $(KDIR) M=$(PWD)/core clean
 	$(MAKE) -C $(KDIR) M=$(PWD)/recipes clean
+endif
 	$(MAKE) -C $(PWD)/lib clean
 	$(MAKE) -C $(PWD)/tools clean
