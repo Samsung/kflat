@@ -1627,8 +1627,10 @@ EXPORT_FUNC(flatten_aggregate_generic_storage);
 
 struct flatten_pointer* flatten_plain_type(struct flat* flat, const void* _ptr, size_t _sz) {
 
+	static const short align_array[] = {8, 1, 2, 1, 4, 1, 2, 1};
 	struct flat_node* node;
 	struct flatten_pointer* flat_ptr;
+	size_t node_offset;
 
 	if (!_sz) {
 		flat_errs("flatten_plain_type - zero size memory");
@@ -1636,13 +1638,16 @@ struct flatten_pointer* flatten_plain_type(struct flat* flat, const void* _ptr, 
 	}
 
 	node = flatten_acquire_node_for_ptr(flat, _ptr, _sz);
-
 	if (!node) {
 		flat_errs("failed to acquire flatten node");
 		return 0;
 	}
 
-	flat_ptr = make_flatten_pointer(flat,node,(uintptr_t)_ptr-node->start);
+	node_offset = (uintptr_t)_ptr - node->start;
+	node->storage->alignment = align_array[(uintptr_t) _ptr % 8];
+	node->storage->align_offset = node_offset;
+
+	flat_ptr = make_flatten_pointer(flat,node, node_offset);
 	if (!flat_ptr) {
 		return 0;
 	}
