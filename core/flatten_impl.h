@@ -14,8 +14,8 @@
 /*************************************
  * FUNCTION DECLS
  *************************************/
-int fixup_set_insert(struct flat* flat, struct flat_node* node, size_t offset, struct flatten_pointer* ptr);
-int fixup_set_update(struct flat* flat, struct flat_node* node, size_t offset, struct flatten_pointer* ptr);
+int fixup_set_insert(struct flat* flat, struct flat_node* node, size_t offset, struct flatten_pointer* ptr, enum fixup_encoding flags);
+int fixup_set_update(struct flat* flat, struct flat_node* node, size_t offset, struct flatten_pointer* ptr, enum fixup_encoding flags);
 struct blstream* binary_stream_append(struct flat* flat, const void* data, size_t size);
 
 

@@ -195,7 +195,7 @@ static void binary_stream_update_pointers(struct flat* flat) {
 	FLATTEN_LOG_DEBUG("# Pointer update\n");
 	while(p) {
     	struct fixup_set_node* node = (struct fixup_set_node*)p;
-    	if ((node->ptr)&&(!(((unsigned long)node->ptr)&1))) {
+    	if (node->ptr && (!IS_FIXUP_FPTR(node))) {
 			void* newptr = (unsigned char*)node->ptr->node->storage->index+node->ptr->offset;
 			DBGS("@ ptr update at ((%lx)%lx:%zu) : %lx => %lx\n",(unsigned long)node->inode,(unsigned long)node->inode->start,node->offset,
 					(unsigned long)newptr,(unsigned long)(((unsigned char*)node->inode->storage->data)+node->offset));
@@ -331,12 +331,13 @@ int bqueue_pop_front(struct bqueue* q, void* m, size_t s) {
  ******************************************************/
 #define ADDR_KEY(p)	((((p)->inode)?((p)->inode->start):0) + (p)->offset)
 
-static struct fixup_set_node* create_fixup_set_node_element(struct flat* flat, struct flat_node* node, size_t offset, struct flatten_pointer* ptr) {
+static struct fixup_set_node* create_fixup_set_node_element(struct flat* flat, struct flat_node* node, size_t offset, struct flatten_pointer* ptr, enum fixup_encoding flags) {
 	struct fixup_set_node* n = (struct fixup_set_node*) flat_zalloc(flat,sizeof(struct fixup_set_node),1);
 	if (n==0) return 0;
 	n->inode = node;
 	n->offset = offset;
 	n->ptr = ptr;
+	n->flags = flags;
 	return n;
 }
 
@@ -377,7 +378,7 @@ int fixup_set_reserve_address(struct flat* flat, uintptr_t addr) {
 	new_node = &(flat->FLCTRL.fixup_set_root.rb_root.rb_node);
 	parent = 0;
 
-	data = create_fixup_set_node_element(flat,0,addr,0);
+	data = create_fixup_set_node_element(flat,0,addr,0, FIXUP_DATA_POINTER);
 	if (!data) {
 		return ENOMEM;
 	}
@@ -421,7 +422,7 @@ int fixup_set_reserve(struct flat* flat, struct flat_node* node, size_t offset) 
 		return EEXIST;
 	}
 
-	data = create_fixup_set_node_element(flat,node,offset,0);
+	data = create_fixup_set_node_element(flat,node,offset, 0, FIXUP_DATA_POINTER);
 	if (!data) {
 		return ENOMEM;
 	}
@@ -449,7 +450,7 @@ int fixup_set_reserve(struct flat* flat, struct flat_node* node, size_t offset) 
 	return 0;
 }
 
-int fixup_set_update(struct flat* flat, struct flat_node* node, size_t offset, struct flatten_pointer* ptr) {
+int fixup_set_update(struct flat* flat, struct flat_node* node, size_t offset, struct flatten_pointer* ptr, enum fixup_encoding flags) {
 
 	struct fixup_set_node* inode;
 
@@ -474,15 +475,16 @@ int fixup_set_update(struct flat* flat, struct flat_node* node, size_t offset, s
 			return EFAULT;
 		}
 		rb_erase(&inode->node, &flat->FLCTRL.fixup_set_root.rb_root);
-		return fixup_set_insert(flat,node,offset,ptr);
+		return fixup_set_insert(flat,node,offset,ptr,flags);
 	}
 
 	inode->ptr = ptr;
+	inode->flags = flags;
 
 	return 0;
 }
 
-int fixup_set_insert(struct flat* flat, struct flat_node* node, size_t offset, struct flatten_pointer* ptr) {
+int fixup_set_insert(struct flat* flat, struct flat_node* node, size_t offset, struct flatten_pointer* ptr, enum fixup_encoding flags) {
 
 	struct fixup_set_node* inode;
 	struct fixup_set_node *data;
@@ -507,15 +509,14 @@ int fixup_set_insert(struct flat* flat, struct flat_node* node, size_t offset, s
 
 	if (inode && inode->inode) {
 		uintptr_t inode_ptr;
-		if (((unsigned long)inode->ptr)&1) {
-			inode_ptr = ((unsigned long)inode->ptr)&(~1);
-		}
-		else {
+		if(IS_FIXUP_FPTR(inode))
+			inode_ptr = (uintptr_t) inode->ptr;
+		else
 			inode_ptr = inode->ptr->node->start + inode->ptr->offset;
-		}
+		
 		if (inode_ptr!=ptr->node->start+ptr->offset) {
 			flat_errs("fixup_set_insert(...): multiple pointer mismatch for the same storage [%ld]: (%lx vs %lx)\n",
-					((unsigned long)inode->ptr)&1,inode_ptr,ptr->node->start+ptr->offset);
+					(unsigned long)inode->flags,inode_ptr,ptr->node->start+ptr->offset);
 			flat_free(ptr);
 			DBGS("fixup_set_insert(...): EFAULT\n");
 			return EFAULT;
@@ -526,10 +527,10 @@ int fixup_set_insert(struct flat* flat, struct flat_node* node, size_t offset, s
 	}
 
 	if (inode) {
-		return fixup_set_update(flat,node, offset, ptr);
+		return fixup_set_update(flat,node, offset, ptr, flags);
 	}
 
-	data = create_fixup_set_node_element(flat,node,offset,ptr);
+	data = create_fixup_set_node_element(flat,node,offset,ptr, flags);
 	if (!data) {
 		flat_free(ptr);
 		return ENOMEM;
@@ -586,15 +587,14 @@ int fixup_set_insert_force_update(struct flat* flat, struct flat_node* node, siz
 
 	if (inode && inode->inode) {
 		uintptr_t inode_ptr;
-		if (((unsigned long)inode->ptr)&1) {
-			inode_ptr = ((unsigned long)inode->ptr)&(~1);
-		}
-		else {
+		if (IS_FIXUP_FPTR(inode))
+			inode_ptr = (unsigned long)inode->ptr;
+		else
 			inode_ptr = inode->ptr->node->start + inode->ptr->offset;
-		}
+		
 		if (inode_ptr!=ptr->node->start+ptr->offset) {
 			flat_errs("fixup_set_insert_force_update(...): multiple pointer mismatch for the same storage [%ld]: (%lx vs %lx)\n",
-					((unsigned long)inode->ptr)&1,inode_ptr,ptr->node->start+ptr->offset);
+					(unsigned long)inode->flags,inode_ptr,ptr->node->start+ptr->offset);
 		}
 		else {
 			flat_free(ptr);
@@ -604,10 +604,10 @@ int fixup_set_insert_force_update(struct flat* flat, struct flat_node* node, siz
 	}
 
 	if (inode && !inode->inode) {
-		return fixup_set_update(flat,node, offset, ptr);
+		return fixup_set_update(flat,node, offset, ptr, FIXUP_DATA_POINTER);
 	}
 
-	data = create_fixup_set_node_element(flat,node,offset,ptr);
+	data = create_fixup_set_node_element(flat,node,offset,ptr, FIXUP_DATA_POINTER);
 	if (!data) {
 		flat_free(ptr);
 		return ENOMEM;
@@ -625,7 +625,7 @@ int fixup_set_insert_force_update(struct flat* flat, struct flat_node* node, siz
 		else if (ADDR_KEY(data) > ADDR_KEY(this_node))
 			new_node = &((*new_node)->rb_right);
 		else {
-			flat_free((void*)(((uintptr_t)data->ptr)&(~1)));
+			flat_free((void*)data->ptr);
 			data->ptr = ptr;
 			return EAGAIN;
 		}
@@ -662,19 +662,19 @@ int fixup_set_insert_fptr(struct flat* flat, struct flat_node* node, size_t offs
 	inode = fixup_set_search(flat,node->start+offset);
 
 	if (inode && inode->inode) {
-		if ((((unsigned long)inode->ptr)&(~1))!=fptr) {
+		if ((unsigned long)inode->ptr != fptr) {
 			flat_errs("fixup_set_insert_fptr(...): multiple pointer mismatch for the same storage: (%lx vs %lx)\n",
-					(((unsigned long)inode->ptr)&(~1)),fptr);
+					(unsigned long)inode->ptr,fptr);
 			return EFAULT;
 		}
 		return EEXIST;
 	}
 
 	if (inode) {
-		return fixup_set_update(flat,node, offset, (struct flatten_pointer*)(fptr|1));
+		return fixup_set_update(flat,node, offset, (struct flatten_pointer*)fptr, FIXUP_FUNC_POINTER);
 	}
 
-	data = create_fixup_set_node_element(flat,node,offset,(struct flatten_pointer*)(fptr|1));
+	data = create_fixup_set_node_element(flat,node,offset,(struct flatten_pointer*)fptr, FIXUP_FUNC_POINTER);
 	if (!data) {
 		return ENOMEM;
 	}
@@ -722,18 +722,18 @@ int fixup_set_insert_fptr_force_update(struct flat* flat, struct flat_node* node
 	inode = fixup_set_search(flat,node->start+offset);
 
 	if (inode && inode->inode) {
-		if ((((unsigned long)inode->ptr)&(~1))!=fptr) {
+		if ((unsigned long)inode->ptr != fptr) {
 			flat_errs("fixup_set_insert_fptr_force_update(...): multiple pointer mismatch for the same storage: (%lx vs %lx)\n",
-					(((unsigned long)inode->ptr)&(~1)),fptr);
+					(unsigned long)inode->ptr, fptr);
 		}
 		return EEXIST;
 	}
 
 	if (inode && !inode->inode) {
-		return fixup_set_update(flat,node, offset, (struct flatten_pointer*)(fptr|1));
+		return fixup_set_update(flat,node, offset, (struct flatten_pointer*)fptr, FIXUP_FUNC_POINTER);
 	}
 
-	data = create_fixup_set_node_element(flat,node,offset,(struct flatten_pointer*)(fptr|1));
+	data = create_fixup_set_node_element(flat,node,offset,(struct flatten_pointer*)fptr, FIXUP_FUNC_POINTER);
 	if (!data) {
 		return ENOMEM;
 	}
@@ -750,8 +750,9 @@ int fixup_set_insert_fptr_force_update(struct flat* flat, struct flat_node* node
 		else if (ADDR_KEY(data) > ADDR_KEY(this_node))
 			new_node = &((*new_node)->rb_right);
 		else {
-			flat_free((void*)(((uintptr_t)data->ptr)&(~1)));
-			data->ptr = (struct flatten_pointer*)(fptr|1);
+			flat_free((void*)data->ptr);
+			data->ptr = (struct flatten_pointer*)fptr;
+			data->flags = FIXUP_FUNC_POINTER;
 			return EAGAIN;
 		}
 	}
@@ -771,8 +772,8 @@ static void fixup_set_print(struct flat* flat) {
 	while(p) {
     	struct fixup_set_node* node = (struct fixup_set_node*)p;
     	if (node->ptr) {
-			if (((unsigned long)node->ptr)&1) {
-				uintptr_t newptr = ((unsigned long)node->ptr)&(~1);
+			if (IS_FIXUP_FPTR(node)) {
+				uintptr_t newptr = (unsigned long)node->ptr;
 				uintptr_t origptr = node->inode->storage->index+node->offset;
 				FLATTEN_LOG_DEBUG(" %zu: (%lx:%zu)->(F) | %zu -> %zu\n",
 					node->inode->storage->index,
@@ -810,7 +811,7 @@ static int fixup_set_write(struct flat* flat, size_t* wcounter_p) {
 	struct rb_node * p = rb_first(&flat->FLCTRL.fixup_set_root.rb_root);
 	while(p) {
     	struct fixup_set_node* node = (struct fixup_set_node*)p;
-    	if ((node->ptr)&&(!(((unsigned long)node->ptr)&1))) {
+    	if (node->ptr && (!IS_FIXUP_FPTR(node))) {
 			size_t origptr = node->inode->storage->index+node->offset;
 			FLATTEN_WRITE_ONCE(&origptr,sizeof(size_t),wcounter_p);
     	}
@@ -823,7 +824,7 @@ static int fixup_set_fptr_write(struct flat* flat, size_t* wcounter_p) {
 	struct rb_node * p = rb_first(&flat->FLCTRL.fixup_set_root.rb_root);
 	while(p) {
     	struct fixup_set_node* node = (struct fixup_set_node*)p;
-    	if ((((unsigned long)node->ptr)&1)) {
+    	if (IS_FIXUP_FPTR(node)) {
 			size_t origptr = node->inode->storage->index+node->offset;
 			FLATTEN_WRITE_ONCE(&origptr,sizeof(size_t),wcounter_p);
     	}
@@ -839,8 +840,8 @@ static size_t fixup_fptr_info_count(struct flat* flat) {
 	struct rb_node * p = rb_first(&flat->FLCTRL.fixup_set_root.rb_root);
 	while(p) {
 		struct fixup_set_node* node = (struct fixup_set_node*)p;
-		if (((unsigned long)node->ptr) & 1) {
-			func_ptr = ((unsigned long)node->ptr) & ~(1ULL);
+		if (IS_FIXUP_FPTR(node)) {
+			func_ptr = (unsigned long)node->ptr;
 			symbol_len = flatten_func_to_name(func_symbol, sizeof(func_symbol), (void*) func_ptr);
 
 			count += 2 * sizeof(size_t) + symbol_len;
@@ -860,8 +861,8 @@ static int fixup_set_fptr_info_write(struct flat* flat, size_t* wcounter_p) {
 	p = rb_first(&flat->FLCTRL.fixup_set_root.rb_root);
 	while(p) {
 		struct fixup_set_node* node = (struct fixup_set_node*)p;
-		if (((unsigned long)node->ptr) & 1) {
-			func_ptr = ((unsigned long)node->ptr) & ~(1ULL);
+		if (IS_FIXUP_FPTR(node)) {
+			func_ptr = (uintptr_t) node->ptr;
 			orig_ptr = node->inode->storage->index+node->offset;
 			symbol_len = flatten_func_to_name(func_symbol, sizeof(func_symbol), (void*) func_ptr);
 
@@ -953,7 +954,7 @@ static size_t fixup_set_count(struct flat* flat) {
 	size_t count=0;
 	while(p) {
 		struct fixup_set_node* node = (struct fixup_set_node*)p;
-		if ((node->ptr)&&(!(((unsigned long)node->ptr)&1))) {
+		if (node->ptr && (!IS_FIXUP_FPTR(node))) {
 			count++;
 		}
     	p = rb_next(p);
@@ -966,7 +967,7 @@ static size_t fixup_set_fptr_count(struct flat* flat) {
 	size_t count=0;
 	while(p) {
 		struct fixup_set_node* node = (struct fixup_set_node*)p;
-		if ((((unsigned long)node->ptr)&1)) {
+		if (IS_FIXUP_FPTR(node)) {
 			count++;
 		}
     	p = rb_next(p);
@@ -980,7 +981,7 @@ static void fixup_set_destroy(struct flat* flat) {
 		struct fixup_set_node* node = (struct fixup_set_node*)p;
 		rb_erase(p, &flat->FLCTRL.fixup_set_root.rb_root);
 		p = rb_next(p);
-		if (!(((unsigned long)node->ptr)&1)) {
+		if (!IS_FIXUP_FPTR(node)) {
 			flat_free(node->ptr);
 		}
 		flat_free(node);

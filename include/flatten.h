@@ -69,6 +69,12 @@ struct FLCONTROL {
 	int mem_fragments_skip;
 };
 
+/* Fixup set */
+enum fixup_encoding {
+	FIXUP_DATA_POINTER		= 0,
+	FIXUP_FUNC_POINTER		= 1
+};
+
 struct fixup_set_node {
 	struct rb_node node;
   	/* Storage area and offset where the original address to be fixed is stored */
@@ -76,7 +82,12 @@ struct fixup_set_node {
 	size_t offset;
 	/* Storage area and offset where the original address points to */
 	struct flatten_pointer* ptr;
+
+	enum fixup_encoding flags;
 };
+
+#define IS_FIXUP_FPTR(NODE)		((NODE)->flags & FIXUP_FUNC_POINTER)
+
 
 /* Root address list */
 struct root_addrnode {
