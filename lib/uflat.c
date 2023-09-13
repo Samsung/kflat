@@ -49,6 +49,9 @@ int udump_dump_vma(struct udump_memory_map* mem);
  */
 volatile int debug_flag = false;
 int verbose_flag = false;
+func_symbol_info *func_sym_table = NULL;
+size_t func_sym_table_n_entries = 0;
+
 
 struct uflat* uflat_init(const char* path) {
     int rv;
@@ -104,8 +107,13 @@ struct uflat* uflat_init(const char* path) {
     uflat->flat.area = uflat->out_mem;
     uflat->flat.size = uflat->out_size;
 
-    return uflat;
+    // Initialize symbol address resolution engine
+    func_sym_table = get_symbol_to_name_mapping(&func_sym_table_n_entries);
+    if (func_sym_table == NULL){
+        FLATTEN_LOG_ERROR("Failed to initialize symbol address resolution engine");
+    }
 
+    return uflat;
 
 err_mmap:
     close(uflat->out_fd);
@@ -131,6 +139,8 @@ void uflat_fini(struct uflat* uflat) {
     udump_destroy(uflat->udump_memory);
     free(uflat->udump_memory);
     free(uflat);
+
+    cleanup_symbol_to_name_mapping(func_sym_table, func_sym_table_n_entries);
 
     FLATTEN_LOG_DEBUG("Deinitialized uflat");
 }
@@ -471,21 +481,40 @@ __attribute__((no_sanitize("address"))) size_t uflat_test_string_len(struct flat
 size_t flatten_func_to_name(char* name, size_t size, void* func_ptr) {
     int rv;
     Dl_info info;
-    
+
+    if (func_ptr == NULL) {
+        FLATTEN_LOG_INFO("Failed to symbolize function - NULL pointer given", func_ptr);
+            memset(name, 0, size);
+            return 0;
+    }
+
     rv = dladdr(func_ptr, &info);
-    if(rv == 0) {
-        FLATTEN_LOG_INFO("Failed to symbolize function at address %p - addr could not be matched to a shared object", func_ptr);
-        memset(name, 0, size);
-        return 0;
-    }
 
-    if(info.dli_sname == NULL) {
-        FLATTEN_LOG_INFO("Failed to symbolize function at address %p - missing debug info for target", func_ptr);
-        memset(name, 0, size);
-        return 0;
-    }
+    // If dladdr returned 0, the address could not be matched to a shared object. Then, search local symbols. 
+    if (rv == 0 || info.dli_sname == NULL) {
+        if (func_sym_table == NULL){
+            FLATTEN_LOG_INFO("Failed to symbolize function at address %p - symbol name lookup engine is not initialized", func_ptr);
+            memset(name, 0, size);
+            return 0;
+        }
+    
+        const char *symbol_name = lookup_func_by_address(func_sym_table, func_sym_table_n_entries, (unsigned long) func_ptr);
 
-    strncpy(name, info.dli_sname, size);
-    FLATTEN_LOG_DEBUG("Resolved func ptr %p to name `%s`(base@%p)", func_ptr, name, info.dli_saddr);
-    return strlen(name);
+        if(symbol_name == NULL) {
+            FLATTEN_LOG_INFO("Failed to symbolize function at address %p - no symbol found with given address", func_ptr);
+            memset(name, 0, size);
+            return 0;
+        } 
+        else {
+            strncpy(name, symbol_name, size);
+            FLATTEN_LOG_DEBUG("Resolved func ptr %p to name `%s` (found among local symbols)", func_ptr, name);
+            return strlen(name);
+        }
+    } 
+    // Address matched to a symbol from a shared object 
+    else {
+        strncpy(name, info.dli_sname, size);
+        FLATTEN_LOG_DEBUG("Resolved func ptr %p to name `%s` (found in %s)", func_ptr, info.dli_sname, info.dli_fname);
+        return strlen(name);
+    }
 }

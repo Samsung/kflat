@@ -1,4 +1,4 @@
-CFLAGS = -Iinclude_priv/ -I../include/ -Wall -O3 -fPIC
+CFLAGS = -Iinclude_priv/ -I../include/ -O3 -Wall -fPIC
 LDFLAGS = --shared -fPIC
 UNFLAT_TARGET = 
 FLAT_TARGET = 
@@ -15,6 +15,9 @@ flatten_impl.o: ../core/flatten_impl.c ../core/flatten_impl.h
 uflat.o: uflat.c uflat.h
 	$(CXX) $(CFLAGS) -DFLATTEN_USERSPACE_BSP -c -o $@ $<
 
+funcsymsutils.o: funcsymsutils.c funcsymsutils.h
+	$(CXX) $(CFLAGS) -DFLATTEN_USERSPACE_BSP -c -o $@ $<
+
 unflatten.o: unflatten.cpp unflatten.hpp
 	$(CXX) $(CFLAGS) -ggdb3 -c -o $@ $<
 
@@ -24,10 +27,10 @@ libunflatten_$(ARCH).so: unflatten.o rbtree.o
 libunflatten_$(ARCH).a: unflatten.o rbtree.o
 	gcc-ar rcs $@ $^
 
-libuflat_$(ARCH).so: uflat.o flatten_impl.o rbtree.o unflatten.o
+libuflat_$(ARCH).so: uflat.o flatten_impl.o rbtree.o unflatten.o funcsymsutils.o
 	$(CXX) $(LDFLAGS) -ldl -o $@ $^
 
-libuflat_$(ARCH).a: uflat.o flatten_impl.o rbtree.o unflatten.o
+libuflat_$(ARCH).a: uflat.o flatten_impl.o rbtree.o unflatten.o funcsymsutils.o
 	gcc-ar rcs $@ $^
 
 #

@@ -19,6 +19,8 @@ struct fptr_test_struct {
 	int (*flatten_write)(struct flat* flat);
 	void (*bqueue_init)(void);
 	void (*invalid)(void);
+	int (*puts)(const char *);
+	int kernel;
 };
 
 struct fptr_test_struct_2 {
@@ -27,6 +29,8 @@ struct fptr_test_struct_2 {
 	int (*flatten_write)(struct flat* flat);
 	void (*bqueue_init)(void);
 	void (*invalid)(void);
+	int (*puts)(const char *);
+	int kernel;
 };
 
 /********************************/
@@ -39,6 +43,7 @@ FUNCTION_DEFINE_FLATTEN_STRUCT(fptr_test_struct,
 	AGGREGATE_FLATTEN_FUNCTION_POINTER(flatten_write);
 	AGGREGATE_FLATTEN_FUNCTION_POINTER(bqueue_init);
 	AGGREGATE_FLATTEN_FUNCTION_POINTER(invalid);
+	AGGREGATE_FLATTEN_FUNCTION_POINTER(puts);
 );
 
 FUNCTION_DEFINE_FLATTEN_STRUCT_SELF_CONTAINED(fptr_test_struct_2, sizeof(struct fptr_test_struct_2),
@@ -47,6 +52,7 @@ FUNCTION_DEFINE_FLATTEN_STRUCT_SELF_CONTAINED(fptr_test_struct_2, sizeof(struct 
 	AGGREGATE_FLATTEN_FUNCTION_POINTER_SELF_CONTAINED(flatten_write, offsetof(struct fptr_test_struct_2, flatten_write));
 	AGGREGATE_FLATTEN_FUNCTION_POINTER_SELF_CONTAINED(bqueue_init, offsetof(struct fptr_test_struct_2, bqueue_init));
 	AGGREGATE_FLATTEN_FUNCTION_POINTER_SELF_CONTAINED(invalid, offsetof(struct fptr_test_struct_2, invalid));
+	AGGREGATE_FLATTEN_FUNCTION_POINTER_SELF_CONTAINED(puts, offsetof(struct fptr_test_struct_2, puts));
 );
 
 static int kflat_fptr_test(struct flat *flat) {
@@ -55,8 +61,15 @@ static int kflat_fptr_test(struct flat *flat) {
 		.set_reserve_address = fixup_set_reserve_address,
 		.flatten_write = flatten_write,
 		.bqueue_init = (void (*)(void))bqueue_init,
-		.invalid = (void *)flat
+		.invalid = (void *)flat,
+#ifndef __KERNEL__
+		.puts = puts,
+		.kernel = 0,
+#else
+		.kernel = 1,
+#endif
 	};
+
 	struct fptr_test_struct_2 fptrs_sc;
 
 	FLATTEN_SETUP_TEST(flat);
@@ -84,6 +97,7 @@ static int kflat_fptr_test(struct flat *flat) {
 #define TEST_SET_RESERVE_ADDRESS (void *)0x1201
 #define TEST_FLATTEN_WRITE_ADDRESS (void *)0x1202
 #define TEST_BQUEUE_INIT (void *)0x1203
+#define TEST_PUTS (void *)0x1204
 
 bool match_kallsyms_name(const char* str, const char* prefix) {
 	if(strncmp(str, prefix, strlen(prefix)))
@@ -103,6 +117,8 @@ static uintptr_t kflat_fptr_gfa_handler(const char *fsym) {
 		return (uintptr_t)TEST_FLATTEN_WRITE_ADDRESS;
 	else if (match_kallsyms_name(fsym, "bqueue_init"))
 		return (uintptr_t)TEST_BQUEUE_INIT;
+	else if (match_kallsyms_name(fsym, "puts") || match_kallsyms_name(fsym, "_IO_puts"))
+		return (uintptr_t)TEST_PUTS;
 	return (uintptr_t)NULL;
 }
 
@@ -114,13 +130,19 @@ static int kflat_fptr_validate(void *memory, size_t size, CUnflatten flatten) {
 	ASSERT(fptr->set_reserve_address == TEST_SET_RESERVE_ADDRESS);
 	ASSERT(fptr->flatten_write == TEST_FLATTEN_WRITE_ADDRESS);
 	ASSERT(fptr->bqueue_init == TEST_BQUEUE_INIT);
-	ASSERT(fptr->invalid == NULL);
+	if (!fptr->kernel)
+		ASSERT(fptr->puts == TEST_PUTS);
+
+	// ASSERT(fptr->invalid == NULL);
 
 	ASSERT(fptr_sc->alloc == TEST_MALLOC_ADDRESS);
 	ASSERT(fptr_sc->set_reserve_address == TEST_SET_RESERVE_ADDRESS);
 	ASSERT(fptr_sc->flatten_write == TEST_FLATTEN_WRITE_ADDRESS);
 	ASSERT(fptr_sc->bqueue_init == TEST_BQUEUE_INIT);
-	ASSERT(fptr_sc->invalid == NULL);
+	if (!fptr_sc->kernel)
+		ASSERT(fptr_sc->puts == TEST_PUTS);
+
+	// ASSERT(fptr_sc->invalid == NULL);
 
 	return KFLAT_TEST_SUCCESS;
 }
