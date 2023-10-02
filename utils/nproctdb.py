@@ -563,7 +563,7 @@ LINUXINCLUDE := ${{LINUXINCLUDE}}
 			args.database += '.img'
 
 		self.ftdb = libftdb.ftdb()
-		self.ftdb.load(args.database,debug=False,quiet=True,no_map_memory=False)
+		self.ftdb.load(args.database,debug=False,quiet=True)
 		print(f'--- Database loaded from {args.database}')
 
 		self.include_dirs = list()
