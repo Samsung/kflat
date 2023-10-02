@@ -32,7 +32,7 @@ static int flatten_unit_addr_valid_test(struct flat *flat) {
 
 	// Test uflat_test_addr_range function
 	// Use most likely unused address so that memory right before and after isn't allocated
-	void* valid = mmap(0x6ffff7ffa000, 4096, PROT_READ, MAP_ANONYMOUS | MAP_PRIVATE, -1, 0);
+	void* valid = mmap((void*)0x6ffff7ffa000, 4096, PROT_READ, MAP_ANONYMOUS | MAP_PRIVATE, -1, 0);
 	if(valid == MAP_FAILED)
 		return 1;
 	results.valid_mem = uflat_test_address_range(flat, valid, 4096);
