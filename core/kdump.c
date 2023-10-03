@@ -410,7 +410,7 @@ static int kdump_is_phys_in_ram(uint64_t addr) {
  *******************************************************/
 #define SIZE_TO_NEXT_PAGE(ADDR, LEVEL)      (LEVEL ## _SIZE - (addr & ~LEVEL ## _MASK))
 
-static size_t walk_addr(pgd_t* swapper_pgd, uint64_t addr, struct page** pagep) {
+static size_t __no_sanitize_address walk_addr(pgd_t* swapper_pgd, uint64_t addr, struct page** pagep) {
     pgd_t* pgdp, pgd;
     p4d_t* p4dp, p4d;
     pud_t* pudp, pud;
@@ -547,16 +547,16 @@ EXPORT_SYMBOL_GPL(kdump_test_address);
 /*******************************************************
  * KASAN misc tools
  *******************************************************/
-#if defined(KASAN)
+#if defined(CONFIG_KASAN)
 /**
  * @brief Perform mempcy after clearing KASAN tags from both pointers and with
  *      kasan report temprarly disable. This allows us to memcpy incorrect memory
  *      (for instance, SLUB redzone) without triggering Kernel panic
  */
-void* hwasan_safe_memcpy(void* dst, const void* src, size_t size) {
+void* __no_sanitize_address hwasan_safe_memcpy(void* dst, const void* src, size_t size) {
     void* ret;
     dst = ptr_reset_tag(dst);
-    src = ptr_reset_tag(src);
+    src = ptr_reset_tag((void*)src); /* Discard const attribute */
 
     kasan_disable_current();
     ret = memcpy(dst, src, size);

@@ -147,7 +147,7 @@ static void* flatten_find_heap_object(void* ptr) {
 
 #else
 /* Based on __check_heap_object@mm/slub.c */
-static bool _flatten_get_heap_obj(struct slab* slab, void* ptr, 
+static bool _flatten_get_heap_obj(struct slab* slab, void* orig_ptr, 
 									void** start, void** end) {
 	off_t offset;
 	size_t object_size;
@@ -155,7 +155,7 @@ static bool _flatten_get_heap_obj(struct slab* slab, void* ptr,
 	void* ptr;
 
 	cache = slab->slab_cache;
-	ptr = kasan_reset_tag(ptr);
+	ptr = kasan_reset_tag(orig_ptr);
 	if(ptr < slab_address(slab))
 		return false;
 
@@ -186,9 +186,9 @@ static bool _flatten_get_heap_obj(struct slab* slab, void* ptr,
 		object_size = cache->usersize;
 
 	if(start)
-		*start = ptr - offset + cache->useroffset;
+		*start = orig_ptr - offset + cache->useroffset;
 	if(end)
-		*end = ptr - offset + cache->useroffset + object_size - 1;
+		*end = orig_ptr - offset + cache->useroffset + object_size - 1;
 	return true;
 }
 
