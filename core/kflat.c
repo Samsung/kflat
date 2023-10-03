@@ -23,6 +23,10 @@
 #include <linux/vmalloc.h>
 #include <linux/list.h>
 
+#if defined(CONFIG_KASAN)
+#include <linux/kasan.h>
+#endif
+
 /*******************************************************
  * NON-EXPORTED FUNCTIONS
  *******************************************************/
@@ -220,11 +224,20 @@ asmlinkage __used uint64_t probing_delegate(struct probe_regs* regs) {
 	if(kflat->recipe->pre_handler)
 		kflat->recipe->pre_handler(kflat);
 
+	// Disable KASAN - flexible recipes may read SLUB redzone
+#if defined(CONFIG_KASAN)
+	kasan_disable_current();
+#endif
+
 	// Invoke recipe via stop_machine if user asked for that
 	if(kflat->use_stop_machine)
 		flatten_stop_machine(kflat, regs);
 	else
 		kflat->recipe->handler(kflat, regs);
+
+#if defined(CONFIG_KASAN)
+	kasan_enable_current();
+#endif
 
 	pr_info("Flatten done: error=%d\n", kflat->flat.error);
 	if (!kflat->flat.error) {
@@ -282,6 +295,10 @@ int kflat_run_test(struct kflat* kflat, struct kflat_ioctl_tests* test) {
 			flatten_init(&kflat->flat);
 			kflat->flat.FLCTRL.debug_flag = kflat->debug_flag;
 
+#if defined(CONFIG_KASAN)
+			kasan_disable_current();
+#endif
+
 			if(test->use_stop_machine) {
 				cpumask_t cpumask;
 				struct stopm_kflat_test arg = {
@@ -306,6 +323,10 @@ int kflat_run_test(struct kflat* kflat, struct kflat_ioctl_tests* test) {
 			} else {
 				err = test_cases[i]->handler(&kflat->flat);
 			}
+
+#if defined(CONFIG_KASAN)
+			kasan_enable_current();
+#endif
 
 			flat_infos("@Flatten done: %d\n",kflat->flat.error);
 			if (!kflat->flat.error && !err)
