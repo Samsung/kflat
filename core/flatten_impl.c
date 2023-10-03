@@ -75,7 +75,7 @@ struct blstream* binary_stream_append(struct flat* flat, const void* data, size_
 	if (!v)
 		return 0;
 	v->source = data;
-	memcpy(v->data,data,size);
+	hwasan_safe_memcpy(v->data,data,size);
 	list_add_tail(&v->head, &flat->FLCTRL.storage_head);
 	return v;
 }
@@ -86,7 +86,7 @@ static struct blstream* binary_stream_insert_front(struct flat* flat, const void
 	if (!v)
 		return 0;
 	v->source = data;
-	memcpy(v->data, data, size);
+	hwasan_safe_memcpy(v->data, data, size);
 	list_add_tail(&v->head, &where->head);
 	return v;
 }
@@ -97,7 +97,7 @@ static struct blstream* binary_stream_insert_back(struct flat* flat, const void*
 	if (!v)
 		return 0;
 	v->source = data;
-	memcpy(v->data,data,size);
+	hwasan_safe_memcpy(v->data,data,size);
 	list_add(&v->head, &where->head);
 	return v;
 }

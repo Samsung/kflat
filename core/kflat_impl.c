@@ -152,6 +152,7 @@ static bool _flatten_get_heap_obj(struct slab* slab, void* ptr,
 	off_t offset;
 	size_t object_size;
 	struct kmem_cache* cache;
+	void* ptr;
 
 	cache = slab->slab_cache;
 	ptr = kasan_reset_tag(ptr);

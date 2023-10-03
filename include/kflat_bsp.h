@@ -68,7 +68,7 @@ static __used bool _addr_range_valid(void* ptr, size_t size) {
 	return false;
 }
 
-static inline size_t strmemlen(const char* s) {
+static inline size_t __no_sanitize_address _strmemlen(const char* s) {
 	size_t str_size, avail_size, test_size;
 	
 	// 1. Fast-path. Check whether first 1000 bytes are maped
@@ -102,6 +102,26 @@ static inline size_t strmemlen(const char* s) {
 
 	return avail_size;
 }
+
+#if defined(CONFIG_KASAN)
+#include <linux/kasan.h>
+
+// Disable
+static inline size_t strmemlen(const char* s) {
+	size_t size = 0;
+
+	s = kasan_reset_tag((void*)s);	/* Discard const qualifier */
+	kasan_disable_current();
+	size = _strmemlen(s);
+	kasan_enable_current();
+
+	return size;
+}
+#else
+static inline size_t strmemlen(const char* s) {
+	return _strmemlen(s);
+}
+#endif
 
 #define ADDR_VALID(PTR)				kdump_test_address((void*) PTR, 1)
 #define ADDR_RANGE_VALID(PTR, SIZE) _addr_range_valid((void*) PTR, SIZE)

@@ -545,6 +545,32 @@ size_t kdump_test_address(void* addr, size_t size) {
 EXPORT_SYMBOL_GPL(kdump_test_address);
 
 /*******************************************************
+ * KASAN misc tools
+ *******************************************************/
+#if defined(KASAN)
+/**
+ * @brief Perform mempcy after clearing KASAN tags from both pointers and with
+ *      kasan report temprarly disable. This allows us to memcpy incorrect memory
+ *      (for instance, SLUB redzone) without triggering Kernel panic
+ */
+void* hwasan_safe_memcpy(void* dst, const void* src, size_t size) {
+    void* ret;
+    dst = ptr_reset_tag(dst);
+    src = ptr_reset_tag(src);
+
+    kasan_disable_current();
+    ret = memcpy(dst, src, size);
+    kasan_enable_current();
+    
+    return ret;
+}
+#else
+void* hwasan_safe_memcpy(void* dst, const void* src, size_t size) {
+    return memcpy(dst, src, size);
+}
+#endif
+
+/*******************************************************
  * (De)initialization
  *******************************************************/
 int kdump_init(void) {

@@ -518,3 +518,7 @@ size_t flatten_func_to_name(char* name, size_t size, void* func_ptr) {
         return strlen(name);
     }
 }
+
+void* hwasan_safe_memcpy(void* dst, const void* src, size_t size) {
+    return memcpy(dst, src, size);
+}

@@ -57,5 +57,6 @@ size_t kdump_tree_total_size(struct kdump_memory_map* kdump);
  */
 size_t kdump_test_address(void* addr, size_t size);
 
+void* hwasan_safe_memcpy(void* dst, const void* src, size_t size);
 
 #endif /* _LINUX_KDUMP_H */

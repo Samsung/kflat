@@ -51,5 +51,6 @@
  *************************************/
 size_t flatten_func_to_name(char* name, size_t size, void* func_ptr);
 bool flatten_get_object(struct flat* flat, void* ptr, void** start, void** end);
+void* hwasan_safe_memcpy(void* dst, const void* src, size_t size);
 
 #endif /* FLATTEN_PORT_H */
