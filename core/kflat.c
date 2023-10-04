@@ -161,11 +161,17 @@ struct stopm_args {
 
 static int _stop_machine_func(void* arg) {
 	struct stopm_args* stopm = (struct stopm_args*) arg;
+#if defined(CONFIG_KASAN)
+	kasan_disable_current();
+#endif
 
 	pr_info("--- Stop machine started ---");
 	stopm->handler(stopm->kflat, stopm->regs);
 	pr_info("-- Stop machine finishing ---");
-	
+
+#if defined(CONFIG_KASAN)
+	kasan_enable_current();
+#endif
 	return 0;
 }
 
