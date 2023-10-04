@@ -652,15 +652,6 @@ LINUXINCLUDE := ${{LINUXINCLUDE}}
 		self.anon_record_id_map = {}
 		self.anon_enum_id_map = {}
 
-		self.all_anon_struct_triggers = list()	# anonymous records
-		self.all_struct_triggers = list()		# struct types
-		self.all_struct_type_triggers = list()	# typedef'ed struct types
-		self.all_anon_enum_triggers = list()	# anonymous enums
-		self.all_enum_triggers = list()			# enum types
-		self.all_enum_type_triggers = list()	# typedef'ed enum types
-		self.all_complex_triggers = list()		# complex trigger to write by user
-		self.all_ignored_triggers = list()		# Failed to generate triggers (to fix)
-
 		self.global_base_addr = 0
 		self.allowed_members = {}
 		self.anchor_list = set([])
@@ -1679,8 +1670,6 @@ the 'container_of' invocation chain.\n   The invocation chain was as follows:\n{
 						return "enum %s*"%(T.str)
 			elif T.classname=="pointer":
 				ptrtp = self.generate_flatten_pointer_trigger(out,T,TPD,gvname,handle_flexible_size)
-				if not ptrtp:
-					self.complex_triggers.append((T,TPD))
 				return ptrtp
 			elif T.classname=="record":
 				recipe_out = ""
