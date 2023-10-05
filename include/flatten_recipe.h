@@ -16,6 +16,7 @@ struct flatten_pointer* FUNC_NAME(struct flat* flat, const void* ptr, size_t n, 
 	void* _fp_first = NULL;		\
 	const FULL_TYPE* _ptr = (const FULL_TYPE*) ptr;			\
 	DBGS("%s(%lx,%zu)\n", __func__, (uintptr_t)_ptr, n);		\
+	AGGREGATE_FLATTEN_ASSERT(n < INT_MAX, EINVAL);	/* Limit array size to some sane value */	\
 	for (_i = 0; _i < n; ++_i) {					\
 		void* _fp = (void*)TARGET_FUNC(flat, (FULL_TYPE*)((unsigned char*)_ptr + _i * FLSIZE), custom_val, index, __q);	\
 		if (_fp == NULL) {			\
@@ -489,7 +490,7 @@ struct flatten_pointer* FUNC_NAME(struct flat* flat, const void* ptr, uintptr_t 
 do {	\
 	if (!(__expr)) {	\
 		FLAT_ACCESSOR->error = __err;	\
-		DBGS("flatten assertion failed on: [" #__expr "]");	\
+		flat_errs("flatten assertion failed on: [" #__expr "]");	\
 	}	\
 } while(0)
 
