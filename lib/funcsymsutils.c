@@ -11,7 +11,7 @@
 
 static char *get_current_process_exec_path() {
 	char *buff = (char *) malloc(256);
-	size_t buff_len;
+	ssize_t buff_len;
 	if ((buff_len = readlink("/proc/self/exe", buff, 255)) != -1) {
 		buff[buff_len] = '\0';
 	}

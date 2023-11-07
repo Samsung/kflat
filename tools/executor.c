@@ -20,6 +20,7 @@
 #include <sys/ioctl.h>
 #include <sys/mman.h>
 #include <unistd.h>
+#include <poll.h>
 
 
 #define KFLAT_NODE      "/sys/kernel/debug/kflat"
@@ -88,6 +89,7 @@ struct args {
     int stop_machine;
     int skip_function_body;
     int run_recipe_now;
+    int poll_timeout;
     const char* output;
     const char* recipe;
     const char* node;
@@ -105,6 +107,7 @@ static struct argp_option options[] = {
     {"stop_machine", 's', 0, 0, "Execute kflat recipe under kernel's stop_machine mode"},
     {"skip_funcion_body", 'n', 0, 0, "Do not execute target function body after flattening memory"},
     {"run_recipe_now", 'f', 0, 0, "Execute KFLAT recipe directly from IOCTL without attaching to any kernel function"},
+    {"poll_timeout", 't', "TIMEOUT", 0, "In miliseconds. Timeout for recipe execution."},
     { 0 }
 };
 
@@ -137,6 +140,11 @@ static error_t parse_opt(int key, char* arg, struct argp_state* state) {
 
         case 'f':
             options->run_recipe_now = 1;
+            break;
+
+        case 't':
+            if (sscanf(arg, "%d", &options->poll_timeout) != 1)
+                return ARGP_KEY_ERROR;
             break;
         
         case ARGP_KEY_ARG:
@@ -392,6 +400,20 @@ int main(int argc, char** argv, char** envp) {
         ret = opts.handler(rd_fd);
         log_info("%s on node %s returned %d - %s", opts.interface, opts.node, ret, strerror(errno));
         close(rd_fd);
+    }
+
+
+    struct pollfd kflat_poll;
+    kflat_poll.fd = fd;
+    kflat_poll.events = POLLIN | POLLRDNORM;
+
+    int ret_poll = poll(&kflat_poll, 1, (opts.poll_timeout ? opts.poll_timeout : -1));
+
+    if (ret_poll == 0) {
+        log_abort("Recipe execution timeout.");
+    } 
+    if (ret_poll < 0) {
+        log_abort("Poll syscall failed when waiting for recipe execution - %s", strerror(errno));
     }
 
     output_size = kflat_disable(fd, dump_size);

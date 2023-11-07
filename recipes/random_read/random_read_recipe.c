@@ -26,7 +26,7 @@ static void handler(struct kflat* kflat, struct probe_regs* regs) {
 }
 
 KFLAT_RECIPE_LIST(
-    KFLAT_RECIPE("random_read", handler)
+    KFLAT_RECIPE("random_read_iter", handler)
 );
 
 KFLAT_RECIPE_MODULE("test module for random_read");

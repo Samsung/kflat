@@ -111,6 +111,7 @@ struct kflat {
 	int 			use_stop_machine;
 	int 			skip_function_body;
 	int			debug_flag;
+	wait_queue_head_t dump_ready_wq;
 };
 
 

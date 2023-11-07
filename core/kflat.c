@@ -22,6 +22,7 @@
 #include <linux/version.h>
 #include <linux/vmalloc.h>
 #include <linux/list.h>
+#include <linux/poll.h>
 
 #if defined(CONFIG_KASAN)
 #include <linux/kasan.h>
@@ -266,6 +267,9 @@ probing_exit:
 	} else
 		pr_info("flatten finished - returning to INTERRUPTED function");
 
+	// Wake up poll handler 
+	wake_up_interruptible(&kflat->dump_ready_wq);
+
 	return return_addr;
 }
 NOKPROBE_SYMBOL(probing_delegate);
@@ -368,6 +372,7 @@ static int kflat_open(struct inode *inode, struct file *filep) {
 	atomic_set(&kflat->refcount, 1);
 
 	mutex_init(&kflat->lock);
+	init_waitqueue_head(&kflat->dump_ready_wq);
 	probing_init(kflat);
 	filep->private_data = kflat;
 	return nonseekable_open(inode, filep);
@@ -565,6 +570,25 @@ static int kflat_mmap(struct file* filep, struct vm_area_struct* vma) {
 		return -EINVAL;
 }
 
+static __poll_t kflat_poll(struct file *filep, struct poll_table_struct *wait) {
+	struct kflat *kflat = filep->private_data;
+	unsigned int ret_mask = 0;
+	size_t size;
+
+	poll_wait(filep, &kflat->dump_ready_wq, wait);
+
+	mutex_lock(&kflat->lock);
+	size = ((struct flatten_header*)kflat->flat.area)->image_size;
+
+	if (size > sizeof(size_t)) {
+		ret_mask = POLLIN | POLLRDNORM;
+	}
+
+	mutex_unlock(&kflat->lock);
+
+	return ret_mask;
+}
+
 static int kflat_close(struct inode *inode, struct file *filep) {
 	struct kflat* kflat = filep->private_data;
 
@@ -582,6 +606,7 @@ static const struct file_operations kflat_fops = {
 	.mmap = kflat_mmap,
 	.release = kflat_close,
 	.read = kflat_dbg_buf_read,
+	.poll = kflat_poll,
 };
 
 
