@@ -28,6 +28,14 @@
 #include <linux/kasan.h>
 #endif
 
+
+/*******************************************************
+ * MODULE PARAMETERS
+ *******************************************************/
+static int dbg_buffer_size = 50 * 1024 * 1024;			// 50MB
+module_param(dbg_buffer_size, int, 0660);
+MODULE_PARM_DESC(dbg_buffer_size, "size of dbg buf used when flattening with debug flag enabled");
+
 /*******************************************************
  * NON-EXPORTED FUNCTIONS
  *******************************************************/
@@ -69,8 +77,13 @@ static int kflat_dbg_buf_init(const size_t buffer_size) {
 	
 	mutex_lock(&kflat_dbg_lock);
 
-	if(_dbg_buffer.mem != NULL)
+	if(_dbg_buffer.mem != NULL) {
+		if(_dbg_buffer.size == buffer_size) {
+			_dbg_buffer.offset = 0;
+			goto exit;
+		}
 		vfree(_dbg_buffer.mem);
+	}
 
 	_dbg_buffer.mem = vmalloc(buffer_size);
 	if(_dbg_buffer.mem == NULL) {
@@ -416,6 +429,9 @@ static int kflat_ioctl_locked(struct kflat *kflat, unsigned int cmd,
 		}
 #endif
 
+		if(kflat->debug_flags)
+			kflat_dbg_buf_init(dbg_buffer_size);
+
 		recipe = kflat_recipe_get(args.enable.target_name);
 		if(recipe == NULL)
 			return -ENOENT;
@@ -620,10 +636,6 @@ static const struct file_operations kflat_fops = {
 /*******************************************************
  * MODULE REGISTRATION
  *******************************************************/
-static int dbg_buffer_size = 50 * 1024 * 1024;			// 50MB
-module_param(dbg_buffer_size, int, 0660);
-MODULE_PARM_DESC(dbg_buffer_size, "size of dbg buf used when flattening with debug flag enabled");
-
 static struct dentry* kflat_dbgfs_node;
 
 static int __init kflat_init(void) {
@@ -641,16 +653,10 @@ static int __init kflat_init(void) {
 		goto fail_debugfs;
 	}
 
-	rv = kflat_dbg_buf_init(dbg_buffer_size);
-	if(rv)
-		goto fail_dbg_buf;
-
 	kflat_lookup_kallsyms_name = probing_get_kallsyms();
 	kflat_dbgfs_node = node;
 	return 0;
 
-fail_dbg_buf:
-	debugfs_remove(kflat_dbgfs_node);
 fail_debugfs:
 	kdump_exit();
 	return rv;
