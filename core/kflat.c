@@ -578,12 +578,19 @@ static __poll_t kflat_poll(struct file *filep, struct poll_table_struct *wait) {
 	poll_wait(filep, &kflat->dump_ready_wq, wait);
 
 	mutex_lock(&kflat->lock);
+	
+	if (kflat->flat.area == NULL) {
+		ret_mask = 0;
+		goto exit;
+	}
+
 	size = ((struct flatten_header*)kflat->flat.area)->image_size;
 
 	if (size > sizeof(size_t)) {
 		ret_mask = POLLIN | POLLRDNORM;
 	}
 
+exit:
 	mutex_unlock(&kflat->lock);
 
 	return ret_mask;
