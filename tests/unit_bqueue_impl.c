@@ -85,6 +85,31 @@ static int kflat_bqueue_impl_unit_test(struct flat *flat) {
 	results.bounds = (bqueue_pop_front(&bq, test, 10) != 0);
 	bqueue_destroy(&bq);
 
+	// Clear check
+	bqueue_init(flat, &bq, 1000);
+	results.chunks_test = true;
+
+	for(int i = 0; i < 1000; i++)
+		bqueue_push_back(flat, &bq, mem, size);
+	for(int i = 0; i < 1000; i++) {
+		bqueue_pop_front(&bq, test, size);
+		if(memcmp(test, mem, size)) {
+			results.chunks_test = false;
+			break;
+		}
+	}
+	bqueue_clear(&bq);
+	for(int i = 0; i < 1000; i++)
+		bqueue_push_back(flat, &bq, mem, size);
+	for(int i = 0; i < 1000; i++) {
+		bqueue_pop_front(&bq, test, size);
+		if(memcmp(test, mem, size)) {
+			results.chunks_test = false;
+			break;
+		}
+	}
+	bqueue_destroy(&bq);
+
 	// Send results back to user
 	FOR_ROOT_POINTER(&results,
 		FLATTEN_STRUCT(bqueue_impl_result, &results);

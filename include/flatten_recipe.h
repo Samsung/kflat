@@ -901,15 +901,10 @@ do {	\
  *******************************/
 #define FOR_EXTENDED_ROOT_POINTER(p,__name,__size,...)	\
 	do {	\
-		struct bqueue bq;	\
 		struct bqueue* __q;	\
 		struct flat* flat = FLAT_EXTRACTOR; \
-		int err = bqueue_init(FLAT_ACCESSOR, &bq, DEFAULT_ITER_QUEUE_SIZE);	\
-		if (err) {	\
-			FLAT_ACCESSOR->error = err;	\
-			break;	\
-		}	\
-		__q = &bq;	\
+		__q = &FLAT_ACCESSOR->bq;	\
+		bqueue_clear(__q);	\
 					\
 		DBGS("FOR_EXTENDED_ROOT_POINTER(%s[%llx], %s, %llx)\n", #p, (uintptr_t)p, __name, __size); \
 		if ((!FLAT_ACCESSOR->error)&&(ADDR_VALID(p))) {	\
@@ -933,7 +928,7 @@ do {	\
 			}	\
 		}	\
 			\
-		flatten_run_iter_harness(FLAT_ACCESSOR, &bq);	\
+		flatten_run_iter_harness(FLAT_ACCESSOR);	\
 	} while(0)
 
 #define FOR_ROOT_POINTER(p,...) FOR_EXTENDED_ROOT_POINTER(p, NULL, 0, ##__VA_ARGS__)

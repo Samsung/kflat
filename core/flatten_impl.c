@@ -237,7 +237,6 @@ int bqueue_init(struct flat* flat, struct bqueue* q, size_t block_size) {
 	list_add(&new_block->head, &q->head);
 	return 0;
 }
-EXPORT_FUNC(bqueue_init);
 
 void bqueue_destroy(struct bqueue* q) {
 	struct queue_block *cur = NULL;
@@ -247,7 +246,23 @@ void bqueue_destroy(struct bqueue* q) {
 		flat_free(cur);
 	}
 }
-EXPORT_FUNC(bqueue_destroy);
+
+void bqueue_clear(struct bqueue* q) {
+	size_t i = 0;
+	struct queue_block *cur = NULL, *tmp = NULL;
+	list_for_each_entry_safe(cur, tmp, &q->head, head) {
+		// Skip first element of the list
+		if(i++ == 0) continue;
+		list_del(&cur->head);
+		flat_free(cur);
+	}
+
+	q->size = 0;
+	q->front_index = 0;
+	q->back_index = 0;
+	q->el_count = 0;
+}
+EXPORT_FUNC(bqueue_clear);
 
 static int bqueue_empty(struct bqueue* q) { return q->size == 0; }
 
@@ -1204,6 +1219,7 @@ void flatten_init(struct flat* flat) {
 	flat->mpool = 0;
 #endif
 
+	bqueue_init(flat, &flat->bq, DEFAULT_ITER_QUEUE_SIZE);	// Error handling?
 	FLATTEN_LOG_CLEAR();
 }
 
@@ -1318,6 +1334,7 @@ EXPORT_FUNC(flatten_write);
 int flatten_fini(struct flat* flat) {
 	struct root_addrnode *ptr = NULL;
 	struct root_addrnode *tmp = NULL;
+	bqueue_destroy(&flat->bq);
 	binary_stream_destroy(flat);
     fixup_set_destroy(flat);
 	list_for_each_entry_safe(ptr, tmp, &flat->FLCTRL.root_addr_head, head) {
@@ -1657,12 +1674,13 @@ struct flatten_pointer* flatten_plain_type(struct flat* flat, const void* _ptr, 
 }
 EXPORT_FUNC(flatten_plain_type);
 
-void flatten_run_iter_harness(struct flat* flat, struct bqueue* bq) {
+void flatten_run_iter_harness(struct flat* flat) {
 	size_t n = 0;
 	ktime_t init_time, now;
 	long long int total_time = 0;
 	void* fp;
 	struct flatten_job job;
+	struct bqueue* bq = &flat->bq;
 
 	init_time = ktime_get();
 	while((!flat->error) && (!bqueue_empty(bq))) {
@@ -1712,6 +1730,5 @@ void flatten_run_iter_harness(struct flat* flat, struct bqueue* bq) {
 	total_time += ktime_get() - init_time;
 	flat_infos("Done working with %lu recipes in total time %lld [ms], memory used: %zu, memory avail: %zu \n",
 		n, total_time / NSEC_PER_MSEC, flat->mptrindex, flat->msize);
-	bqueue_destroy(bq);
 }
 EXPORT_FUNC(flatten_run_iter_harness);

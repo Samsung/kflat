@@ -128,6 +128,9 @@ struct flat {
 	struct rb_root		root_addr_set;
 	int 				error;
 
+	/* Iter jobs queue */
+	struct bqueue 		bq;
+
 	/* Destination area where dump will be saved */
     unsigned long		size;
 	void				*area;
@@ -187,10 +190,11 @@ struct fixup_set_node* fixup_set_search(struct flat* flat, uintptr_t v);
 
 int bqueue_init(struct flat* flat, struct bqueue* q, size_t block_size);
 void bqueue_destroy(struct bqueue* q);
+void bqueue_clear(struct bqueue* q);
 int bqueue_push_back(struct flat* flat, struct bqueue* q, const void* m, size_t s);
 int bqueue_pop_front(struct bqueue* q, void* m, size_t s);
 
-void flatten_run_iter_harness(struct flat* flat, struct bqueue* bq);
+void flatten_run_iter_harness(struct flat* flat);
 void flatten_generic(struct flat* flat, void* q, struct flatten_pointer* fptr, const void* p, size_t el_size, size_t count, uintptr_t custom_val, flatten_struct_t func_ptr, unsigned long shift);
 struct flat_node* flatten_acquire_node_for_ptr(struct flat* flat, const void* _ptr, size_t size);
 void flatten_aggregate_generic(struct flat* flat, void* q, const void* _ptr, 
