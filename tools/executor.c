@@ -400,6 +400,9 @@ int main(int argc, char** argv, char** envp) {
         ret = opts.handler(rd_fd);
         log_info("%s on node %s returned %d - %s", opts.interface, opts.node, ret, strerror(errno));
         close(rd_fd);
+
+        // Stop alarm at this point
+        alarm(0);
     }
 
 

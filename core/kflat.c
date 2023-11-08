@@ -267,12 +267,13 @@ asmlinkage __used uint64_t probing_delegate(struct probe_regs* regs) {
 	}
 	flatten_fini(&kflat->flat);
 
+	// Wake up poll handler 
+	wake_up_interruptible(&kflat->dump_ready_wq);
+
 probing_exit:
 	// Prepare for return
 	probing_disarm(kflat);
 	return_addr = READ_ONCE(kflat->probing.return_ip);
-
-	kflat_put(kflat);
 
 	if(kflat->skip_function_body) {
 		pr_info("flatten finished - returning to PARENT function");
@@ -280,9 +281,7 @@ probing_exit:
 	} else
 		pr_info("flatten finished - returning to INTERRUPTED function");
 
-	// Wake up poll handler 
-	wake_up_interruptible(&kflat->dump_ready_wq);
-
+	kflat_put(kflat);
 	return return_addr;
 }
 NOKPROBE_SYMBOL(probing_delegate);
@@ -429,7 +428,7 @@ static int kflat_ioctl_locked(struct kflat *kflat, unsigned int cmd,
 		}
 #endif
 
-		if(kflat->debug_flags)
+		if(kflat->debug_flag)
 			kflat_dbg_buf_init(dbg_buffer_size);
 
 		recipe = kflat_recipe_get(args.enable.target_name);
@@ -593,16 +592,17 @@ static __poll_t kflat_poll(struct file *filep, struct poll_table_struct *wait) {
 
 	poll_wait(filep, &kflat->dump_ready_wq, wait);
 
+	// Check whether timeout occurred or recipe was triggered
 	mutex_lock(&kflat->lock);
-	
 	if (kflat->flat.area == NULL) {
-		ret_mask = 0;
+		ret_mask = POLLERR;
 		goto exit;
 	}
 
 	size = ((struct flatten_header*)kflat->flat.area)->image_size;
-
-	if (size > sizeof(size_t)) {
+	if(kflat->flat.error) {
+		ret_mask = POLLERR;
+	} else if (size > sizeof(size_t)) {
 		ret_mask = POLLIN | POLLRDNORM;
 	}
 
