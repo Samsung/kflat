@@ -70,70 +70,117 @@ static struct {
 	size_t offset;
 } _dbg_buffer;
 
-DEFINE_MUTEX(kflat_dbg_lock);
+// Use spinlock: kflat_dbg_printf can be run in atomic context
+DEFINE_SPINLOCK(kflat_dbg_lock);
 
 static int kflat_dbg_buf_init(const size_t buffer_size) {
-	int rv = 0;
-	
-	mutex_lock(&kflat_dbg_lock);
+	void* mem_to_release = NULL;
+	void* new_memory;
+	unsigned long flags;
 
-	if(_dbg_buffer.mem != NULL) {
+	// Check whether fine memory is already allocated
+	spin_lock_irqsave(&kflat_dbg_lock, flags);
+	if(_dbg_buffer.mem != NULL)
 		if(_dbg_buffer.size == buffer_size) {
 			_dbg_buffer.offset = 0;
 			goto exit;
 		}
-		vfree(_dbg_buffer.mem);
+	spin_unlock_irqrestore(&kflat_dbg_lock, flags);
+
+	// New buffer need to be allocated
+	new_memory = vmalloc(buffer_size);
+	if(new_memory == NULL) {
+		WARN_ONCE(1, "Failed to allocate buffer for kflat debug logs");
+		return -ENOMEM;
 	}
 
-	_dbg_buffer.mem = vmalloc(buffer_size);
-	if(_dbg_buffer.mem == NULL) {
-		WARN_ONCE(1, "Failed to allocate buffer for kflat debug logs");
-		rv = -ENOMEM;
-		goto exit;
+	spin_lock_irqsave(&kflat_dbg_lock, flags);
+	if(_dbg_buffer.mem != NULL) {
+		if(_dbg_buffer.size == buffer_size) {
+			// This buffer is just fine - release new_memory
+			_dbg_buffer.offset = 0;
+			mem_to_release = new_memory;
+			goto exit;
+		}
+		// Release old memory
+		mem_to_release = _dbg_buffer.mem;
 	}
+
+	_dbg_buffer.mem = new_memory;
 	_dbg_buffer.size = buffer_size;
 	_dbg_buffer.offset = 0;
 
 exit:
-	mutex_unlock(&kflat_dbg_lock);
-	return rv;
+	spin_unlock_irqrestore(&kflat_dbg_lock, flags);
+	vfree(mem_to_release);
+	return 0;
 }
 
 static void kflat_dbg_buf_deinit(void) {
-	mutex_lock(&kflat_dbg_lock);
+	unsigned long flags;
+	void* mem_to_release;
 
-	vfree(_dbg_buffer.mem);
+	spin_lock_irqsave(&kflat_dbg_lock, flags);
+	mem_to_release = _dbg_buffer.mem;
 	_dbg_buffer.mem = NULL;
 	_dbg_buffer.offset = 0;
 	_dbg_buffer.size = 0;
+	spin_unlock_irqrestore(&kflat_dbg_lock, flags);
 
-	mutex_unlock(&kflat_dbg_lock);
+	vfree(mem_to_release);
 }
 
 void kflat_dbg_buf_clear(void) {
-	mutex_lock(&kflat_dbg_lock);
+	unsigned long flags;
+	spin_lock_irqsave(&kflat_dbg_lock, flags);
 	_dbg_buffer.offset = 0;
-	mutex_unlock(&kflat_dbg_lock);
+	spin_unlock_irqrestore(&kflat_dbg_lock, flags);
 }
 
 static ssize_t kflat_dbg_buf_read(struct file* file, char* __user buffer, size_t size, loff_t* ppos) {
 	ssize_t ret = 0;
+	loff_t pos = *ppos;
+	void* page;
+	unsigned long flags;
 
-	mutex_lock(&kflat_dbg_lock);
-	if(_dbg_buffer.mem == NULL || _dbg_buffer.offset == 0)
+	if(pos < 0)
+		return -EINVAL;
+	if(size == 0)
+		return 0;
+	else if(size > PAGE_SIZE)
+		size = PAGE_SIZE;
+
+	page = (void*) __get_free_page(GFP_KERNEL);
+	if(page == NULL)
+		return -ENOMEM;
+
+	spin_lock_irqsave(&kflat_dbg_lock, flags);
+	if(_dbg_buffer.mem == NULL || _dbg_buffer.offset == 0 || pos > _dbg_buffer.offset) {
+		size = 0;
 		goto exit;
+	}
+	if(size > _dbg_buffer.offset - pos)
+		size = _dbg_buffer.offset - pos;
+	memcpy(page, _dbg_buffer.mem, size);
 
-	ret = simple_read_from_buffer(buffer, size, ppos, _dbg_buffer.mem, _dbg_buffer.offset);
 exit:
-	mutex_unlock(&kflat_dbg_lock);
-	return ret;
+	spin_unlock_irqrestore(&kflat_dbg_lock, flags);
+
+	ret = copy_to_user(buffer, page, size);
+	if(ret)
+		return -EFAULT;
+	*ppos = pos + size;
+
+	free_page((unsigned long) page);
+	return size;
 }
 
 void kflat_dbg_printf(const char* fmt, ...) {
 	long avail_size, written;
+	unsigned long flags;
 	va_list args;
 
-	mutex_lock(&kflat_dbg_lock);
+	spin_lock_irqsave(&kflat_dbg_lock, flags);
 
 	if(_dbg_buffer.mem == NULL)
 		goto exit;
@@ -149,7 +196,7 @@ void kflat_dbg_printf(const char* fmt, ...) {
 	_dbg_buffer.offset += written;
 
 exit:
-	mutex_unlock(&kflat_dbg_lock);
+	spin_unlock_irqrestore(&kflat_dbg_lock, flags);
 	return;
 }
 EXPORT_SYMBOL_GPL(kflat_dbg_printf);
@@ -313,6 +360,8 @@ int kflat_run_test(struct kflat* kflat, struct kflat_ioctl_tests* test) {
 	for(size_t i = 0; i < tests_count; i++) {
 		if(!strcmp(test->test_name, test_cases[i]->name)) {
 			kflat->debug_flag = test->debug_flag;
+			if(kflat->debug_flag)
+				kflat_dbg_buf_init(dbg_buffer_size);
 
 			flatten_init(&kflat->flat);
 			kflat->flat.FLCTRL.debug_flag = kflat->debug_flag;
