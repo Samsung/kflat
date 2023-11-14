@@ -90,6 +90,7 @@ struct args {
     int skip_function_body;
     int run_recipe_now;
     int poll_timeout;
+    int broadcast;
     const char* output;
     const char* recipe;
     const char* node;
@@ -108,6 +109,7 @@ static struct argp_option options[] = {
     {"skip_funcion_body", 'n', 0, 0, "Do not execute target function body after flattening memory"},
     {"run_recipe_now", 'f', 0, 0, "Execute KFLAT recipe directly from IOCTL without attaching to any kernel function"},
     {"poll_timeout", 't', "TIMEOUT", 0, "In miliseconds. Timeout for recipe execution."},
+    {"broadcast", 'b', 0, 0, "Capture memory dump from any process running on the machine"},
     { 0 }
 };
 
@@ -140,6 +142,10 @@ static error_t parse_opt(int key, char* arg, struct argp_state* state) {
 
         case 'f':
             options->run_recipe_now = 1;
+            break;
+        
+        case 'b':
+            options->broadcast = 1;
             break;
 
         case 't':
@@ -257,7 +263,7 @@ void kflat_enable(int fd, struct args* opts) {
     int ret;
     struct kflat_ioctl_enable enable = {0, };
 
-    enable.pid = getpid();
+    enable.pid = opts->broadcast ? -1 : getpid();
     enable.debug_flag = opts->debug;
     enable.use_stop_machine = opts->stop_machine;
     enable.skip_function_body = opts->skip_function_body;
@@ -349,7 +355,7 @@ size_t kflat_disable(int fd, size_t dump_size) {
 
 
 int main(int argc, char** argv, char** envp) {
-    int fd, ret, rd_fd;
+    int fd, ret, rd_fd, trigger_func;
     size_t output_size;
     struct args opts = {0};
     const size_t dump_size = 100 * 1024 * 1024;
@@ -361,9 +367,12 @@ int main(int argc, char** argv, char** envp) {
     if(ret)
         log_abort("invalid options provided");
 
+    // If neither run_recipe_now nor broadcast is provided, we need to manually
+    //  trigger kernel function from userspace using selected syscall
+    trigger_func = !opts.run_recipe_now && !opts.broadcast;
     if(opts.recipe == NULL)
         log_abort("you need to specify the ID of target recipe");
-    if(!opts.run_recipe_now && opts.node == NULL)
+    if(trigger_func && opts.node == NULL)
         log_abort("you need to specify the target file used by recipe");
     
     // In case of interface compat_ioctl we're deploying executor_32 app
@@ -389,7 +398,7 @@ int main(int argc, char** argv, char** envp) {
 
     kflat_enable(fd, &opts);
 
-    if(!opts.run_recipe_now) {
+    if(trigger_func) {
         /*
          * Setup timeout and invoke handler
          */
@@ -405,6 +414,9 @@ int main(int argc, char** argv, char** envp) {
         alarm(0);
     }
 
+    if(opts.broadcast) {
+        log_info("Awaiting for the recipe to be externally triggered ...");
+    }
 
     struct pollfd kflat_poll;
     kflat_poll.fd = fd;
@@ -413,10 +425,13 @@ int main(int argc, char** argv, char** envp) {
     int ret_poll = poll(&kflat_poll, 1, (opts.poll_timeout ? opts.poll_timeout : -1));
 
     if (ret_poll == 0) {
-        log_abort("Recipe execution timeout.");
-    } 
-    if (ret_poll < 0) {
-        log_abort("Poll syscall failed when waiting for recipe execution - %s", strerror(errno));
+        log_error("");
+        log_error("[Recipe execution timeout]");
+        log_error(" Recipe failed to execute before selected timeout (-t %d) occurred", opts.poll_timeout);
+        log_error("");
+        log_abort("Recipe was not invoked ");
+    } else if (ret_poll < 0) {
+        log_abort("Poll syscall failed while waiting for recipe execution - %s", strerror(errno));
     }
 
     output_size = kflat_disable(fd, dump_size);
