@@ -161,7 +161,7 @@ static ssize_t kflat_dbg_buf_read(struct file* file, char* __user buffer, size_t
 	}
 	if(size > _dbg_buffer.offset - pos)
 		size = _dbg_buffer.offset - pos;
-	memcpy(page, _dbg_buffer.mem, size);
+	memcpy(page, _dbg_buffer.mem + pos, size);
 
 exit:
 	spin_unlock_irqrestore(&kflat_dbg_lock, flags);
