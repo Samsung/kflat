@@ -2619,7 +2619,7 @@ the 'container_of' invocation chain.\n   The invocation chain was as follows:\n{
 											self.anon_typedefs.append((AT.id,anonstruct_type_name))
 											iout.write(indent(RecipeGenerator.template_flatten_struct_type_flexible_recipe.format(
 												anonstruct_type_name,
-												AT.size,
+												AT.size//8,
 												refname,
 												moffset//8,
 												self.safeInfo(False)
@@ -2630,7 +2630,7 @@ the 'container_of' invocation chain.\n   The invocation chain was as follows:\n{
 											if AT.isunion is False:
 												iout.write(indent(RecipeGenerator.template_flatten_struct_flexible_recipe.format(
 													AT.str,
-													AT.size,
+													AT.size//8,
 													refname,
 													moffset//8,
 													self.safeInfo(False)
@@ -2638,7 +2638,7 @@ the 'container_of' invocation chain.\n   The invocation chain was as follows:\n{
 											else:
 												iout.write(indent(RecipeGenerator.template_flatten_union_flexible_recipe.format(
 													AT.str,
-													AT.size,
+													AT.size//8,
 													refname,
 													moffset//8,
 													self.safeInfo(False)
@@ -2648,7 +2648,7 @@ the 'container_of' invocation chain.\n   The invocation chain was as follows:\n{
 									else:
 										iout.write(indent(RecipeGenerator.template_flatten_struct_type_flexible_recipe.format(
 											TPDAT.name,
-											AT.size,
+											AT.size//8,
 											refname,
 											moffset//8,
 											self.safeInfo(False)
