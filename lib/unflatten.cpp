@@ -864,10 +864,13 @@ public:
 		fptrmap.clear();
 
 		rbtree_postorder_for_each_entry_safe(node, tmp, &FLCTRL.imap_root.rb_root, rb) {
-			interval_tree_remove(node, &FLCTRL.imap_root);
+			// Don't call `interval_tree_remove` here - it might trigger rebalance and 
+			//  invalidate iterator. The tree is going to be removed completely so it's
+			//  sufficient to just clear imap_root at the end
 			free(node->mptr);
 			free(node);
 		}
+		memset(&FLCTRL.imap_root, 0, sizeof(struct rb_root_cached));
 
 		FLCTRL.root_addr.clear();
 		root_addr_map.clear();
