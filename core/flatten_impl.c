@@ -991,16 +991,14 @@ static size_t fixup_set_fptr_count(struct flat* flat) {
 }
 
 static void fixup_set_destroy(struct flat* flat) {
-	struct rb_node * p = rb_first(&flat->FLCTRL.fixup_set_root.rb_root);
-	while(p) {
-		struct fixup_set_node* node = (struct fixup_set_node*)p;
-		rb_erase(p, &flat->FLCTRL.fixup_set_root.rb_root);
-		p = rb_next(p);
+	struct fixup_set_node *node, *tmp;
+	rbtree_postorder_for_each_entry_safe(node, tmp, &flat->FLCTRL.fixup_set_root.rb_root, node) {
 		if (!IS_FIXUP_FPTR(node)) {
 			flat_free(node->ptr);
 		}
 		flat_free(node);
-	};
+	}
+	memset(&flat->FLCTRL.fixup_set_root, 0, sizeof(struct rb_root_cached));
 }
 
 /*******************************************************
@@ -1133,16 +1131,12 @@ size_t root_addr_extended_size(struct flat* flat) {
 }
 
 static void root_addr_set_destroy(struct flat* flat) {
-
-	struct rb_root* root = &flat->root_addr_set;
-	struct rb_node * p = rb_first(root);
-    while(p) {
-        struct root_addr_set_node* data = (struct root_addr_set_node*)p;
-        rb_erase(p, root);
-        p = rb_next(p);
-        flat_free((void*)data->name);
+	struct root_addr_set_node *data, *tmp;
+	rbtree_postorder_for_each_entry_safe(data, tmp, &flat->root_addr_set, node) {
+		flat_free((void*)data->name);
         flat_free(data);
-    }
+	}
+	memset(&flat->root_addr_set, 0, sizeof(struct rb_root));
 }
 
 void interval_tree_print(struct rb_root *root) {
@@ -1162,37 +1156,13 @@ void interval_tree_print(struct rb_root *root) {
 	FLATTEN_LOG_DEBUG("Total size: %zu\n\n",total_size);
 }
 
-int interval_tree_destroy(struct flat* flat, struct rb_root *root) {
-	struct interval_nodelist *h = 0, *i = 0;
-	struct rb_node * p = rb_first(root);
-	int rv = 0;
-	while(p) {
-		struct flat_node* node = (struct flat_node*)p;
-		struct interval_nodelist* v;
-		v = (struct interval_nodelist*) flat_zalloc(flat,sizeof(struct interval_nodelist),1);
-		if (!v) {
-			rv = ENOMEM;
-			break;
-		}
-		interval_tree_remove(node,&flat->FLCTRL.imap_root);
-	    v->node = node;
-	    if (!h) {
-	        h = v;
-	        i = v;
-	    }
-	    else {
-	        i->next = v;
-	        i = i->next;
-	    }
-		p = rb_next(p);
-	};
-	while(h) {
-    	struct interval_nodelist* p = h;
-    	h = h->next;
-    	flat_free(p->node);
-    	flat_free(p);
-    }
-	return rv;
+int interval_tree_destroy(struct flat* flat) {
+	struct flat_node *node, *tmp;
+	rbtree_postorder_for_each_entry_safe(node, tmp, &flat->FLCTRL.imap_root.rb_root, rb) {
+		flat_free(node);
+	}
+	memset(&flat->FLCTRL.imap_root, 0, sizeof(struct rb_root_cached));
+	return 0;
 }
 
 
@@ -1341,7 +1311,7 @@ int flatten_fini(struct flat* flat) {
 		list_del(&ptr->head);
 		flat_free(ptr);
 	}
-    interval_tree_destroy(flat,&flat->FLCTRL.imap_root.rb_root);
+    interval_tree_destroy(flat);
 	root_addr_set_destroy(flat);
 #if LINEAR_MEMORY_ALLOCATOR
     FLATTEN_BSP_FREE(flat->mpool);

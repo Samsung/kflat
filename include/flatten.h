@@ -104,11 +104,6 @@ struct root_addr_set_node {
 	uintptr_t root_addr;
 };
 
-struct interval_nodelist {
-	struct interval_nodelist* next;
-	struct flat_node* node;
-};
-
 struct queue_block {
 	struct list_head head;
 	unsigned char data[];

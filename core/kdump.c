@@ -36,46 +36,14 @@ INTERVAL_TREE_DEFINE(struct kdump_memory_node, rb,
 		     START, END,
              static __attribute__((used)), interval_tree)
 
-struct interval_nodelist {
-	struct interval_nodelist* next;
-	struct kdump_memory_node* node;
-};
 
 int kdump_tree_destroy(struct kdump_memory_map* kdump) {
-    int rv = 0;
-	struct rb_node* p;
-    struct rb_root* root;
-    struct kdump_memory_node* node;
-    struct interval_nodelist *h = 0, *i = 0, *v;
-
-    root = &kdump->imap_root.rb_root;
-
-	for(p = rb_first(root); p != NULL; p = rb_next(p)) {
-		node = (struct kdump_memory_node*) p;
-		v = kzalloc(sizeof(struct interval_nodelist), GFP_KERNEL);
-		if (!v) {
-			rv = -ENOMEM;
-			break;
-		}
-		interval_tree_remove(node, &kdump->imap_root);
-	    v->node = node;
-	    if (!h) {
-	        h = v;
-	        i = v;
-	    }
-	    else {
-	        i->next = v;
-	        i = i->next;
-	    }
-	};
-
-	while(h) {
-    	struct interval_nodelist* p = h;
-    	h = h->next;
-    	kfree(p->node);
-    	kfree(p);
+    struct kdump_memory_node *node, *tmp;
+    rbtree_postorder_for_each_entry_safe(node, tmp, &kdump->imap_root.rb_root, rb) {
+        kfree(node);
     }
-	return rv;
+    memset(&kdump->imap_root, 0, sizeof(struct rb_root_cached));
+    return 0;
 }
 
 /*
