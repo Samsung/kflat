@@ -1,0 +1,192 @@
+{
+	"base_config": {
+	},
+	"OT_info": {
+		"functions": [ (<str>,<int>,<str>), ...], /* List of functions in the original FTDB which are present in the OT: (function name, function id in original FTDB, function hash) */
+		"ot_functions": [ (<str>,<int>), ...], /* List of functions in the OT FTDB which are present in the OT: (function name, function id in OT FTDB) */
+		"anchor_types": [ <str>, ...], /* list of struct tags for the struct types that behave as an anchor types (i.e. struct members with pointers members that only point to the parent type) */
+		"record_count": <int>, /* Size of the unique list of record types */
+		"record_done": [],	/* Unique list of record types (with dependencies) used in functions arguments, global variables and member expressions */
+							/*  typestring: */
+							/*   's:<str>': named record type (struct tag) */
+							/*   't:<str>': anonymous typedef'ed record type (typedef name) */
+							/*   'a:<int>@<str>': anonymous non-typedef'ed record type of function argument (argument index, function name) */
+							/*   'g:<str>': anonymous non-typedef'ed record type of global variable (global variable hash) */
+							/*   'm:<int>:<int>@<str>': anonymous non-typedef'ed record type of member expression (derefs index, type index, function name) */
+		"member_count": <int>,
+		"used_members": [],		/* List of used members from the unique list of all record types */
+								/*  mStr (member string):  */
+								/*   's:<str>:<str>': struct member string (struct tag, member name or anchor chain) */
+								/*   't:<str>:<str>': typedef'ed struct member string (typedef name, member name or anchor chain) */
+								/*   '<str>:<str>': anonymous struct member string (typestring, member name or anchor chain) */
+		"overlapping_members": {
+			<mStr>: {	/* This member overlaps with other members */
+				/* overlapping info */
+				'use': <bool>,	/* Set to True to indicate that this overlapping member was actually used */
+				'ignore': <bool>,	/* Set to True to skip this overlapping member from recipe generation */
+				'overlap_list': [ (<str>,<int>,<int>), ... ]	/* List of all members that overlap with the memory of this member (mStr,member_start,member_end) */
+			}, (...)
+		}
+	},
+	"ptr_config": {
+		"container_of_map": {
+			<mStr>: [
+				/* this member was used in the 'container_of' macro */
+				{
+					'tps': <str>,		/* type string for the container type */
+					'tpid': <int>,		/* container type id */
+					'offset': <int>,	/* offset of this member in the container type */
+					'expr': <str>		/* original code expression of this member in the 'container_of' */
+				},
+				(...)
+			], /* in case of ambiguity this list will contains multiple elements */
+			(...)
+		},
+		"container_of_global_map": {
+			<ghash>: [
+				/* this global variable was used in the 'container_of' macro */
+				{
+					'tps': <str>,		/* type string for the container type */
+					'tpid': <int>,		/* container type id */
+					'offset': <int>,	/* offset of this member in the container type */
+					'expr': <str>		/* original code expression of this member in the 'container_of' */
+				},
+				(...)
+			], /* in case of ambiguity this list will contains multiple elements */
+			(...)
+		},
+		"container_of_local_map": {
+			<__%fn__%varid>: [
+				{
+					/* 'fn' function local variable with 'varid' id was used directly in the 'container_of' macro */
+					'tps': <str>,		/* type string for the container type */
+					'tpid': <int>,		/* container type id */
+					'offset': <int>,	/* offset of this member in the container type */
+					'expr': <str>,		/* original code expression of this function local variable in the 'container_of' */
+					'varid': <int>,		/* OPTIONAL; if the 'container_of' information was acquired deeper down in the variable
+											flow of this function this is the id of a variable first in the chain */
+					'tpvarid': <int>,	/* full type of the 'fn' local variable with the 'varid' id */
+					'tpvars': <str>		/* OPTIONAL; type string for the type the 'fn' local variable with 'vaid' id points to */
+				},
+				(...)
+			], /* in case of ambiguity this list will contains multiple elements */
+			(...)
+		},
+		"container_of_parm_map": {
+			<__%fn__%parm_index>: [
+				{
+					/* 'fn' function parameter at index 'parm_index' was used directly in the 'container_of' macro */
+					'tps': <str>,		/* type string for the container type */
+					'tpid': <int>,		/* container type id */
+					'offset': <int>,	/* offset of this member in the container type */
+					'expr': <str>,		/* original code expression of this function parameter in the 'container_of' */
+					'call_id': <int>,	/* OPTIONAL; if the 'container_of' information was acquired deeper down in the call
+					                        hierarchy of this function this is the id of a function first in the call chain */
+					'tpargid': <int>,	/* full type of the 'fn' parameter at the index 'parm_index'
+					'tpargs': <str>		/* OPTIONAL; type string for the type the 'fn' parameter at the index 'parm_index' points to
+				},
+				(...)
+			], /* in case of ambiguity this list will contains multiple elements */
+			(...)
+		},
+		"pvoid_map": {
+			<mStr>: {
+				<tpid>: [ <str>, ...], /* list of 'void*' cast expressions to specific 'tpid' type */
+				(...)
+			}, /* in case of ambiguity this map contains multiple elements */
+			(...)
+		},
+		"custom_ptr_map": {
+			<mStr>: {
+				/* custom pointer map - telling exactly to which type the given member pointer points to */
+				'tpid': <int>, /* pointee TID */
+				'offset': <int>,
+				'info': <str> /* custom information */
+			}, (...)
+		},
+		"deref_map": {
+			<mStr>: [(<int>,<int>,<str>),...] /* dereference offset and number of non-literal variables used in dereference expr.
+												 (including original expression) */
+		},
+		"assign_list": {
+			<mStr>: ...
+		},
+		"custom_element_count_map": {
+			<mStr>: {
+				/* element count info */
+				'count': <int>
+				'size_expr': <str> /* We have either 'count' or 'size_expr' (takes precedence) attribute */
+			},
+			(...)
+		},
+		"string_members": {
+			<mStr>: [ <str>, ...], /* list of call expressions passed to the c-string parameters */
+			(...)
+		}
+	},
+	"custom_recipes": {},	/* TBD */
+	"recipe_templates": {},	/* TBD */
+	"listhead_config": {
+		"lh_members": [ <mStr>, ...],	/* Unique list of structure members with the 'list_head' type */
+		"head_members": {	/* Use to indicate which 'list_head' structure members are actually heads of a list */
+			<mStr>: [ <str>, ...],
+			(...)
+		},
+		"head_variables": {		/* Use to indicate which 'list_head' global variables are actually heads of a list */
+			<hash>: [ <str>, ...],
+			(...)
+		},
+		"resolve_members": {
+			<mStr>: [		/* Usage of member expression in the 'list_head' resolution */
+				[<str>,<int>,<str>,<int>,<int>],	/* (expr,offset,typestr,typeid,offset_shift) */
+													/* If 'typeid'<0 then the list head member has resolved to the record forward */
+				(...)
+			],
+			(...)
+		},
+		"resolve_variables": {
+			<hash>: [		/* Usage of global variable in the 'list_head' resolution */
+				[<str>,<int>,<str>,<int>,<int>],	/* (expr,offset,typestr,typeid,offset_shift) */
+													/* If 'typeid'<0 then the list head global variable has resolved to the record forward */
+				(...)
+			],
+			(...)
+		},
+		"additional_head_members": {	/* Additional information provided to resolve 'list_head' members to proper type of list elements */
+			<mStr>: {
+				'offset': <int>,	/* offset of 'list_head' member within the container type */
+				'tag': <str>,		/* container type string tag */
+				'hash': <str>		/* OPTIONAL; in case the provided container type string tag resolved ambiguously, this is the hash information
+										 used to disambiguate the types */
+			},
+			(...)
+		},
+		"additional_head_variables": {
+			<hash>: {
+				'offset': <int>,	/* offset of 'list_head' global variable within the container type */
+				'tag': <str>,		/* container type string tag */
+				'hash': <str>		/* OPTIONAL; in case the provided container type string tag resolved ambiguously, this is the hash information
+										 used to disambiguate the types */
+			},
+			(...)
+		},
+		"disable_head_members": [	/* Use to treat the 'list_head' member as a normal member even if it was detected as a head of a list */
+			<mStr>, (...)
+		],
+		"disable_head_variables": [	/* Use to treat the 'list_head' global variable as a normal variable even if it was detected as a head of a list */
+			<hash>, (...)
+		]
+	},
+	"anchor_heads": {
+		"global_anchor_heads": {	/* Maps specific struct tag that represents anchor type with a list of global variables of that type */
+			<str>: [	/* struct tag of anchor type */
+				<str>, ...	/* list of global variable hashes with the specific anchor type */
+			]
+		},
+		"member_anchor_heads": {	/* Maps specific struct tag that represents anchor type with a list of struct members of that type */
+			<str>: [	/* struct tag of anchor type */
+				<str>, ...	/* list of member strings with the specific anchor type */
+			]
+		}
+	}
+}
