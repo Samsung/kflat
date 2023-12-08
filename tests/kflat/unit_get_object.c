@@ -15,6 +15,7 @@ struct get_obj_result {
 	bool test_globals_pass;
 	bool test_code_pass;
 	bool test_vmalloc_pass;
+	bool test_vmalloc_large_pass;
 };
 
 /********************************/
@@ -85,6 +86,17 @@ static int kflat_get_object_unit_test(struct flat *flat) {
 		results.test_vmalloc_pass = true;
 	vfree(buffer);
 
+	buffer = vmalloc(12 * PAGE_SIZE);
+	ret = flatten_get_object(flat, buffer + PAGE_SIZE * 2 + 1, &start, &end);
+	if (!ret)
+		flat_errs("get_object test: flatten_get_object ignored pointer to vmalloc area");
+	else if(start != buffer || end != buffer + 12 * PAGE_SIZE - 1)
+		flat_errs("get_object test: flatten_get_object incorrectly located vmalloc(PAGE_SIZE * 12) memory - s:%llx; e:%llx",
+					(uint64_t) start, (uint64_t) end);
+	else
+		results.test_vmalloc_large_pass = true;
+	vfree(buffer);
+
 	// Check access to the last byte of allocated memory
 	buffer = kmalloc(17, GFP_KERNEL);
 	ret = flatten_get_object(flat, buffer + 16, &start, &end);
@@ -124,6 +136,7 @@ static int kflat_get_object_unit_validate(void *memory, size_t size, CUnflatten 
 	ASSERT(pResults->test_globals_pass);
 	ASSERT(pResults->test_code_pass);
 	ASSERT(pResults->test_vmalloc_pass);
+	ASSERT(pResults->test_vmalloc_large_pass);
 	return KFLAT_TEST_SUCCESS;
 }
 
