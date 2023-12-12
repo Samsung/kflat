@@ -539,17 +539,103 @@ void* hwasan_safe_memcpy(void* dst, const void* src, size_t size) {
 #endif
 
 /*******************************************************
+ * CMA ALLOCATOR SUPPORT
+ *   Runtime detection of CMA memory based on pointer
+ *******************************************************/
+#if defined(CONFIG_CMA) && defined(KFLAT_GET_OBJ_SUPPORT)
+#include <linux/cma.h>
+#include "../../mm/cma.h"
+
+struct cma_res_entry {
+	struct list_head list;
+	unsigned long pfn_start;
+	unsigned long count;
+};
+LIST_HEAD(cma_mem_ranges);
+
+static int _cma_areas_iterator(struct cma* cma, void* data) {
+	struct cma_res_entry* entry;
+
+	entry = kmalloc(sizeof(*entry), GFP_KERNEL);
+	if(entry == NULL) {
+		pr_err("failed to allocate memory for CMA res entry");
+		return -ENOMEM;
+	}
+	
+	entry->pfn_start = cma->base_pfn;
+	entry->count = cma->count;
+	list_add(&entry->list, &cma_mem_ranges);
+
+	return 0;
+}
+
+static int collect_cma_pfns(void) {
+	size_t regions_count = 0;
+	struct cma_res_entry* entry;
+
+	int ret = cma_for_each_area(_cma_areas_iterator, NULL);
+
+	list_for_each_entry(entry, &cma_mem_ranges, list) 
+		regions_count++;
+	pr_info("Discovered %lu regions of CMA memory", regions_count);
+	return ret;
+}
+
+static void release_cma_pfns(void) {
+	struct cma_res_entry *entry, *tmp;
+	list_for_each_entry_safe(entry, tmp, &cma_mem_ranges, list) {
+		list_del(&entry->list);
+		kfree(entry);
+	}
+}
+
+bool is_cma_memory(void* ptr) {
+	struct page* pagep;
+	unsigned long pfn;
+	struct cma_res_entry* entry;
+
+	walk_addr(kdump_get_kernel_pgd(), (uint64_t)ptr, &pagep);	
+	if(pagep == NULL)
+		return false;
+	pfn = page_to_pfn(pagep);
+
+	list_for_each_entry(entry, &cma_mem_ranges, list) {
+		if(pfn >= entry->pfn_start && pfn < entry->pfn_start + entry->count)
+			return true;
+	}
+	return false;
+}
+
+#else /* !defined(CONFIG_CMA) || !defined(KFLAT_GET_OBJ_SUPPORT) */
+bool is_cma_memory(void* ptr) {
+	return false;
+}
+#endif /* CONFIG_CMA && KFLAT_GET_OBJ_SUPPORT */
+
+
+/*******************************************************
  * (De)initialization
  *******************************************************/
 int kdump_init(void) {
+    int ret;
 
 #ifdef CONFIG_ARM64
     tbi_check();
 #endif
 
-    return kdump_collect_iomem_ram();
+#if defined(CONFIG_CMA) && defined(KFLAT_GET_OBJ_SUPPORT)
+    ret = collect_cma_pfns();
+    if(ret)
+        return ret;
+#endif
+
+    ret = kdump_collect_iomem_ram();
+    return ret;
 }
 
 void kdump_exit(void) {
+#if defined(CONFIG_CMA) && defined(KFLAT_GET_OBJ_SUPPORT)
+    release_cma_pfns();
+#endif
     kdump_uncollect_iomem();
 }

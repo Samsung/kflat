@@ -294,6 +294,12 @@ bool flatten_get_object(struct flat* flat, void* ptr, void** start, void** end) 
 		return _flatten_get_heap_obj(obj, ptr, start, end);
 	}
 
+	// Check for CMA memory
+	if(is_cma_memory(ptr)) {
+		pr_warn("flatten_get_object - ptr (%llx) is a pointer to CMA area: return false", (unsigned long long) ptr);
+		return false;
+	}
+
 	// Try retrieving object size from compound_page (used by kmalloc_large)
 	head = virt_to_head_page(ptr);
 	if(head != NULL) {

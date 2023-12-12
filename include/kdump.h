@@ -59,4 +59,13 @@ size_t kdump_test_address(void* addr, size_t size);
 
 void* hwasan_safe_memcpy(void* dst, const void* src, size_t size);
 
+/**
+ * @brief Check whether provided address belongs to CMA allocator
+ * 
+ * @param ptr pointer to memory
+ * @return true CMA area
+ * @return false other memory
+ */
+bool is_cma_memory(void* ptr);
+
 #endif /* _LINUX_KDUMP_H */
