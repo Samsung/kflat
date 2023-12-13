@@ -110,9 +110,15 @@ Script for automatic generation of such recipes for any given kernel structure i
 ### Execute kflat recipe
 To execute selected kflat recipe, use `executor` app located in `tools/` directory. The basic usage looks as follow:
 ```sh
-# Run kflat recipe named RANDOM_READ triggered by READing from `/dev/random` and save
+# Run kflat recipe named random_read_iter and trigger it by AUTOmatically READing from `/dev/random` and save
 #  the dumped memory to file image.kflat
-./executor -i READ -o image.kflat RANDOM_READ /dev/random
+# Executor will automatically 
+./executor -o image.kflat AUTO random_read_iter READ /dev/random
+
+# Run kflat recipe named do_init_module and wait for an external MANUAL trigger by user. By default, the dump is saved to "dump.kflat". 
+./executor MANUAL do_init_module 
+# In another terminal
+insmod some_module.ko
 ```
 
 Recipe identifier is the name of function for which assigned recipe will be triggered. IDs are insensitive to case. For details on available program arguments, please refer to `./executor --help`:

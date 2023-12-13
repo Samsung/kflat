@@ -58,8 +58,8 @@ $(UFLAT_COMMON_TEST_OBJS): $(PWD)/tests/test_%.o: $(PWD)/tests/%.c
 common.o: common.c
 	$(CC) $(CFLAGS) --static -c -o $@ $^
 
-executor: executor.c common.o
-	$(CC) $(CFLAGS) -DENV_64 --static -o $@ $^
+executor: executor_v2.cpp $(PWD)/lib/libExecFlat.a
+	$(CXX) -I$(PWD)/include -I$(PWD)/lib --static -std=c++17 -o $@ $^
 
 kflattest: kflattest.c common.o $(TEST_OBJS) $(KFLAT_TEST_OBJS)
 	$(CC) $(CFLAGS) $(EXTRA_CFLAGS) --static -o $@ $^ $(PWD)/lib/libunflatten_$(ARCH).a -lstdc++ -lm -D__VALIDATOR__
@@ -71,12 +71,11 @@ uflattest: uflattest.c common.o $(UFLAT_COMMON_TEST_OBJS) $(UFLAT_SPEC_TEST_OBJS
 common_32.o: common.c
 	arm-linux-gnueabihf-gcc -c -o $@ $^
 
-executor_32: executor.c common_32.o
-	arm-linux-gnueabihf-gcc -DENV_32 -I${INCLUDE_PATH} --static -o $@ $^
-
+executor_32: executor_v2.cpp $(PWD)/lib/libExecFlat_arm32.a
+	arm-linux-gnueabihf-g++ -DENV_32 -std=c++17 --static -I${INCLUDE_PATH} -I$(PWD)/lib -o $@ $^
 
 ifeq ($(ARCH), arm64)
-all: executor executor_32 kflattest uflattest
+all: executor executor_32  kflattest uflattest
 else
 all: executor kflattest uflattest
 endif

@@ -1,4 +1,4 @@
-CFLAGS = -Iinclude_priv/ -I../include/ -O3 -Wall -fPIC
+CFLAGS = -Iinclude_priv/ -I../include/ -O3 -Wall -fPIC 
 LDFLAGS = --shared -fPIC
 UNFLAT_TARGET = 
 FLAT_TARGET = 
@@ -17,6 +17,15 @@ uflat.o: uflat.c uflat.h
 
 funcsymsutils.o: funcsymsutils.c funcsymsutils.h
 	$(CXX) $(CFLAGS) -DFLATTEN_USERSPACE_BSP -c -o $@ $<
+
+ExecFlat.o: ExecFlat.cpp ExecFlat.hpp
+	$(CXX) $(CFLAGS) -std=c++17 -DFLATTEN_USERSPACE_BSP -c -o $@ $<
+
+libExecFlat.so: ExecFlat.o
+	$(CXX) $(LDFLAGS) -o $@ $^
+
+libExecFlat.a: ExecFlat.o
+	ar rcs $@ $^
 
 unflatten.o: unflatten.cpp unflatten.hpp
 	$(CXX) $(CFLAGS) -ggdb3 -c -o $@ $<
@@ -55,7 +64,7 @@ libunflatten_$(ARCH)_dfsan.a: unflatten_dfsan.o rbtree_dfsan.o
 	ar rcs $@ $^
 
 
-FLAT_TARGET += libuflat_$(ARCH).a libuflat_$(ARCH).so
+FLAT_TARGET += libuflat_$(ARCH).a libuflat_$(ARCH).so 
 
 #
 # When building for ARM64, extra provide x86 version of
@@ -74,13 +83,26 @@ libunflatten_x86_64.so: unflatten_x86_64.o rbtree_x86_64.o
 libunflatten_x86_64.a: unflatten_x86_64.o rbtree_x86_64.o
 	ar rcs $@ $^
 
-UNFLAT_TARGET += libunflatten_$(ARCH).a libunflatten_$(ARCH).so libunflatten_x86_64.a libunflatten_x86_64.so
+ExecFlat_arm32.o: ExecFlat.cpp ExecFlat.hpp
+	arm-linux-gnueabihf-g++ -I$(PWD)/include -std=c++17 -DENV_32 -c -o $@ $<       
+
+libExecFlat_arm32.a: ExecFlat_arm32.o
+	ar rcs $@ $^
+
+libExecFlat_arm32.so: ExecFlat_arm32.o
+	arm-linux-gnueabihf-g++ $(LDFLAGS) -o $@ $^ 
+
+
+UNFLAT_TARGET += libunflatten_$(ARCH).a libunflatten_$(ARCH).so libunflatten_x86_64.a libunflatten_x86_64.so 
+FLAT_TARGET += libExecFlat_arm32.a libExecFlat_arm32.so
 
 else
 
 UNFLAT_TARGET += libunflatten_$(ARCH).a libunflatten_$(ARCH).so
 
 endif
+
+FLAT_TARGET += libExecFlat.so libExecFlat.a
 
 # Check if clang-9 is available. If so, built libraries for KLEE as well
 ifneq (${KLEE_LIBCXX_INSTALL},)
