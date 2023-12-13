@@ -448,6 +448,7 @@ static int kflat_ioctl_locked(struct kflat *kflat, unsigned int cmd,
 		struct kflat_ioctl_disable disable;
 		struct kflat_ioctl_mem_map map;
 		struct kflat_ioctl_tests tests;
+		char *buf;
 	} args;
 	struct kflat_recipe* recipe;
 
@@ -542,6 +543,20 @@ static int kflat_ioctl_locked(struct kflat *kflat, unsigned int cmd,
 		kdump_dump_vma(&kflat->mem_map);
 		ret = kdump_tree_flatten(&kflat->mem_map, args.map.buffer, args.map.size);
 		kdump_tree_destroy(&kflat->mem_map);
+		return ret;
+
+	case KFLAT_GET_LOADED_RECIPES:
+		args.buf = (char *) kmalloc(RECIPE_LIST_BUFF_SIZE, GFP_KERNEL);
+		if (args.buf == NULL)
+			return -EFAULT;
+			
+		ret = kflat_recipe_get_all(args.buf, RECIPE_LIST_BUFF_SIZE);
+		if (copy_to_user((char *) arg, args.buf, RECIPE_LIST_BUFF_SIZE)) {
+			kfree(args.buf);
+			return -EFAULT;
+		}
+
+		kfree(args.buf);
 		return ret;
 
 	default:

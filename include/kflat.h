@@ -114,6 +114,8 @@ struct kflat {
 	wait_queue_head_t dump_ready_wq;
 };
 
+int kflat_recipe_get_all(char *buff, size_t bufsize);
+
 
 /*******************************
  * EXPORTED FUNCTIONS

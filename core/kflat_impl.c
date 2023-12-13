@@ -378,6 +378,27 @@ exit:
 EXPORT_SYMBOL_GPL(kflat_recipe_unregister);
 
 
+int kflat_recipe_get_all(char *buf, size_t bufsize) {
+	int i = 0;
+	char *name;
+	struct kflat_recipe* entry = NULL;
+
+	memset(buf, 0, bufsize);
+
+	mutex_lock(&kflat_recipes_registry_lock);
+	list_for_each_entry(entry, &kflat_recipes_registry, list) {
+		name = entry->symbol;
+		if (i + strlen(name) + 1 >= bufsize)
+			break;
+		
+		i += strscpy(buf + i, name, bufsize - i) + 1;
+	}
+	mutex_unlock(&kflat_recipes_registry_lock);
+
+	return i;
+}
+
+
 struct kflat_recipe* kflat_recipe_get(char* name) {
     struct kflat_recipe* entry, *ret = NULL;
     
