@@ -241,7 +241,7 @@ void ExecFlat::disable(const fs::path &outfile, int poll_timeout) {
 }
 
 std::vector<std::string> ExecFlat::get_loaded_recipes() {
-    char buf[4096];
+    char buf[RECIPE_LIST_BUFF_SIZE];
     std::vector<std::string> recipes;
     std::string str;
     int ret = ioctl(kflat_fd, KFLAT_GET_LOADED_RECIPES, buf);
