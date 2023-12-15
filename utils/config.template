@@ -188,5 +188,8 @@
 				<str>, ...	/* list of member strings with the specific anchor type */
 			]
 		}
-	}
+	},
+	"per_cpu_variables": [			/* lists all global per_cpu variables names */
+		<str>, (...)
+	]
 }
