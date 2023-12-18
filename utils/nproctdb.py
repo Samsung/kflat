@@ -937,6 +937,24 @@ LINUXINCLUDE := ${{LINUXINCLUDE}}
 		for T in self.ftdb.types:
 			if T.classname=='builtin' and 'char' in T.str:
 				return T
+	
+	def isTypeConst(self, T):
+		return 'c' in T.qualifiers
+	
+	def typeToNonConst(self, T):
+		if T is None or not self.isTypeConst(T):
+			return T
+		for type in self.ftdb.types:
+			if type.str != T.str:
+				continue
+			elif type.classname=="record_forward":
+				continue
+			elif type.hash.split(':')[3] != T.hash.split(':')[3]:
+				continue
+			elif self.isTypeConst(type):
+				continue
+			return type
+		return T
 
 	# Walk through pointer or array types and extract underlying record type
 	# Returns (RT,TPD) pair where:
@@ -2046,8 +2064,8 @@ the 'container_of' invocation chain.\n   The invocation chain was as follows:\n{
 			results = set()
 			for ref in T.refs:
 				type = self.ftdb.types[ref]
-				if self.DI.isTypeConst(type):
-					type = self.DI.typeToNonConst(type)
+				if self.isTypeConst(type):
+					type = self.typeToNonConst(type)
 				results.add((type.id, type.str))
 			return results
 		# TRT - the underlying record type for which the harness is generated
