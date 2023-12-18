@@ -2185,7 +2185,7 @@ the 'container_of' invocation chain.\n   The invocation chain was as follows:\n{
 									if mStr in lh_config['resolve_members']:
 										extra_info += "\nWe also have a member resolution information in the config file"
 										rnfo = lh_config['resolve_members'][mStr][0]
-										if rnfo[3]<0:
+										if rnfo[3] is None or rnfo[3]<0:
 											# We have resolved to the record_forward; try to find a proper record definition for that forward
 											containerT_L = [x for x in self.ftdb.types if x.classname=='record' and x.str==rnfo[2]]
 											if len(containerT_L)==1:
