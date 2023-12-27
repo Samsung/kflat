@@ -46,10 +46,10 @@ libuflat_$(ARCH).a: uflat.o flatten_impl.o rbtree.o unflatten.o funcsymsutils.o
 # KLEE libraries
 #
 unflatten.bc: unflatten.cpp unflatten.hpp
-	clang++-11 -emit-llvm -o $@ -D KLEE_SUPPORT -c -Iinclude_priv/ -I../include/ -std=c++11 -I${KLEE_LIBCXX_INSTALL}/include/c++/v1/ -nostdinc++ unflatten.cpp
+	clang++-13 -emit-llvm -o $@ -D KLEE_SUPPORT -c -Iinclude_priv/ -I../include/ -std=c++11 -I${KLEE_LIBCXX_INSTALL}/include/c++/v1/ -nostdinc++ unflatten.cpp
 
 rbtree.bc: rbtree.c
-	clang++-11 -emit-llvm -o $@ -D KLEE_SUPPORT -c -Iinclude_priv/ -I../include/ -std=c++11 -I${KLEE_LIBCXX_INSTALL}/include/c++/v1/ -nostdinc++ rbtree.c
+	clang++-13 -emit-llvm -o $@ -D KLEE_SUPPORT -c -Iinclude_priv/ -I../include/ -std=c++11 -I${KLEE_LIBCXX_INSTALL}/include/c++/v1/ -nostdinc++ rbtree.c
 
 #
 # DFSAN targets
