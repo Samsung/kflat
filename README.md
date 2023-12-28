@@ -139,3 +139,10 @@ int main(int argc, char** argv) {
 
 Refer to README file in `lib/` directory for details regarding API reference and C bindings usage.
 
+### Talks
+
+Talk about KFLAT from the Open Source Summit NA 2023 can be found [here](https://www.youtube.com/watch?v=Ynunpuk-Vfo)
+
+### Documentation
+
+[KFLAT](https://samsung.github.io/kflat/) - Selective Kernel Memory Serialization for Security and Debugging
