@@ -1,1 +1,0 @@
-Place here any tests that are specific for UFLAT variant

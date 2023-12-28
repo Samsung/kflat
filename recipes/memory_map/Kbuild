@@ -1,2 +1,0 @@
-obj-m += memory_map_recipe.o
-EXTRA_CFLAGS := -I${PWD}/include/ -Wno-unused-local-typedefs -DFLATTEN_KERNEL_BSP
