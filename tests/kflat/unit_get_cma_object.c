@@ -34,7 +34,6 @@ static int _cma_areas_it(struct cma* cma, void* data) {
 FUNCTION_DEFINE_FLATTEN_STRUCT(get_cma_obj_result);
 
 static int kflat_get_cma_object_unit_test(struct flat *flat) {
-    void* heap_ptr;
 	struct get_cma_obj_result results = { 0 };
 
 	FLATTEN_SETUP_TEST(flat);
@@ -42,6 +41,7 @@ static int kflat_get_cma_object_unit_test(struct flat *flat) {
 #if defined(KFLAT_GET_OBJ_SUPPORT) && defined(CONFIG_CMA)
     // For test allocate 8 pages from CMA allocator
     void* cma_memory;
+    void* heap_ptr;
     struct page* area;
 
     cma_for_each_area(_cma_areas_it, NULL);
