@@ -308,6 +308,8 @@ private:
 		}
 
 		// At this point we've got read_lock, check header and try to mmap file
+		read_file(&FLCTRL.HDR,sizeof(struct flatten_header),1);
+		fseek(f, 0, SEEK_SET);
 		void* mmap_addr = (void*) FLCTRL.HDR.last_load_addr;
 		if(mmap_addr != NULL && support_mmap) {	
 			opened_mmap_addr = mmap(mmap_addr, opened_mmap_size, 
