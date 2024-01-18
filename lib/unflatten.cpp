@@ -357,7 +357,7 @@ private:
 		lock.l_whence = SEEK_SET;
 		lock.l_start = 0;
 
-		info("Closing file with mode: '%d'\n", open_mode);
+		debug("Closing file with mode: '%d'\n", open_mode);
 		switch(open_mode) {
 			case UNFLATTEN_OPEN_MMAP:
 			case UNFLATTEN_OPEN_MMAP_WRITE:
