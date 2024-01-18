@@ -266,42 +266,48 @@ private:
 		opened_file_fd = fd;
 		opened_file_file = f;
 		current_mmap_offset = 0;
+		open_mode = UNFLATTEN_OPEN_READ_COPY;
 
 		fseek(f, 0, SEEK_END);
 		opened_mmap_size = ftell(f);
 		fseek(f, 0, SEEK_SET);
 
-		// Attempt to obtain read_lock
-		struct flock lock = { 0 };
-		lock.l_type = F_RDLCK;
-		lock.l_start = 0;
-		lock.l_whence = SEEK_SET;
-		lock.l_start = 0;
+		int ret = 0;
+		struct flock lock = {.l_type = F_WRLCK, .l_whence = SEEK_SET, .l_start = 0,};
 
 #ifndef KLEE_SUPPORT
-		int ret = fcntl(fd, F_SETLKW, &lock);
+		// Attempt to obtain write_lock
+		if(support_write_lock && support_mmap){
+			ret = fcntl(fd, F_SETLK, &lock);
+			if(ret >= 0) {
+				// Acquired exclusive write access
+				read_file(&FLCTRL.HDR,sizeof(struct flatten_header),1);
+				fseek(f, 0, SEEK_SET);
+				if(!FLCTRL.HDR.last_load_addr){
+					// rewrite image, mmap it and release lock
+					opened_mmap_addr = mmap(NULL, opened_mmap_size,
+						PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+					if(opened_mmap_addr != MAP_FAILED) {
+						info("Opened file in write mode\n");
+						open_mode = UNFLATTEN_OPEN_MMAP_WRITE;
+						return;
+					}
+				}
+				info("Failed to open file in write mode - %s\n", strerror(errno));
+			} else
+				debug("Write-lock failed - %s\n", strerror(errno));
+		} else
+			info("Skipping write-lock as requested by callee\n");
+
+		// Wait for read_lock
+		lock.l_type = F_RDLCK;
+		ret = fcntl(fd, F_SETLKW, &lock);
 		if(ret < 0) {
 			info("Failed to obtain read-lock - fcntl returned: %s\n", strerror(errno));
 			throw std::runtime_error("Failed to acquire read-lock on input file");
 		}
-#endif
 
-		// At this point we've got read-lock, check header and try to mmap file
-		size_t size = fread(&FLCTRL.HDR, sizeof(struct flatten_header), 1, f);
-		if(size != 1) {
-			lock.l_type = F_UNLCK;
-			fcntl(fd, F_SETLK, &lock);
-			throw std::runtime_error("Truncated input file");
-		}
-		fseek(f, 0, SEEK_SET);
-		try {
-			check_header();
-		} catch(...) {
-			lock.l_type = F_UNLCK;
-			fcntl(fd, F_SETLK, &lock);
-			throw;
-		}
-#ifndef KLEE_SUPPORT
+		// At this point we've got read_lock, check header and try to mmap file
 		void* mmap_addr = (void*) FLCTRL.HDR.last_load_addr;
 		if(mmap_addr != NULL && support_mmap) {	
 			opened_mmap_addr = mmap(mmap_addr, opened_mmap_size, 
@@ -315,36 +321,8 @@ private:
 			} else
 				debug("Failed to open input file in mmap mode - %s\n", strerror(errno));
 		}
-
-		// Mmap failed, acquire write lock without block
-		if(support_write_lock && support_mmap) {
-			debug("Failed to open file in mmap mode. Attempting to get write lock\n");
-			lock.l_type = F_WRLCK;
-			ret = fcntl(fd, F_SETLK, &lock);
-			if(ret >= 0) {
-				// Acquired exclusive write access - quickly rewrite image, mmap it and release lock
-				opened_mmap_addr = mmap(NULL, opened_mmap_size, 
-					PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
-				if(opened_mmap_addr != MAP_FAILED) {
-					info("Opened file in write mode\n");
-					open_mode = UNFLATTEN_OPEN_MMAP_WRITE;
-					return;
-				}
-
-				info("Failed to open file in write mode - %s\n", strerror(errno));
-			} else
-				debug("Write-lock failed - %s\n", strerror(errno));
-		} else
-			info("Skipping write-lock as requested by callee\n");
-
-		lock.l_type = F_RDLCK;
-		ret = fcntl(fd, F_SETLK, &lock);
-		if(ret < 0) {
-			info("Failed to obtain read-lock - fcntl returned: %s\n", strerror(errno));
-			throw std::runtime_error("Failed to acquire read-lock on input file");
-		}
 #endif
-		// Write-lock failed. The only thing left is to load whole image into memory
+		// Mmap failed. The only thing left is to load whole image into memory
 		info("Opened file in copy mode\n");
 		open_mode = UNFLATTEN_OPEN_READ_COPY;
 		return;
