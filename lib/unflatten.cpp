@@ -15,6 +15,7 @@
 #include <fcntl.h>
 #include <sys/time.h>
 #include <sys/mman.h>
+#include <unistd.h>
 
 #include <map>
 #include <vector>
@@ -247,8 +248,7 @@ private:
 	 *     3) The next running instance of Unflatten lib obtains O_RDLCK and maps flatten image
 	 *        at the same address as the first instance did - if it succeed, memory can be used
 	 *        without any further modifications (pointers are still valid), if not:
-	 *     4a) Try to lock O_WRLCK -> if success, repeat step 2)
-	 *     4b) Lock O_RDLCK, open file in OPEN_READ_COPY, copy it into local memory, fix locally 
+	 *     4) Lock O_RDLCK, open file in OPEN_READ_COPY, copy it into local memory, fix locally 
 	 *         and release O_RDLCK.
 	 * 
 	 *   The OPEN_MMAP mode is fastest, while the OPEN_READ_COPY is slowest, but OPEN_MMAP requires some
@@ -268,9 +268,8 @@ private:
 		current_mmap_offset = 0;
 		open_mode = UNFLATTEN_OPEN_READ_COPY;
 
-		fseek(f, 0, SEEK_END);
-		opened_mmap_size = ftell(f);
-		fseek(f, 0, SEEK_SET);
+		opened_mmap_size = lseek(fd, 0, SEEK_END);
+		lseek(fd, 0, SEEK_SET);
 
 		int ret = 0;
 		struct flock lock = {.l_type = F_WRLCK, .l_whence = SEEK_SET, .l_start = 0,};
@@ -293,7 +292,7 @@ private:
 						return;
 					}
 				}
-				info("Failed to open file in write mode - %s\n", strerror(errno));
+				debug("Failed to open file in write mode - %s\n", strerror(errno));
 			} else
 				debug("Write-lock failed - %s\n", strerror(errno));
 		} else
