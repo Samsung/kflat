@@ -831,7 +831,7 @@ LINUXINCLUDE := ${{LINUXINCLUDE}}
 					dep, module, size, hash = GRI
 					
 					# FIXME: Move it to some config file
-					if hash in ['__per_cpu_offset', 'jiffies']:
+					if hash in ['__per_cpu_offset', 'jiffies', '__start_rodata', '__end_rodata']:
 						print(f"Ignoring blacklisted global '{hash}'")
 						continue
 
