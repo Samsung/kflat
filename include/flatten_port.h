@@ -45,6 +45,9 @@
 #error "Missing macro for marking exported functions"
 #endif
 
+#if !defined(FLATTEN_GET_IMG_BASE_ADDR)
+#error "Missing macro computing base address of flattened image"
+#endif
 
 /*************************************
  * DECLs FOR EXTERNAL FUNCS

@@ -522,3 +522,18 @@ size_t flatten_func_to_name(char* name, size_t size, void* func_ptr) {
 void* hwasan_safe_memcpy(void* dst, const void* src, size_t size) {
     return memcpy(dst, src, size);
 }
+
+/*
+ * Image relocation
+ */
+#define UFLAT_IMAGE_REGION_START    0x100000000000ULL
+#define UFLAT_IMAGE_REGION_SIZE     0x200000000000ULL
+#define UFLAT_IMAGE_SLICE_SIZE      0x400000000
+#define UFLAT_IMAGE_SLICE_COUNT     ((UFLAT_IMAGE_REGION_SIZE - 1) / UFLAT_IMAGE_SLICE_SIZE)
+
+uintptr_t uflat_image_base_addr(void) {
+    int number;
+    srand(time(NULL));
+    number = rand() % UFLAT_IMAGE_SLICE_COUNT;
+    return UFLAT_IMAGE_REGION_START + number * UFLAT_IMAGE_SLICE_SIZE;
+}

@@ -196,7 +196,7 @@ static void binary_stream_update_pointers(struct flat* flat) {
 	while(p) {
     	struct fixup_set_node* node = (struct fixup_set_node*)p;
     	if (node->ptr && (!IS_FIXUP_FPTR(node))) {
-			void* newptr = (unsigned char*)node->ptr->node->storage->index+node->ptr->offset;
+			void* newptr = (unsigned char*)node->ptr->node->storage->index+node->ptr->offset + flat->FLCTRL.HDR.last_mem_addr;
 			DBGS("@ ptr update at ((%lx)%lx:%zu) : %lx => %lx\n",(unsigned long)node->inode,(unsigned long)node->inode->start,node->offset,
 					(unsigned long)newptr,(unsigned long)(((unsigned char*)node->inode->storage->data)+node->offset));
 			size_to_cpy = sizeof(void*);
@@ -1200,19 +1200,29 @@ static void flatten_debug_info(struct flat* flat) {
     mem_fragment_index_debug_print(flat);
 }
 
+static uintptr_t get_mem_addr(struct FLCONTROL* FLCTRL) {
+	if(FLCTRL->HDR.last_load_addr == 0x0)
+		return 0x0;
+	return FLCTRL->HDR.last_load_addr + 		 	\
+		sizeof(FLCTRL->HDR) +						\
+		FLCTRL->HDR.root_addr_count * sizeof(size_t) + \
+		FLCTRL->HDR.root_addr_extended_size +		\
+		FLCTRL->HDR.ptr_count * sizeof(size_t) + 	\
+		FLCTRL->HDR.fptr_count * sizeof(size_t) +	\
+		FLCTRL->HDR.mcount * 2 * sizeof(size_t);
+}
+
 static int flatten_write_internal(struct flat* flat, size_t* wcounter_p) {
 	int err = 0;
 	struct root_addrnode* entry = NULL;
 
 	binary_stream_calculate_index(flat);
-    binary_stream_update_pointers(flat);
     if (flat->FLCTRL.debug_flag) {
     	flatten_debug_info(flat);
     }
 	flat->FLCTRL.HDR.magic = KFLAT_IMG_MAGIC;
 	flat->FLCTRL.HDR.version = KFLAT_IMG_VERSION;
-	flat->FLCTRL.HDR.last_load_addr = (uintptr_t) NULL;
-	flat->FLCTRL.HDR.last_mem_addr = (uintptr_t) NULL;
+	flat->FLCTRL.HDR.last_load_addr = (uintptr_t) FLATTEN_GET_IMG_BASE_ADDR();
 	
     flat->FLCTRL.HDR.memory_size = binary_stream_size(flat);
     flat->FLCTRL.HDR.ptr_count = fixup_set_count(flat);
@@ -1221,11 +1231,15 @@ static int flatten_write_internal(struct flat* flat, size_t* wcounter_p) {
     flat->FLCTRL.HDR.root_addr_extended_count = root_addr_extended_count(flat);
     flat->FLCTRL.HDR.root_addr_extended_size = root_addr_extended_size(flat);
     flat->FLCTRL.HDR.fptrmapsz = fixup_fptr_info_count(flat);
-    if(!flat->FLCTRL.mem_fragments_skip)
-        flat->FLCTRL.HDR.mcount = mem_fragment_index_count(flat);
-    else
-        flat->FLCTRL.HDR.mcount = 0;
+	if(!flat->FLCTRL.mem_fragments_skip)
+		flat->FLCTRL.HDR.mcount = mem_fragment_index_count(flat);
+	else
+		flat->FLCTRL.HDR.mcount = 0;
+	
+	flat->FLCTRL.HDR.last_mem_addr = get_mem_addr(&flat->FLCTRL); 
     FLATTEN_WRITE_ONCE(&flat->FLCTRL.HDR, sizeof(struct flatten_header), wcounter_p);
+
+	binary_stream_update_pointers(flat);
 
 	list_for_each_entry(entry, &flat->FLCTRL.root_addr_head, head) {
 		size_t root_addr_offset;

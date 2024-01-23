@@ -123,6 +123,10 @@ static inline size_t strmemlen(const char* s) {
 }
 #endif
 
+static inline uintptr_t _get_image_base_addr(void) {
+	return 0;
+}
+
 #define ADDR_VALID(PTR)				kdump_test_address((void*) PTR, 1)
 #define ADDR_RANGE_VALID(PTR, SIZE) _addr_range_valid((void*) PTR, SIZE)
 #define TEXT_ADDR_VALID(PTR)		ADDR_VALID(PTR)		// TODO: Consider checking +x permission
@@ -130,8 +134,9 @@ static inline size_t strmemlen(const char* s) {
 
 
 /* Misc */
-#define EXPORT_FUNC         EXPORT_SYMBOL_GPL
-#define FLAT_EXTRACTOR		&(kflat->flat)
+#define EXPORT_FUNC         		EXPORT_SYMBOL_GPL
+#define FLAT_EXTRACTOR				&(kflat->flat)
+#define FLATTEN_GET_IMG_BASE_ADDR 	_get_image_base_addr
 
 
 #endif /* KFLAT_BSP_H */

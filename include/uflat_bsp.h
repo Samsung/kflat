@@ -49,6 +49,7 @@ void uflat_dbg_log_clear();
 bool uflat_test_address_range(struct flat*, void* ptr, size_t size);
 bool uflat_test_exec_range(struct flat*, void* ptr) ;
 size_t uflat_test_string_len(struct flat*, const char* str);
+uintptr_t uflat_image_base_addr(void);
 
 
 /* Logging */
@@ -74,6 +75,7 @@ size_t uflat_test_string_len(struct flat*, const char* str);
 /* Misc */
 #define EXPORT_FUNC(X)         
 #define FLAT_EXTRACTOR		            &(uflat->flat)
+#define FLATTEN_GET_IMG_BASE_ADDR 		uflat_image_base_addr
 
 #define unlikely                        
 #define ALIGN(X, A)                     (((X) + (A - 1)) & ~(A -1))
