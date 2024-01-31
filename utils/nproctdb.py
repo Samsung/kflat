@@ -2077,7 +2077,10 @@ the 'container_of' invocation chain.\n   The invocation chain was as follows:\n{
 		if TRTTPD is not None:
 			Ts = "t:%s"%(TRTTPD.name)
 		else:
-			Ts = "s:%s"%(TRT.str)
+			if TRT.str!="":
+				Ts = "s:%s"%(TRT.str)
+			else:
+				Ts = "a:%d"%(TRT.id)
 		if TPD:
 			if T.name in RecipeGenerator.FLATTEN_STRUCT_TYPE_BLACKLIST:
 				out.write("/* Recipes for struct type %s have been blacklisted */\n"%(T.name))
@@ -2091,6 +2094,7 @@ the 'container_of' invocation chain.\n   The invocation chain was as follows:\n{
 				do_recipes = False
 				self.structs_blacklisted.add((TRT.str,TRT.isunion))
 		have_flexible_member = False
+
 		if do_recipes:
 			try:
 				real_refs = list()
