@@ -80,7 +80,7 @@ static int kflat_large_stringset_test(struct flat *flat) {
 	
 	unsigned i, j;
 	static const char chars[] = "ABCDEFGHIJKLMNOPQRST";
-	unsigned int r = 0;
+	unsigned long r = 0;
 
 	FLATTEN_SETUP_TEST(flat);
 

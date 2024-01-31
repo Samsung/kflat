@@ -5,8 +5,9 @@ ccflags-y := -std=gnu99 -Wno-unused-local-typedefs -I${TOPDIR}/include/ $(patsub
 
 LINUX_INCLUDES := ${LINUX_INCLUDES} ${TOPDIR}/include/
 
-# Disable KCOV for whole KFLAT kernel module
+# Disable KCOV and KASAN for whole KFLAT kernel module
 KCOV_INSTRUMENT		:= n
+KASAN_SANITIZE := n
 
 # Generate list of available kflat tests
 quiet_cmd_kflat_tests_gen = GEN     $@

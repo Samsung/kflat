@@ -1,13 +1,15 @@
 export KBUILD_EXTRA_SYMBOLS=${M}/../core/Module.symvers
 ccflags-y := -std=gnu99 -Wno-unused-local-typedef -DFLATTEN_KERNEL_BSP
 
-# Disable KCOV instrumentation for KFLAT recipes module
+# Disable KCOV and KASAN instrumentation for KFLAT recipes module
 KCOV_INSTRUMENT		:= n
+KASAN_SANITIZE := n
 
 obj-m += random_read/
 obj-m += memory_map/
 obj-m += drm_framebuffer/
 obj-m += task_current/
+obj-m += userspace_flattening/
 
 ifneq ($(RECIPE_DIRS),)
 obj-m += $(RECIPE_DIRS)/

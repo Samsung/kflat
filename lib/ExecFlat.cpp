@@ -54,6 +54,18 @@ ExecFlat::ExecFlat(size_t dump_size, ExecFlatVerbosity log_level) : dump_size(du
     LOG(INFO) << "Initializing ExecFlat...";
     open_kflat_node();
     mmap_kflat();
+
+    // We need to make sure that the execution stays on the same CPU
+    getcpu(&current_cpu, NULL);
+
+    cpu_set_t cpu_mask;
+    CPU_ZERO(&cpu_mask);
+    CPU_SET(current_cpu, &cpu_mask);
+
+    sched_setaffinity(0, sizeof(cpu_mask), &cpu_mask);
+
+    governor_filepath = get_governor_path();
+
     set_governor("performance");
 }
 
@@ -61,7 +73,7 @@ ExecFlat::~ExecFlat() {
     restore_governor();
     munmap(shared_memory, dump_size);
     close(kflat_fd);
-    LOG(INFO) << "Qutting ExecFlat...";
+    LOG(INFO) << "Quitting ExecFlat...";
 }
 
 void ExecFlat::do_enable(
@@ -103,8 +115,8 @@ void ExecFlat::run_recipe(
     ) {    
     do_enable(
         recipe, 
-        debug, 
         use_stop_machine, 
+        debug, 
         skip_func_body, 
         run_recipe_now,
         getpid()
@@ -129,8 +141,8 @@ void ExecFlat::run_recipe_no_target(
     
     do_enable(
         recipe, 
-        debug, 
         use_stop_machine, 
+        debug, 
         skip_func_body, 
         run_recipe_now,
         -1
@@ -154,8 +166,8 @@ void ExecFlat::run_recipe_custom_target(
     ) {
         do_enable(
         recipe, 
-        debug, 
         use_stop_machine, 
+        debug, 
         skip_func_body, 
         run_recipe_now,
         getpid()
@@ -317,9 +329,19 @@ void ExecFlat::execute_interface(const fs::path &target, ExecFlatInterface inter
 }
 
 
+fs::path ExecFlat::get_governor_path() {
+    std::stringstream ss;
+    ss << "cpu" << current_cpu; 
+    fs::path path = fs::path("/sys/devices/system/cpu/") / ss.str() / "cpufreq/scaling_governor";
+
+    return path;
+}
+
+
 void ExecFlat::set_governor(const std::string &targetGovernor) {
     saved_governor.clear();
-    std::fstream governor_file(GOVERNOR_FILE);
+    
+    std::fstream governor_file(governor_filepath);
     if (governor_file) {
         if(!(governor_file >> saved_governor)) {
             LOG(WARNING) << "Failed to read the current CPU governor";
@@ -340,18 +362,18 @@ void ExecFlat::set_governor(const std::string &targetGovernor) {
         LOG(DEBUG) << "Set the CPU governor to \"" << targetGovernor << "\"";
     }
     else {
-        LOG(WARNING) << "Failed to open " << GOVERNOR_FILE;
+        LOG(WARNING) << "Failed to open " << governor_filepath;
     }
     governor_file.close();
 }
-
+ 
 void ExecFlat::restore_governor() {
     if (saved_governor.empty())
         return;
     
-    std::fstream governor_file(GOVERNOR_FILE);
+    std::fstream governor_file(governor_filepath);
     if (!governor_file) {
-        LOG(WARNING) << "Failed to open " << GOVERNOR_FILE;
+        LOG(WARNING) << "Failed to open " << governor_filepath;
         return; 
     }
 

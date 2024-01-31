@@ -246,7 +246,7 @@ static int flatten_stop_machine(struct kflat* kflat, struct probe_regs* regs) {
 	};
 
 	cpumask_clear(&cpumask);
-	cpumask_set_cpu(0, &cpumask);
+	cpumask_set_cpu(smp_processor_id(), &cpumask);
 
 	err = stop_machine(_stop_machine_func, (void*) &arg, &cpumask);
 	if(err)
@@ -385,7 +385,7 @@ int kflat_run_test(struct kflat* kflat, struct kflat_ioctl_tests* test) {
 				}
 
 				cpumask_clear(&cpumask);
-				cpumask_set_cpu(0, &cpumask);
+				cpumask_set_cpu(smp_processor_id(), &cpumask);
 
 				flat_infos("Running kflat test under stop_machine: %s",test_cases[i]->name);
 				err = stop_machine(kflat_test_stop_machine, (void*) &arg, &cpumask);

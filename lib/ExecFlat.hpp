@@ -8,6 +8,7 @@
 #ifndef EXECFLAT_HDR
 #define EXECFLAT_HDR
 
+#include <sched.h>
 #include <sys/ioctl.h>
 #include <unistd.h>
 #include <cstdarg>
@@ -244,7 +245,7 @@ public:
         const std::string &recipe, 
         const fs::path &outfile, 
         bool use_stop_machine=false, 
-        bool debug=true, 
+        bool debug=false, 
         bool skip_func_body=false,
         bool run_recipe_now=false,
         unsigned int target_timeout=0,
@@ -261,7 +262,8 @@ public:
 private:
     // Consts
     const char *KFLAT_NODE = "/sys/kernel/debug/kflat";
-    const char *GOVERNOR_FILE = "/sys/devices/system/cpu/cpu0/cpufreq/scaling_governor";
+    fs::path governor_filepath;
+    unsigned int current_cpu;
     static const std::map<ExecFlatInterface, std::function<int (int)>> interface_mapping;
 
     // Variables
@@ -302,6 +304,7 @@ private:
     void disable(const fs::path &outfile, int poll_timeout);
 
     // CPU governor stuff
+    fs::path get_governor_path();
     void set_governor(const std::string &targetGovernor);
     void restore_governor();
 };

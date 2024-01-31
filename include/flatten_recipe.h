@@ -7,6 +7,10 @@
 #ifndef FLATTEN_RECIPE_H
 #define FLATTEN_RECIPE_H
 
+#if defined(FLATTEN_KERNEL_BSP)
+#include "kflat_uaccess.h"
+#endif /* defined(FLATTEN_KERNEL_BSP) */
+
 /*************************************
  * FUNCTION_FLATTEN macros for ARRAYS
  *************************************/
@@ -932,6 +936,20 @@ do {	\
 	} while(0)
 
 #define FOR_ROOT_POINTER(p,...) FOR_EXTENDED_ROOT_POINTER(p, NULL, 0, ##__VA_ARGS__)
+
+
+#if defined(FLATTEN_KERNEL_BSP)
+/*
+ * Kernel space memory must not be accessed when using FOR_USER_ROOT_POINTER 
+ */
+#define FOR_EXTENDED_USER_ROOT_POINTER(p,__name,__size,...) \
+    arch_enable_ua(); \
+    FOR_EXTENDED_ROOT_POINTER(p,__name,__size,##__VA_ARGS__); \
+    arch_disable_ua();
+
+#define FOR_USER_ROOT_POINTER(p,...) FOR_EXTENDED_USER_ROOT_POINTER(p, NULL, 0, ##__VA_ARGS__)
+#endif /* defined(FLATTEN_KERNEL_BSP) */
+
 
 
 /* Try to detect the size of the heap object pointed to by '__ptr'

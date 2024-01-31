@@ -7,6 +7,7 @@
  */
 
 #include "kdump.h"
+#include "kflat_uaccess.h"
 
 #include <linux/interval_tree_generic.h>
 #include <linux/ioport.h>
@@ -220,14 +221,31 @@ static pgd_t* kdump_get_kernel_pgd(void) {
     return swapper_pgd;
 }
 
+static pgd_t *kdump_get_user_pgd(void) {
+    pgd_t* swapper_pgd;
+    uint64_t ttbr0_el1, baddr;
+
+    asm volatile(
+        "mrs %0, TTBR0_EL1;" 
+        : "=r"(ttbr0_el1)
+    );
+
+    baddr = ttbr0_el1 & 0xFFFFFFFFFFFEULL;
+    swapper_pgd = (pgd_t*) __phys_to_virt(baddr);
+
+    return swapper_pgd;
+}
+
 #elif CONFIG_X86_64
-static pgd_t* kdump_get_kernel_pgd(void) {
+static pgd_t *kdump_get_kernel_pgd(void) {
     pgd_t* swapper_pgd;
 
-    swapper_pgd = (pgd_t*) __va(read_cr3_pa());
+    swapper_pgd = (pgd_t*) phys_to_virt(native_read_cr3_pa());
     
     return swapper_pgd;
 }
+
+#define kdump_get_user_pgd kdump_get_kernel_pgd
 
 #else 
 #error "Kflat module supports only x86 and ARM64 architectures"
@@ -385,26 +403,7 @@ static size_t __no_sanitize_address walk_addr(pgd_t* swapper_pgd, uint64_t addr,
     pmd_t* pmdp, pmd;
     pte_t* ptep, pte;
 
-#ifdef CONFIG_X86_64
-    uint64_t top_bits;
-#endif
-
     *pagep = NULL;
-
-#ifdef CONFIG_ARM64
-
-    // Check whether address belongs to kernel VA space
-    if(addr < PAGE_OFFSET)
-        return SIZE_TO_NEXT_PAGE(addr, PGDIR);
-
-#elif CONFIG_X86_64
-
-    // Check whether provided address is canonical
-    top_bits = (int64_t)addr >> __VIRTUAL_MASK_SHIFT;
-    if(top_bits != -1ULL && top_bits != 0)
-        return SIZE_TO_NEXT_PAGE(addr, PGDIR);
-
-#endif
 
     // Walk through top-level table
     pgdp = pgd_offset_pgd(swapper_pgd, addr);
@@ -483,10 +482,12 @@ void kdump_dump_vma(struct kdump_memory_map* kdump) {
     pr_info("Finished kernel memory dump");
 }
 
+
 size_t kdump_test_address(void* addr, size_t size) {
     size_t walked_size = 0;
     struct page* page;
-    pgd_t* kernel_pgd;
+    pgd_t* pgd;
+    bool is_kernel_addr;
     size_t page_offset = (uint64_t)addr & (~PAGE_MASK);
 
     addr = ptr_reset_tag(addr);
@@ -496,9 +497,28 @@ size_t kdump_test_address(void* addr, size_t size) {
 	if (addr == NULL)
 		return 0;
     
-    kernel_pgd = kdump_get_kernel_pgd();
+#ifdef CONFIG_X86_64
+    if(!x86_test_addr_canonical(addr))
+        return 0;  
+
+#endif
+
+    is_kernel_addr = arch_is_kernel_addr(addr);
+
+    if(!is_kernel_addr && !arch_read_ua()) {
+        pr_warn("Attempted to access user memory with disabled User Access.");
+        return 0;
+    }
+
+    if(is_kernel_addr && arch_read_ua()) {
+        pr_warn("Attempted to access kernel memory with enabled User Access.");
+        return 0;
+    }
+    
+    pgd = is_kernel_addr ? kdump_get_kernel_pgd() : kdump_get_user_pgd();
+    
     for(walked_size = 0; walked_size < size + page_offset;) {
-        size_t ret_size = walk_addr(kernel_pgd, (uint64_t) addr + walked_size, &page);
+        size_t ret_size = walk_addr(pgd, (uint64_t) addr + walked_size, &page);
         if(page == NULL || !kdump_is_phys_in_ram(page_to_phys(page)))
             break;
         
