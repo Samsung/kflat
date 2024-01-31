@@ -94,6 +94,9 @@ static int kflat_unflatten_replace_unit_validate(void *memory, size_t size, CUnf
 	ssize_t result = unflatten_replace_variable(flatten, replace_target, &my_global, sizeof(struct replace_test));
 	ASSERT(result > 0);
 
+	struct replace_test* target_after_replace = (struct replace_test*)unflatten_root_pointer_seq(flatten, 1);
+	ASSERT_EQ(target_after_replace, &my_global);
+
 	for(int i = 0; i < 10; i++) {
 		ASSERT(!strcmp(tests[i].str, strs[i % 3]));
 		ASSERT_EQ(tests[i].integer, i * 20);

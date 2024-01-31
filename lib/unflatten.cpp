@@ -160,19 +160,21 @@ private:
 	}
 
 	void* root_pointer_next() {
-		assert(FLCTRL.last_accessed_root < (ssize_t)FLCTRL.root_addr.size() - 1);
+		if(FLCTRL.last_accessed_root >= (ssize_t)FLCTRL.root_addr.size() - 1)
+			throw std::invalid_argument("No next root pointer available");
 		FLCTRL.last_accessed_root++;
 		
 		struct root_addr_node* last_root = &FLCTRL.root_addr[FLCTRL.last_accessed_root];
-		return get_root_addr_mem(last_root->root_addr);
+		return (void*)last_root->root_addr;
 	}
 
 	void* root_pointer_seq(size_t index) {
-		assert(index < FLCTRL.root_addr.size());
+		if(index >= FLCTRL.root_addr.size())
+			throw std::invalid_argument("Index out-of-range for root pointer arrays");
 		FLCTRL.last_accessed_root = index;
 
 		struct root_addr_node* last_root = &FLCTRL.root_addr[FLCTRL.last_accessed_root];
-		return get_root_addr_mem(last_root->root_addr);
+		return (void*)last_root->root_addr;
 	}
 
 	void* root_pointer_named(const char* name, size_t* size) {
@@ -188,7 +190,7 @@ private:
 			return NULL;
 		}
 
-		return get_root_addr_mem(root_addr);
+		return (void*)root_addr;
 	}
 
 	void root_addr_append(uintptr_t root_addr, const char* name = nullptr, size_t size = 0) {
@@ -207,6 +209,13 @@ private:
 		root_addr_append(root_addr, name, size);
 		root_addr_map.insert({name, {root_addr, size}});
 		return 0;
+	}
+
+	void fix_root_pointers(void) {
+		for(auto& root_ptr : FLCTRL.root_addr)
+			root_ptr.root_addr = (uintptr_t) get_root_addr_mem(root_ptr.root_addr);
+		for(auto& [name, entry] : root_addr_map)
+			entry.first = (uintptr_t) get_root_addr_mem(entry.first);
 	}
 
 	/***************************
@@ -816,6 +825,8 @@ public:
 			}
 		}
 
+		fix_root_pointers();
+
 		// At this point mode UNFLATTEN_OPEN_READ_COPY copied all memory to local RAM
 		//  so there's no need to hold lock any longer
 		if(open_mode == UNFLATTEN_OPEN_READ_COPY) {
@@ -916,6 +927,23 @@ public:
 					*((void**)((char*)node->mptr + node_offset)) = (unsigned char*)new_mem + ((unsigned char*)target - (unsigned char*)old_mem);
 					fixed++;
 				}
+			}
+		}
+
+		// Replace variable in root and named_root pointers
+		for (size_t i = 0; i < FLCTRL.HDR.root_addr_count; i++) {
+			uintptr_t root_mem = FLCTRL.root_addr[i].root_addr;
+			if(root_mem >= (uintptr_t)old_mem && root_mem < (uintptr_t)old_mem + size) {
+				uintptr_t offset = root_mem - (uintptr_t)old_mem;
+				FLCTRL.root_addr[i].root_addr = (uintptr_t)new_mem + offset;
+				fixed++;
+			}
+		}
+		for(auto& [name, entry] : root_addr_map) {
+			if(entry.first >= (uintptr_t)old_mem && entry.first < (uintptr_t)old_mem + size) {
+				uintptr_t offset = entry.first - (uintptr_t)old_mem;
+				entry.first = (uintptr_t)new_mem + offset;
+				fixed++;
 			}
 		}
 

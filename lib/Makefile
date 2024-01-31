@@ -28,7 +28,7 @@ libExecFlat.a: ExecFlat.o
 	ar rcs $@ $^
 
 unflatten.o: unflatten.cpp unflatten.hpp
-	$(CXX) $(CFLAGS) -ggdb3 -c -o $@ $<
+	$(CXX) $(CFLAGS) -ggdb3 --std=c++17 -c -o $@ $<
 
 libunflatten_$(ARCH).so: unflatten.o rbtree.o
 	$(CXX) $(LDFLAGS) -o $@ $^
