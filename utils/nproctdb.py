@@ -17,6 +17,7 @@ from typing import List, Optional, Tuple
 from intervaltree import Interval, IntervalTree
 import itertools
 import hashlib
+import re
 
 try:
 	import libftdb
@@ -449,13 +450,14 @@ static void handler_{0}(struct kflat* kflat, struct probe_regs* regs) {{
 	# 4 - real type string of the argument (after the possible shift)
 	# 5 - size of the real type
 	# 6 - additional information (if any)
+	# 7 - additional triggers specification
 	template_output_struct_arg_handler = """
 	// Dump argument no. {1}
 	{{
 		{0} *target = ({0}*) regs->arg{1};
 {6}
 		FOR_EXTENDED_ROOT_POINTER(target, "_func_arg_{1}", {2},
-				FLATTEN_STRUCT_SHIFTED_SELF_CONTAINED({4}, {5}, target, {3});
+				FLATTEN_STRUCT_SHIFTED_SELF_CONTAINED({4}, {5}, target, {3});{7}
 		);
 	}}
 """
@@ -467,13 +469,14 @@ static void handler_{0}(struct kflat* kflat, struct probe_regs* regs) {{
 	# 4 - real type string of the argument (after the possible shift)
 	# 5 - size of the real type
 	# 6 - additional information (if any)
+	# 7 - additional triggers specification
 	template_output_struct_type_arg_handler = """
 	// Dump argument no. {1}
 	{{
 		{0} *target = ({0}*) regs->arg{1};
 {6}
 		FOR_EXTENDED_ROOT_POINTER(target, "_func_arg_{1}", {2},
-				FLATTEN_STRUCT_TYPE_SHIFTED_SELF_CONTAINED({4}, {5}, target, {3});
+				FLATTEN_STRUCT_TYPE_SHIFTED_SELF_CONTAINED({4}, {5}, target, {3});{7}
 		);
 	}}
 """
@@ -670,7 +673,8 @@ LINUXINCLUDE := ${{LINUXINCLUDE}}
 					(	record_typename,
 						argument_pos_starting_from_1,
 						typesize_in_bytes,
-						record_classname ('record' or 'typedef')
+						record_classname ('record' or 'typedef'),
+						type offset
 					),
 					...
 				]
@@ -772,20 +776,56 @@ LINUXINCLUDE := ${{LINUXINCLUDE}}
 				return ((None,None), module, type.size // 8, result.hash)
 			return ((RT.id if TPD is None else TPD.id,RT.str if TPD is None else TPD.name), module, type.size // 8, result.hash)
 
+		def trig_info_valid(trig_info):
+			if "type" not in trig_info:
+				return True
+			if trig_info["type"]=="update" or trig_info["type"]=="append":
+				return True
+			return False
+
+		def trig_info_update(trig_info):
+			if "type" not in trig_info or trig_info["type"]=="update":
+				return True
+			return False
+
+		def trig_info_with_update(trig_info_list):
+			for trig_info in trig_info_list:
+				if trig_info_update(trig_info):
+					return trig_info
+			return None
+
+		def trig_info_offset_calculate(offset):
+			if isinstance(offset,int):
+				return str(offset)
+			sizeof_pattern = re.compile("@\{[st]\:[\w]+\}")
+			m = sizeof_pattern.search(offset)
+			while m:
+				dep, size, classname = _find_RI_for_func(m.group()[2:-1].split(":")[1])
+				offset = offset[:m.span()[0]] + f'((size_t){size})' + offset[m.span()[0] + m.span()[1]-m.span()[0]:]
+				m = sizeof_pattern.search(offset)
+			return offset
+
+		trigger_info_map = {}
+		if func and "trigger_list" in self.config["base_config"]:
+			for ti,trig_info in enumerate(self.config["base_config"]["trigger_list"]):
+				if not trig_info_valid(trig_info):
+					print (f'WW- Ignored invalid trigger type \'{trig_info["type"]}\' in trigger_list[config] at index \'{ti}\'')
+					continue
+				if isinstance(trig_info["trigger_fn"],str):
+					func_list = [trig_info["trigger_fn"]]
+				else:
+					func_list = trig_info["trigger_fn"]
+				for fn in func_list:
+					if fn in trigger_info_map:
+						if trig_info_update(trig_info) and trig_info_with_update(trigger_info_map[fn]) is not None:
+							print (f'EE- Duplicated update information in trigger_list[config] regarding function \'{fn}\'')
+							exit(1)
+						trigger_info_map[fn].append(trig_info)
+					else:
+						trigger_info_map[fn] = [trig_info]
+
 		for arg in args:
-			if '@' in arg:
-				type, pos = arg.split('@')
-				dep, size, classname = _find_RI_for_func(type)
-				# return (res.id, res.str if res.classname == 'record' else res.name), res.size // 8, res.classname
-				func_args_to_dump.append((type, int(pos), size, classname))
-				deps.add(dep)
-				argStr = ("____%s____%d"%(func,int(pos)-1))
-				if "ptr_config" in self.config and "container_of_parm_map" in self.config["ptr_config"]:
-					if argStr in self.config["ptr_config"]["container_of_parm_map"]:
-						e = self.config["ptr_config"]["container_of_parm_map"][argStr][0]
-						tp = self.ftdb.types.entry_by_id(e["tpid"])
-						deps.add((tp.id,tp.str if tp.classname == 'record' else tp.name))
-			elif ':' in arg:
+			if ':' in arg:
 				name, loc = arg.split(':')
 				GRI = _find_RI_for_global(name, loc)
 				if GRI is None:
@@ -795,16 +835,40 @@ LINUXINCLUDE := ${{LINUXINCLUDE}}
 				if dep[0] is not None:
 					deps.add(dep)
 			else:
+				if not func:
+					continue
 				# default to first function argument
+				pos = 1
+				if '@' in arg:
+					arg, pos = arg.split('@')
+				# [0:res.id, 1:res.str if res.classname == 'record' else res.name), 2:res.size // 8, 3:res.classname, 4:offset]
+				if func in trigger_info_map:
+					trig_info = trig_info_with_update(trigger_info_map[func])
+					if trig_info and int(pos)-1==trig_info["arg_index"]:
+						# Config file tells us to use specific type for this argument
+						dep, size, classname = _find_RI_for_func(trig_info["arg_type"].split(":")[1])
+						func_args_to_dump.append((trig_info["arg_type"].split(":")[1], int(pos), size, classname, trig_info_offset_calculate(trig_info["offset"]),True))
+						deps.add(dep)
+						continue
 				dep, size, classname = _find_RI_for_func(arg)
-				func_args_to_dump.append((arg, 1, size, classname))
+				func_args_to_dump.append((arg, int(pos), size, classname, 0))
 				deps.add(dep)
-				argStr = ("__%s__%d"%(func,0))
+				argStr = ("____%s____%d"%(func,int(pos)-1))
 				if "ptr_config" in self.config and "container_of_parm_map" in self.config["ptr_config"]:
 					if argStr in self.config["ptr_config"]["container_of_parm_map"]:
 						e = self.config["ptr_config"]["container_of_parm_map"][argStr][0]
 						tp = self.ftdb.types.entry_by_id(e["tpid"])
 						deps.add((tp.id,tp.str if tp.classname == 'record' else tp.name))
+				if func in trigger_info_map:
+					for trig_info in trigger_info_map[func]:
+						if int(pos)-1==trig_info["arg_index"] and "type" in trig_info and trig_info["type"]=='append':
+							# Config file tells us to add additional trigger for this argument
+							dep, size, classname = _find_RI_for_func(trig_info["arg_type"].split(":")[1])
+							if isinstance(func_args_to_dump[-1],tuple):
+								func_args_to_dump[-1] = [func_args_to_dump[-1]]
+							func_args_to_dump[-1].append((trig_info["arg_type"].split(":")[1], int(pos), size, classname, trig_info_offset_calculate(trig_info["offset"]),True))
+							deps.add(dep)
+
 		if globals_file:
 			ofid_map = {}
 			for u in self.ftdb.sources:
@@ -2917,7 +2981,6 @@ def main():
 	if len(deps) == 0:
 		print(f'EE- No structures to generate recipes for')
 		exit(1)
-
 	# First pass of generating global triggers just to catch additional dependencies
 	additional_deps = list()
 	for glob in globals_to_dump:
@@ -3163,11 +3226,17 @@ def main():
 
 	func_args_stream = io.StringIO()
 	record_type_list = list(set(RG.structs_done_match) - set(RG.structs_missing))
+	arg_updated_type = False
 	for arg in func_args_to_dump:
-		narg = list(arg)+[0,arg[0],arg[2],"struct %s"%(arg[0]) if arg[3]=='record' else arg[0]] # += [4:shift,5:original type string,6:original typesize,7:full original type string]
+		# (0:res.id, 1:res.str if res.classname == 'record' else res.name), 2:res.size // 8, 3:res.classname, 4:offset)
+		if isinstance(arg,tuple):
+			arg = [arg]
+		if len(arg[0])>5:
+			arg_updated_type = arg[0][5]
+		narg = list(arg[0][:5])+[arg[0][0],arg[0][2],"struct %s"%(arg[0][0]) if arg[0][3]=='record' else arg[0][0]] # += [5:original type string,6:original typesize,7:full original type string]
 		argStr = ("____%s____%d"%(args.func,narg[1]-1))
 		extra_info = ""
-		if "ptr_config" in RG.config and "container_of_parm_map" in RG.config["ptr_config"]:
+		if not arg_updated_type and "ptr_config" in RG.config and "container_of_parm_map" in RG.config["ptr_config"]:
 			if argStr in RG.config["ptr_config"]["container_of_parm_map"]:
 				e = RG.config["ptr_config"]["container_of_parm_map"][argStr][0]
 				tp = RG.ftdb.types.entry_by_id(e["tpid"])
@@ -3185,10 +3254,23 @@ def main():
 				if "call_id" in e:
 					extra_info += "\n   The conclusion was made based on a call deeper down in the call graph. The first function called was '{0}' */".format(
 						RG.ftdb.funcs.entry_by_id(e["call_id"]).name,
-
 					)
 				else:
 					extra_info += " */"
+		if len(arg)>1:
+			extra_info += "\n/* It was detected that the config file specified {1} additional triggers for the function argument no. {0}. Additional triggers are reflected in the recipe */".format(
+				narg[1],
+				len(arg)-1
+			)
+		extra_triggers = ""
+		if len(arg)>1:
+			for extra_arg in arg[1:]:
+				extra_triggers+="\n\t\t\t\tFLATTEN_STRUCT_{3}SHIFTED_SELF_CONTAINED({0}, {1}, target, {2});".format(
+					extra_arg[0],
+					extra_arg[2],
+					extra_arg[4],
+					"TYPE_" if extra_arg[3]=='typedef' else ""
+				)
 		for tp in record_type_list:
 			if narg[0]==tp[0] and narg[3]=='record':
 					# 0 - full type of argument
@@ -3198,10 +3280,32 @@ def main():
 					# 4 - real type string of the argument (after the possible shift)
 					# 5 - size of the real type
 					# 6 - additional information (if any)
-				func_args_stream.write(RecipeGenerator.template_output_struct_arg_handler.format(narg[7], narg[1], narg[6], -narg[4], narg[5], narg[2], "\n".join(["\t\t"+x for x in extra_info.split("\n")])))
+					# 7 - additional triggers specification
+				off = narg[4]
+				if isinstance(off,int):
+					off = "%d"%(-int(off))
+				func_args_stream.write(RecipeGenerator.template_output_struct_arg_handler.format(
+					narg[7],
+					narg[1],
+					narg[6],
+					off,
+					narg[5],
+					narg[2],
+					"\n".join(["\t\t"+x for x in extra_info.split("\n")]),
+					extra_triggers
+				))
 		for tp in record_typedefs_list:
 			if narg[0]==tp and narg[3]=='typedef':
-				func_args_stream.write(RecipeGenerator.template_output_struct_type_arg_handler.format(narg[7], narg[1], narg[6], -narg[4], narg[5], narg[2], "\n".join(["\t\t"+x for x in extra_info.split("\n")])))
+				func_args_stream.write(RecipeGenerator.template_output_struct_type_arg_handler.format(
+					narg[7],
+					narg[1],
+					narg[6],
+					off,
+					narg[5],
+					narg[2],
+					"\n".join(["\t\t"+x for x in extra_info.split("\n")]),
+					extra_triggers
+				))
 
 	recipe_register_stream.write(f"KFLAT_RECIPE_EX(\"{args.recipe_id if args.recipe_id else args.func}\", handler_{args.func}, prehandler_globals_search),\n")
 	recipe_handlers_stream.write(
