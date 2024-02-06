@@ -1,5 +1,22 @@
 {
 	"base_config": {
+		"allowed_members": {
+			/* (...) */
+		},
+		"trigger_list": [
+			{  /* There can be many 'append' entries for a specific function but only single 'update' entry */
+				"trigger_fn": <str>/[<str>,...],    /* Name of the trigger function (can be a list for the same entries for multiple functions) */
+				"arg_index": <int>, /* Index of the trigger function argument */
+				"arg_type": <str>, /* Typestring describing the argument type */
+				"offset": <int>/<str>, /* Offset value for the argument type or offset expression in C code */
+					/* Offset expression should be simple enough so it can be compiled without referencing types;
+						In case of more complicated expressions like  'sizeof(TYPE)', the `sizeof` can be specified using '@{Typestring}' inside the expression */
+				"type": <str> /* Type of the trigger update; either 'update' or 'append' ('update' is the default value); 
+					when we use 'update' we can update trigger values for cases where recipe generator couldn't detect them properly;
+					when 'append' is used we just add another serialization trigger for the provided data */
+			},
+			(...)
+		]
 	},
 	"OT_info": {
 		"functions": [ (<str>,<int>,<str>), ...], /* List of functions in the original FTDB which are present in the OT: (function name, function id in original FTDB, function hash) */
