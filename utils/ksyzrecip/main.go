@@ -223,13 +223,13 @@ func generateRecipes(ioctls []*prog.Syscall) {
 			switch k.(type) {
 			case *prog.StructType:
 				r := k.(*prog.StructType)
-				f.WriteString(fmt.Sprintf("FUNCTION_DEFINE_FLATTEN_STRUCT_SELF_CONTAINED(%s", r.Name()))
+				f.WriteString(fmt.Sprintf("FUNCTION_DEFINE_FLATTEN_STRUCT_SELF_CONTAINED(%s, %d", r.Name(), r.Size()))
 				needExpansion(r, f)
 				f.WriteString(");\n")
 				break
 			case *prog.UnionType:
 				r := k.(*prog.UnionType)
-				f.WriteString(fmt.Sprintf("FUNCTION_DEFINE_FLATTEN_UNION_SELF_CONTAINED(%s", r.Name()))
+				f.WriteString(fmt.Sprintf("FUNCTION_DEFINE_FLATTEN_UNION_SELF_CONTAINED(%s, %d", r.Name(), r.Size()))
 				needExpansion(r, f)
 				f.WriteString(");\n")
 				break
@@ -345,6 +345,7 @@ func main() {
 	}
 
 	descs = parseFromList(descFiles, errorHandler)
+	// Should get ARM64 syscall numbers dynamically, there was a function in syzkaller API for that
 	consts = constsFromList(constFiles, errorHandler)
 
 	var p *compiler.Prog = nil
