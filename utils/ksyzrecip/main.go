@@ -85,39 +85,54 @@ func compileErrorHandler(pos ast.Pos, msg string) {
 	}
 }
 
-func shouldQueue(typ prog.Type) bool {
+func shouldQueue(typ prog.Type) (bool, prog.Type) {
 again:
 	switch typ.(type) {
 	case *prog.StructType:
-		return true
+		return true, typ
 		break
 	case *prog.UnionType:
-		return true
+		return true, typ
 		break
 	case *prog.PtrType:
 		typ = typ.(*prog.PtrType).Elem
 		goto again
 	}
 
-	return false
+	return false, nil
 }
 
-func hasPointer(typ prog.Type) bool {
+func hasPointer(typ prog.Type) ([]prog.Type, bool) {
+	types := make([]prog.Type, 0)
 	if record, ok := typ.(*prog.StructType); ok {
 		for _, f := range record.Fields {
-			if _, ok := f.Type.(*prog.PtrType); ok {
-				return true
+			if t, ok := f.Type.(*prog.PtrType); ok {
+				if record2, ok := t.Elem.(*prog.StructType); ok {
+					types = append(types, record2)
+				}
+				if union2, ok := t.Elem.(*prog.UnionType); ok {
+					types = append(types, union2)
+				}
 			}
 		}
 	} else if union, ok := typ.(*prog.UnionType); ok {
 		for _, f := range union.Fields {
-			if _, ok := f.Type.(*prog.PtrType); ok {
-				return true
+			if t, ok := f.Type.(*prog.PtrType); ok {
+				if record2, ok := t.Elem.(*prog.StructType); ok {
+					types = append(types, record2)
+				}
+				if union2, ok := t.Elem.(*prog.UnionType); ok {
+					types = append(types, union2)
+				}
 			}
 		}
 	}
 
-	return false
+	if len(types) > 0 {
+		return types, true
+	}
+
+	return types, false
 }
 
 func generateRecipes(ioctls []*prog.Syscall) {
@@ -135,7 +150,6 @@ func generateRecipes(ioctls []*prog.Syscall) {
 		types := make(map[prog.Type]struct{})
 		typQueue := make([]prog.Type, 1)
 		typQueue[0] = insideType
-		types[insideType] = struct{}{}
 
 		for len(typQueue) > 0 {
 			var iter prog.Type
@@ -153,28 +167,36 @@ func generateRecipes(ioctls []*prog.Syscall) {
 
 			if record, ok := iter.(*prog.StructType); ok {
 				for _, field := range record.Fields {
-					if shouldQueue(field.Type) {
-						typQueue = append(typQueue, field.Type)
+					if ok, t := shouldQueue(field.Type); ok {
+						typQueue = append(typQueue, t)
 					}
 				}
 
-				if hasPointer(record) {
+				if _, ok := hasPointer(record); ok {
 					types[record] = struct{}{}
 				}
 				typQueue = append(typQueue[:0], typQueue[1:]...)
 			} else if union, ok := iter.(*prog.UnionType); ok {
 				for _, field := range union.Fields {
-					if shouldQueue(field.Type) {
-						typQueue = append(typQueue, field.Type)
+					if ok, t := shouldQueue(field.Type); ok {
+						typQueue = append(typQueue, t)
 					}
 				}
 
-				if hasPointer(union) {
+				if _, ok := hasPointer(union); ok {
 					types[union] = struct{}{}
 				}
 				typQueue = append(typQueue[:0], typQueue[1:]...)
 			}
+
+			if t, ok := hasPointer(typ); ok {
+				for _, typp := range t {
+					types[typp] = struct{}{}
+				}
+			}
 		}
+
+		types[insideType] = struct{}{}
 
 		f, err := os.Create(filepath.Join("recipes", fmt.Sprintf("%s.c", strings.TrimPrefix(sc.Name, "ioctl$"))))
 		if err != nil {
@@ -201,13 +223,13 @@ func generateRecipes(ioctls []*prog.Syscall) {
 			switch k.(type) {
 			case *prog.StructType:
 				r := k.(*prog.StructType)
-				f.WriteString(fmt.Sprintf("FUNCTION_DEFINE_FLATTEN_STRUCT(%s", r.Name()))
+				f.WriteString(fmt.Sprintf("FUNCTION_DEFINE_FLATTEN_STRUCT_SELF_CONTAINED(%s", r.Name()))
 				needExpansion(r, f)
 				f.WriteString(");\n")
 				break
 			case *prog.UnionType:
 				r := k.(*prog.UnionType)
-				f.WriteString(fmt.Sprintf("FUNCTION_DEFINE_FLATTEN_UNION(%s", r.Name()))
+				f.WriteString(fmt.Sprintf("FUNCTION_DEFINE_FLATTEN_UNION_SELF_CONTAINED(%s", r.Name()))
 				needExpansion(r, f)
 				f.WriteString(");\n")
 				break
@@ -234,43 +256,47 @@ func needExpansion(t prog.Type, w io.Writer) bool {
 		}
 
 		if record, ok := iter.(*prog.StructType); ok {
+			var fieldOffset uint64 = 0
 			for _, field := range record.Fields {
 				if ptr, ok := field.Type.(*prog.PtrType); ok {
 					if record2, ok := ptr.Elem.(*prog.StructType); ok {
 						if i == 0 {
 							w.Write([]byte(","))
 						}
-						w.Write([]byte(fmt.Sprintf("\n\tAGGREGATE_FLATTEN_STRUCT(%s, %s);\n", record2.Name(), field.Name)))
+						w.Write([]byte(fmt.Sprintf("\n\tAGGREGATE_FLATTEN_STRUCT_SELF_CONTAINED(%s, %d, %s, %d);\n", record2.Name(), record2.Size(), field.Name, fieldOffset)))
 						i += 1
 					}
 					if union2, ok := ptr.Elem.(*prog.UnionType); ok {
 						if i == 0 {
 							w.Write([]byte(","))
 						}
-						w.Write([]byte(fmt.Sprintf("\n\tAGGREGATE_FLATTEN_UNION(%s, %s);\n", union2.Name(), field.Name)))
+						w.Write([]byte(fmt.Sprintf("\n\tAGGREGATE_FLATTEN_UNION_SELF_CONTAINED(%s, %d, %s, %d);\n", union2.Name(), union2.Name(), field.Name, fieldOffset)))
 						i += 1
 					}
 				}
+				fieldOffset += field.Size()
 			}
 			typQueue = append(typQueue[:0], typQueue[1:]...)
 		} else if union, ok := iter.(*prog.UnionType); ok {
+			var fieldOffset uint64 = 0
 			for _, field := range union.Fields {
 				if ptr, ok := field.Type.(*prog.PtrType); ok {
 					if record2, ok := ptr.Elem.(*prog.StructType); ok {
 						if i == 0 {
 							w.Write([]byte(","))
 						}
-						w.Write([]byte(fmt.Sprintf("\n\tAGGREGATE_FLATTEN_STRUCT(%s, %s);\n", record2.Name(), field.Name)))
+						w.Write([]byte(fmt.Sprintf("\n\tAGGREGATE_FLATTEN_STRUCT_SELF_CONTAINED(%s, %d, %s, %d);\n", record2.Name(), record2.Size(), field.Name, fieldOffset)))
 						i += 1
 					}
 					if union2, ok := ptr.Elem.(*prog.UnionType); ok {
 						if i == 0 {
 							w.Write([]byte(","))
 						}
-						w.Write([]byte(fmt.Sprintf("\n\tAGGREGATE_FLATTEN_UNION(%s, %s);\n", union2.Name(), field.Name)))
+						w.Write([]byte(fmt.Sprintf("\n\tAGGREGATE_FLATTEN_UNION_SELF_CONTAINED(%s, %d, %s, %d);\n", union2.Name(), union2.Name(), field.Name, fieldOffset)))
 						i += 1
 					}
 				}
+				fieldOffset += field.Size()
 			}
 			typQueue = append(typQueue[:0], typQueue[1:]...)
 		}
