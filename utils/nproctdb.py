@@ -1158,8 +1158,8 @@ LINUXINCLUDE := ${{LINUXINCLUDE}}
 			# [2] record_count_extra
 			# [3] record_count_extra_kind (either 'deref', 'assign' or 'nested')
 			# [4] record_count_kind (either 'direct', 'derived' or 'default')
-			if 'ptr_config' in self.config:
-				haveCount = False
+			haveCount = False
+			if 'base_config' in self.config:
 				# First check if this information is given to us directly
 				if 'custom_element_count_map' in self.config['base_config']:
 					ecM = self.config['base_config']['custom_element_count_map']
@@ -1172,8 +1172,9 @@ LINUXINCLUDE := ${{LINUXINCLUDE}}
 						if 'size_expr' in element_count_nfo:
 							record_count_tuple[1] = element_count_nfo['size_expr']
 						record_count_tuple[4] = 'direct'
-				if not haveCount:
-					# Ok, so try to conclude this information from precomputed data
+			if not haveCount:
+				# Ok, so try to conclude this information from precomputed data
+				if 'ptr_config' in self.config:
 					# First check if in dereference expression this member is never used with offset > 0 (or with any variables used in the offset expression)
 					#  or we don't have dereference information for this member (meaning it was never used in dereference expressions)
 					deref_offset = 0
