@@ -2513,9 +2513,8 @@ the 'container_of' invocation chain.\n   The invocation chain was as follows:\n{
 					# Check if the member pointer points to a different type than specified in the structure
 					#  (either through the use of 'container_of' macro or source type casting constructs)
 					#  (or we point to the type directly through the config file)
-					if 'ptr_config' in self.config:
-						havePte = False
-
+					havePte = False
+					if 'base_config' in self.config:
 						if 'custom_ptr_map' in self.config['base_config']:
 							custom_ptr_map = self.config['base_config']['custom_ptr_map']
 							if mStr in custom_ptr_map:
@@ -2525,9 +2524,11 @@ the 'container_of' invocation chain.\n   The invocation chain was as follows:\n{
 								PTEExt = (cT['tpid'],cT['offset'],'custom',cT['info'])
 								PTE=self.ftdb.types[cT['tpid']]
 
+					if not havePte and 'ptr_config' in self.config:
+
 						if 'container_of_map' in self.config['ptr_config']:
 							container_of_map = self.config['ptr_config']['container_of_map']
-							if not havePte and mStr in container_of_map:
+							if mStr in container_of_map:
 								havePte = True
 								# This member was used in the 'container_of' macro
 								cL = container_of_map[mStr]
