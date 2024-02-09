@@ -16,7 +16,23 @@
 					when 'append' is used we just add another serialization trigger for the provided data */
 			},
 			(...)
-		]
+		],
+		"custom_ptr_map": {
+			<mStr>: {
+				/* custom pointer map - telling exactly to which type the given member pointer points to */
+				'tpid': <int>, /* pointee TID */
+				'offset': <int>,
+				'info': <str> /* custom information */
+			}, (...)
+		},
+		"custom_element_count_map": {
+			<mStr>: {
+				/* element count info */
+				'count': <int>
+				'size_expr': <str> /* We have either 'count' or 'size_expr' (takes precedence) attribute */
+			},
+			(...)
+		}
 	},
 	"OT_info": {
 		"functions": [ (<str>,<int>,<str>), ...], /* List of functions in the original FTDB which are present in the OT: (function name, function id in original FTDB, function hash) */
@@ -113,28 +129,12 @@
 			}, /* in case of ambiguity this map contains multiple elements */
 			(...)
 		},
-		"custom_ptr_map": {
-			<mStr>: {
-				/* custom pointer map - telling exactly to which type the given member pointer points to */
-				'tpid': <int>, /* pointee TID */
-				'offset': <int>,
-				'info': <str> /* custom information */
-			}, (...)
-		},
 		"deref_map": {
 			<mStr>: [(<int>,<int>,<str>),...] /* dereference offset and number of non-literal variables used in dereference expr.
 												 (including original expression) */
 		},
 		"assign_list": {
 			<mStr>: ...
-		},
-		"custom_element_count_map": {
-			<mStr>: {
-				/* element count info */
-				'count': <int>
-				'size_expr': <str> /* We have either 'count' or 'size_expr' (takes precedence) attribute */
-			},
-			(...)
 		},
 		"string_members": {
 			<mStr>: [ <str>, ...], /* list of call expressions passed to the c-string parameters */

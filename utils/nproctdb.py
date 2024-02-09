@@ -1161,8 +1161,8 @@ LINUXINCLUDE := ${{LINUXINCLUDE}}
 			if 'ptr_config' in self.config:
 				haveCount = False
 				# First check if this information is given to us directly
-				if 'custom_element_count_map' in self.config['ptr_config']:
-					ecM = self.config['ptr_config']['custom_element_count_map']
+				if 'custom_element_count_map' in self.config['base_config']:
+					ecM = self.config['base_config']['custom_element_count_map']
 					if mStr in ecM:
 						haveCount = True
 						element_count_nfo = ecM[mStr]
@@ -2515,8 +2515,8 @@ the 'container_of' invocation chain.\n   The invocation chain was as follows:\n{
 					if 'ptr_config' in self.config:
 						havePte = False
 
-						if 'custom_ptr_map' in self.config['ptr_config']:
-							custom_ptr_map = self.config['ptr_config']['custom_ptr_map']
+						if 'custom_ptr_map' in self.config['base_config']:
+							custom_ptr_map = self.config['base_config']['custom_ptr_map']
 							if mStr in custom_ptr_map:
 								havePte = True
 								# Our config file tells us exactly to which type this pointer points to
