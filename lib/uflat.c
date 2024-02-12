@@ -109,9 +109,6 @@ struct uflat* uflat_init(const char* path) {
 
     // Initialize symbol address resolution engine
     func_sym_table = get_symbol_to_name_mapping(&func_sym_table_n_entries);
-    if (func_sym_table == NULL){
-        FLATTEN_LOG_ERROR("Failed to initialize symbol address resolution engine");
-    }
 
     return uflat;
 
@@ -481,11 +478,21 @@ __attribute__((no_sanitize("address"))) size_t uflat_test_string_len(struct flat
 size_t flatten_func_to_name(char* name, size_t size, void* func_ptr) {
     int rv;
     Dl_info info;
+    static bool not_ready_warn_issued = false;
+
+    if (func_sym_table == NULL) {
+        if(!not_ready_warn_issued) {
+            FLATTEN_LOG_ERROR("Failed to initialize symbol address resolution engine");
+            not_ready_warn_issued = true;
+        }
+        memset(name, 0, size);
+        return 0;
+    }
 
     if (func_ptr == NULL) {
         FLATTEN_LOG_INFO("Failed to symbolize function - NULL pointer given", func_ptr);
-            memset(name, 0, size);
-            return 0;
+        memset(name, 0, size);
+        return 0;
     }
 
     rv = dladdr(func_ptr, &info);
