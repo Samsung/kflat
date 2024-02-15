@@ -379,15 +379,17 @@ AGGREGATE_FLATTEN_STRUCT_ARRAY_SELF_CONTAINED(list_head,{0},{1}.prev,{4},1);
 	# 2 - struct size
 	# 3 - refname
 	# 4 - element count
+	# 5 - extra message
 	template_flatten_struct_array_pointer_self_contained = \
-		"FLATTEN_{0}_ARRAY_SELF_CONTAINED({1},{2},{3},{4});"
+		"{5}FLATTEN_{0}_ARRAY_SELF_CONTAINED({1},{2},{3},{4});"
 	
 	# 0 - typename
 	# 1 - typesize
 	# 2 - refname
 	# 3 - element count
+	# 4 - extra message
 	template_flatten_struct_type_array_pointer_self_contained = \
-		"FLATTEN_STRUCT_TYPE_ARRAY_SELF_CONTAINED({0},{1},{2},{3});"
+		"{4}FLATTEN_STRUCT_TYPE_ARRAY_SELF_CONTAINED({0},{1},{2},{3});"
 
 
 	## Arguments:
@@ -1156,7 +1158,7 @@ LINUXINCLUDE := ${{LINUXINCLUDE}}
 			# [0] record_count (If this is None then the dereference expression gives us ambiguous results; more info in extra field)
 			# [1] record_count_expr (This is the code expression that yields the record count (exclusively used if not None))
 			# [2] record_count_extra
-			# [3] record_count_extra_kind (either 'deref', 'assign' or 'nested')
+			# [3] record_count_extra_kind (either 'deref', 'assign', 'function', 'functionptr' or 'nested')
 			# [4] record_count_kind (either 'direct', 'derived' or 'default')
 			haveCount = False
 			if 'base_config' in self.config:
@@ -1178,7 +1180,7 @@ LINUXINCLUDE := ${{LINUXINCLUDE}}
 					# First check if in dereference expression this member is never used with offset > 0 (or with any variables used in the offset expression)
 					#  or we don't have dereference information for this member (meaning it was never used in dereference expressions)
 					deref_offset = 0
-					if 'deref_map' in self.config['ptr_config'] and 'assign_list' in self.config['ptr_config']:
+					if 'deref_map' in self.config['ptr_config'] and 'assign_list' in self.config['ptr_config'] and 'me_calls' in self.config['ptr_config'] and 'me_refcalls' in self.config['ptr_config']:
 						deref_map = self.config['ptr_config']['deref_map']
 						if mStr in deref_map:
 							dL = deref_map[mStr]
@@ -1198,16 +1200,115 @@ LINUXINCLUDE := ${{LINUXINCLUDE}}
 							record_count_tuple[2] = assign_list[mStr]
 							record_count_tuple[3] = 'assign'
 							return record_count_tuple
+						# Finally check if this member has not been passed to any function
+						#  (if it has then we cannot be sure how the memory was accessed through the function parameter)
+						me_calls = self.config['ptr_config']['me_calls']
+						if mStr in me_calls:
+							# Our member was passed to a function; we conclude ambiguously
+							record_count_tuple[0] = None
+							record_count_tuple[2] = me_calls[mStr]
+							record_count_tuple[3] = 'function'
+							return record_count_tuple
+						# Maybe it's a function call through the pointer?
+						me_refcalls = self.config['ptr_config']['me_refcalls']
+						if mStr in me_refcalls:
+							# Our member was passed to a function; we conclude ambiguously
+							record_count_tuple[0] = None
+							record_count_tuple[2] = me_refcalls[mStr]
+							record_count_tuple[3] = 'functionptr'
+							return record_count_tuple
 						# Our pointer member is not used in any dereference expression with offset > 0
 						# Also it's not used at the right-hand side of any assignment expression
+						# Finally it's not been passed as an argument to any function
 						# Let's then assume that we point to a single element of a given type
 						extra_msg = "/* We've concluded that this pointer is not used in any dereference expression with offset > 0.\n\
 Also it's not used at the right-hand side of any assignment expression.\n\
+Finally it's not been passed as an argument to any function.\n\
 We then assume that this pointer is pointing to a single element of a given type */\n"
 						record_count_tuple = [1,None,None,'','derived']
 
 			return record_count_tuple
 
+
+	def get_global_element_count(self,ghash):
+
+		# Normally we cannot know whether the global pointer points to a single element or an array of elements (or other types)
+		# Try to conclude that from information in config file, otherwise we will try to detect it at runtime
+		# When the detection fails we will assume there's a single element pointed there (default value)
+		record_count_tuple = [1,None,None,'','default']
+		# [0] record_count (If this is None then the dereference expression gives us ambiguous results; more info in extra field)
+		# [1] record_count_expr (This is the code expression that yields the record count (exclusively used if not None))
+		# [2] record_count_extra
+		# [3] record_count_extra_kind (either 'deref', 'assign', 'function', 'functionptr' or 'nested')
+		# [4] record_count_kind (either 'direct', 'derived' or 'default')
+		haveCount = False
+		if 'base_config' in self.config:
+			# First check if this information is given to us directly
+			if 'custom_global_element_count_map' in self.config['base_config']:
+				ecM = self.config['base_config']['custom_global_element_count_map']
+				if ghash in ecM:
+					haveCount = True
+					element_count_nfo = ecM[ghash]
+					# We should have either 'count' or 'size_expr' attributes
+					if 'count' in element_count_nfo:
+						record_count_tuple[0] = element_count_nfo['count']
+					if 'size_expr' in element_count_nfo:
+						record_count_tuple[1] = element_count_nfo['size_expr']
+					record_count_tuple[4] = 'direct'
+		if not haveCount:
+			# Ok, so try to conclude this information from precomputed data
+			if 'ptr_config' in self.config:
+				# First check if in dereference expression this global is never used with offset > 0 (or with any variables used in the offset expression)
+				#  or we don't have dereference information for this global (meaning it was never used in dereference expressions)
+				deref_offset = 0
+				if 'global_deref_map' in self.config['ptr_config'] and 'global_assign_list' in self.config['ptr_config'] and 'g_calls' in self.config['ptr_config'] and 'g_refcalls' in self.config['ptr_config']:
+					deref_map = self.config['ptr_config']['global_deref_map']
+					if ghash in deref_map:
+						dL = deref_map[ghash]
+						deref_offset = sum([x[0]+x[1] for x in dL])
+					if deref_offset>0:
+						# The conclusion gives us ambiguous results (either we use the member with non-zero offset at dereference expresion or other variables are involved)
+						record_count_tuple[0] = None
+						record_count_tuple[2] = dL
+						record_count_tuple[3] = 'deref'
+						return record_count_tuple
+					# Now check if this member is not used in the right-hand side of any assignment expression
+					#  (otherwise we wouldn't be sure if the assigned value is not used at some other dereference expression somewhere else)
+					assign_list = self.config['ptr_config']['global_assign_list']
+					if ghash in assign_list:
+						# Our member is on the right hand side of some assignment expression; we conclude ambiguously
+						record_count_tuple[0] = None
+						record_count_tuple[2] = assign_list[ghash]
+						record_count_tuple[3] = 'assign'
+						return record_count_tuple
+					# Finally check if this member has not been passed to any function
+					#  (if it has then we cannot be sure how the memory was accessed through the function parameter)
+					g_calls = self.config['ptr_config']['g_calls']
+					if ghash in g_calls:
+						# Our member was passed to a function; we conclude ambiguously
+						record_count_tuple[0] = None
+						record_count_tuple[2] = g_calls[ghash]
+						record_count_tuple[3] = 'function'
+						return record_count_tuple
+					# Maybe it's a function call through the pointer?
+					g_refcalls = self.config['ptr_config']['g_refcalls']
+					if ghash in g_refcalls:
+						# Our member was passed to a function; we conclude ambiguously
+						record_count_tuple[0] = None
+						record_count_tuple[2] = g_refcalls[ghash]
+						record_count_tuple[3] = 'functionptr'
+						return record_count_tuple
+					# Our global pointer is not used in any dereference expression with offset > 0
+					# Also it's not used at the right-hand side of any assignment expression
+					# Finally it's not been passed as an argument to any function
+					# Let's then assume that we point to a single element of a given type
+					extra_msg = "/* We've concluded that this global pointer is not used in any dereference expression with offset > 0.\n\
+Also it's not used at the right-hand side of any assignment expression.\n\
+Finally it's not been passed as an argument to any function.\n\
+We then assume that this pointer is pointing to a single element of a given type */\n"
+					record_count_tuple = [1,None,None,'','derived']
+
+		return record_count_tuple
 
 	def construct_element_count_expression(self,record_count_tuple,refname,mStr,refoffset,refsize,ptrLevel):
 		if record_count_tuple[1] is not None:
@@ -1250,6 +1351,111 @@ We then assume that this pointer is pointing to a single element of a given type
 					msg = "/* Couldn't conclude unambiguously the number of elements pointer points to.\n\
    Member '{0}' was used on the right-hand side of the following assignment expressions:\n{1}\n".format(
   			"%s [%s]"%(refname,mStr),
+  			"\n".join(ambiguous_exprs)
+  	)
+				elif record_count_tuple[3]=='function':
+					ambiguous_exprs = list()
+					for eT in record_count_tuple[2]:
+						ambiguous_exprs.append("     "+"%s{ ... %s( arg$%d ) ... } -> %s"%(
+							self.ftdb.funcs.entry_by_id(eT[0]).name,
+							self.ftdb.funcs.entry_by_id(eT[1]).name,
+							eT[2],
+							eT[3]
+						))
+					msg = "/* Couldn't conclude unambiguously the number of elements pointer points to.\n\
+   Member '{0}' was passed as a function argument in the following expressions:\n{1}\n".format(
+  			"%s [%s]"%(refname,mStr),
+  			"\n".join(ambiguous_exprs)
+  	)
+				elif record_count_tuple[3]=='functionptr':
+					ambiguous_exprs = list()
+					for eT in record_count_tuple[2]:
+						ambiguous_exprs.append("     "+"%s{ ... *F( arg$%d ) ... } -> %s"%(
+							self.ftdb.funcs.entry_by_id(eT[0]).name,
+							# TODO: print information about dereferenced function */
+							eT[2],
+							eT[3]
+						))
+					msg = "/* Couldn't conclude unambiguously the number of elements pointer points to.\n\
+   Member '{0}' was passed as a function argument in the following expressions:\n{1}\n".format(
+  			"%s [%s]"%(refname,mStr),
+  			"\n".join(ambiguous_exprs)
+  	)
+				else:
+					msg = "/* Couldn't conclude the number of elements pointer points to as this was a nested pointer at higher level than 0\n"
+				msg += "   We will try to detect the array size at runtime. When it fails we will dump a single element pointed to by this pointer (default)\n */\n"
+				return (detect_element_count_expr,msg)
+
+	def construct_global_element_count_expression(self,record_count_tuple,gv,PTE,ptrname,ptrLevel):
+
+		if record_count_tuple[1] is not None:
+			return (record_count_tuple[1],'')
+		else:
+			detect_element_count_expr = "\n  FLATTEN_DETECT_OBJECT_SIZE(%s,%s)/%s"%(ptrname,PTE.size//8,PTE.size//8)
+			if record_count_tuple[0] is not None:
+				if record_count_tuple[4]!='default':
+					return (str(record_count_tuple[0]),'')
+				else:
+					# We don't have information about the number of elements the pointer points to
+					# Try to detect the object size pointed to by this pointer and conclude the number
+					#  of elements based on that
+					# When it fails adhere to the simple default of single element
+					detect_extra_msg = "/* We couldn't find the number of elements this pointer is pointing to (also no direct information in config file exists).\n\
+   We'll try to detect the number of elements based on the object size pointed to by this pointer (assuming it's on the heap).\n\
+   When it fails we'll default to a single element pointed to by it */\n"
+					return (detect_element_count_expr,detect_extra_msg)
+			else:
+				if record_count_tuple[3]=='deref':
+					ambiguous_exprs = list()
+					for dT in record_count_tuple[2]:
+						if dT[0]+dT[1]>0:
+							aexpr = "     "+dT[2]
+							if dT[0]>0:
+								aexpr+="  | offset %d"%(dT[0])
+							if dT[1]>0:
+								aexpr+="  | %d variables in offset expression"%(dT[1])
+							ambiguous_exprs.append(aexpr)
+					msg = "/* Couldn't conclude unambiguously the number of elements pointer points to.\n\
+   Global '{0}' was used in {1} dereference expressions and the ambiguous expressions were as follows:\n{2}\n".format(
+  			gv.name,
+  			len(record_count_tuple[2]),
+  			"\n".join(ambiguous_exprs)
+  	)
+				elif record_count_tuple[3]=='assign':
+					ambiguous_exprs = list()
+					for expr in record_count_tuple[2]:
+						ambiguous_exprs.append("     "+expr)
+					msg = "/* Couldn't conclude unambiguously the number of elements pointer points to.\n\
+   Global '{0}' was used on the right-hand side of the following assignment expressions:\n{1}\n".format(
+  			gv.name,
+  			"\n".join(ambiguous_exprs)
+  	)
+				elif record_count_tuple[3]=='function':
+					ambiguous_exprs = list()
+					for eT in record_count_tuple[2]:
+						ambiguous_exprs.append("     "+"%s{ ... %s( arg$%d ) ... } -> %s"%(
+							self.ftdb.funcs.entry_by_id(eT[0]).name,
+							self.ftdb.funcs.entry_by_id(eT[1]).name,
+							eT[2],
+							eT[3]
+						))
+					msg = "/* Couldn't conclude unambiguously the number of elements pointer points to.\n\
+   Global '{0}' was passed as a function argument in the following expressions:\n{1}\n".format(
+  			gv.name,
+  			"\n".join(ambiguous_exprs)
+  	)
+				elif record_count_tuple[3]=='functionptr':
+					ambiguous_exprs = list()
+					for eT in record_count_tuple[2]:
+						ambiguous_exprs.append("     "+"%s{ ... *F( arg$%d ) ... } -> %s"%(
+							self.ftdb.funcs.entry_by_id(eT[0]).name,
+							# TODO: print information about dereferenced function */
+							eT[2],
+							eT[3]
+						))
+					msg = "/* Couldn't conclude unambiguously the number of elements pointer points to.\n\
+   Global '{0}' was passed as a function argument in the following expressions:\n{1}\n".format(
+  			gv.name,
   			"\n".join(ambiguous_exprs)
   	)
 				else:
@@ -1565,7 +1771,7 @@ the 'container_of' invocation chain.\n   The invocation chain was as follows:\n{
 				self.builtin_pointers.append((TPDptrT,TRT,refname))
 				return pteT.str+"*"
 
-	def generate_flatten_record_trigger(self,out,T,TPD,refname,handle_flexible_size=False,tab=0):
+	def generate_flatten_record_trigger(self,out,T,TPD,refname,element_count_expr,element_count_extra_msg,ptrLevel,handle_flexible_size=False,tab=0):
 		if TPD:
 			__type_size = TPD.size//8
 			if handle_flexible_size and TPD.name in self.RTRMap and self.RTRMap[TPD.name].have_flexible_member:
@@ -1574,7 +1780,8 @@ the 'container_of' invocation chain.\n   The invocation chain was as follows:\n{
 				TPD.name,
 				__type_size,
 				refname,
-				str(1)
+				element_count_expr if ptrLevel==1 else str(1),
+				element_count_extra_msg if ptrLevel==1 else ""
 			),tab)
 			out.write(recipe+"\n")
 			return TPD.name
@@ -1587,7 +1794,8 @@ the 'container_of' invocation chain.\n   The invocation chain was as follows:\n{
 				anonstruct_type_name,
 				__type_size,
 				refname,
-				str(1)
+				element_count_expr if ptrLevel==1 else str(1),
+				element_count_extra_msg if ptrLevel==1 else ""
 			),tab)
 			out.write(recipe+"\n")
 			return anonstruct_type_name
@@ -1606,26 +1814,40 @@ the 'container_of' invocation chain.\n   The invocation chain was as follows:\n{
 			T.str,
 			__type_size,
 			refname,
-			str(1)
+			element_count_expr if ptrLevel==1 else str(1),
+			element_count_extra_msg if ptrLevel==1 else ""
 		),tab)
 		out.write(recipe+"\n")
 		return "struct %s"%(T.str)
 
-	def generate_flatten_pointer_trigger(self,out,T,TPD,gvname,handle_flexible_size=False,tab=0,ptrLevel=0,arrsize=1):
+	def generate_flatten_pointer_trigger(self,out,T,TPD,gv,handle_flexible_size=False,tab=0,ptrLevel=0,arrsize=1):
+
+		if ptrLevel==1:
+			record_count_tuple = self.get_global_element_count(gv.hash)
+			element_count_expr,element_count_extra_msg = self.construct_global_element_count_expression(record_count_tuple,gv,T,ptrNestedRefName(gv.name,ptrLevel),ptrLevel)
 
 		if T.classname=="attributed" and "__attribute__((noderef))" in T.attrcore:
 			# Global variable points to user memory
 			return None
 		if T.classname=="record" or T.classname=="record_forward":
 			# pointer to struct
-			rtp = self.generate_flatten_record_trigger(out,T,TPD,ptrNestedRefName(gvname,ptrLevel),handle_flexible_size)
+			rtp = self.generate_flatten_record_trigger(
+				out,
+				T,
+				TPD,
+				ptrNestedRefName(gv.name,ptrLevel),
+				element_count_expr,
+				element_count_extra_msg,
+				ptrLevel,
+				handle_flexible_size
+			)
 			if rtp is None:
 				return None
 			else:
 				return rtp+"*"
 		
 		elif T.classname=="incomplete_array" or T.classname=="const_array":
-			out.write(indent("/* TODO: implement flattening trigger for global variable '%s' */"%(gvname),tab)+"\n")
+			out.write(indent("/* TODO: implement flattening trigger for global variable '%s' */"%(gv.name),tab)+"\n")
 			return None
 		elif T.classname=="pointer":
 			PTE = self.ftdb.types[T.refs[0]]
@@ -1634,11 +1856,11 @@ the 'container_of' invocation chain.\n   The invocation chain was as follows:\n{
 				TPDE = PTE
 				PTE = self.walkTPD(PTE)
 			ptrout = io.StringIO()
-			ptrtp = self.generate_flatten_pointer_trigger(ptrout,PTE,TPDE,gvname,handle_flexible_size,tab+1,ptrLevel+1)
+			ptrtp = self.generate_flatten_pointer_trigger(ptrout,PTE,TPDE,gv,handle_flexible_size,tab+1,ptrLevel+1)
 			out.write(RecipeGenerator.template_flatten_pointer_array_recipe.format(
 				ptrtp,
-				ptrNestedRefName(gvname,ptrLevel+1),
-				ptrNestedRefNameOrRoot(gvname,ptrLevel),
+				ptrNestedRefName(gv.name,ptrLevel+1),
+				ptrNestedRefNameOrRoot(gv.name,ptrLevel),
 				str(arrsize),
 				indent(ptrout.getvalue().rstrip(),tab+1)
 			)+"\n")
@@ -1652,10 +1874,10 @@ the 'container_of' invocation chain.\n   The invocation chain was as follows:\n{
 				recipe = indent(RecipeGenerator.template_flatten_compound_type_array_pointer_recipe.format(
 					TPD.name,
 					T.size//8,
-					ptrNestedRefName(gvname,ptrLevel),
-					str(1),
+					ptrNestedRefName(gv.name,ptrLevel),
+					element_count_expr if ptrLevel==1 else str(1),
 					"",
-					""
+					element_count_extra_msg if ptrLevel==1 else ""
 				),tab)+"\n"
 				out.write(recipe+"\n")
 				return TPD.name+"*"
@@ -1665,10 +1887,10 @@ the 'container_of' invocation chain.\n   The invocation chain was as follows:\n{
 					recipe = indent(RecipeGenerator.template_flatten_compound_type_array_pointer_recipe.format(
 						anonenum_type_name,
 						T.size//8,
-						ptrNestedRefName(gvname,ptrLevel),
-						str(1),
+						ptrNestedRefName(gv.name,ptrLevel),
+						element_count_expr if ptrLevel==1 else str(1),
 						"",
-						""
+						element_count_extra_msg if ptrLevel==1 else ""
 					),tab)+"\n"
 					out.write(recipe+"\n")
 					return anonenum_type_name+"*"
@@ -1676,43 +1898,43 @@ the 'container_of' invocation chain.\n   The invocation chain was as follows:\n{
 					recipe = indent(RecipeGenerator.template_flatten_compound_type_array_pointer_recipe.format(
 						"enum %s"%(T.str),
 						T.size//8,
-						ptrNestedRefName(gvname,ptrLevel),
-						str(1),
+						ptrNestedRefName(gv.name,ptrLevel),
+						element_count_expr if ptrLevel==1 else str(1),
 						"",
-						""
+						element_count_extra_msg if ptrLevel==1 else ""
 					),tab)+"\n"
 					out.write(recipe+"\n")
 					return "enum %s*"%(T.str)
 		elif T.classname=="builtin" and T.str=="char":
 			# char* - treat it as if it was a C string
 			recipe = indent(RecipeGenerator.template_flatten_string_pointer_recipe.format(
-				ptrNestedRefName(gvname,ptrLevel),"",""),tab)+"\n"
+				ptrNestedRefName(gv.name,ptrLevel),"",""),tab)+"\n"
 			out.write(recipe+"\n")
 			return "char*"
 		elif T.classname=="builtin" and T.str=="void":
 			# void*
 			recipe = indent(RecipeGenerator.template_flatten_type_array_pointer_recipe.format(
 				"unsigned char",
-				ptrNestedRefName(gvname,ptrLevel),
-				str(1),
+				ptrNestedRefName(gv.name,ptrLevel),
+				element_count_expr if ptrLevel==1 else str(1),
 				"",
-				""
+				element_count_extra_msg if ptrLevel==1 else ""
 			),tab)+"\n"
 			out.write(recipe+"\n")
 			return "unsigned char*"
 		elif T.classname=="function":
 			# pointer to function
-			recipe = indent(RecipeGenerator.template_flatten_fptr_pointer_recipe.format(ptrNestedRefName(gvname,ptrLevel)),tab)+"\n"
+			recipe = indent(RecipeGenerator.template_flatten_fptr_pointer_recipe.format(ptrNestedRefName(gv.name,ptrLevel)),tab)+"\n"
 			out.write(recipe+"\n")
 			return "void*"
 		else:
 			# pointer to builtin
 			recipe = indent(RecipeGenerator.template_flatten_type_array_pointer_recipe.format(
 				T.str,
-				ptrNestedRefName(gvname,ptrLevel),
-				str(1),
+				ptrNestedRefName(gv.name,ptrLevel),
+				element_count_expr if ptrLevel==1 else str(1),
 				"",
-				""
+				element_count_extra_msg if ptrLevel==1 else ""
 			),tab)+"\n"
 			out.write(recipe+"\n")
 			return T.str+"*"
@@ -1760,7 +1982,7 @@ the 'container_of' invocation chain.\n   The invocation chain was as follows:\n{
 						out.write(trigger+"\n")
 						return "enum %s*"%(T.str)
 			elif T.classname=="pointer":
-				ptrtp = self.generate_flatten_pointer_trigger(out,T,TPD,gvname,handle_flexible_size)
+				ptrtp = self.generate_flatten_pointer_trigger(out,T,TPD,gv,handle_flexible_size)
 				return ptrtp
 			elif T.classname=="record":
 				recipe_out = ""
@@ -1899,7 +2121,8 @@ the 'container_of' invocation chain.\n   The invocation chain was as follows:\n{
 						TPD.name,
 						__type_size,
 						"__root_ptr",
-						str(1)
+						str(1),
+						""
 					)
 					recipe_out += trigger+"\n"
 					out.write(recipe_out)
@@ -1914,7 +2137,8 @@ the 'container_of' invocation chain.\n   The invocation chain was as follows:\n{
 							anonstruct_type_name,
 							__type_size,
 							"__root_ptr",
-							str(1)
+							str(1),
+							""
 						)
 						recipe_out += trigger+"\n"
 						out.write(recipe_out)
@@ -1928,7 +2152,8 @@ the 'container_of' invocation chain.\n   The invocation chain was as follows:\n{
 									T.str,
 									__type_size,
 									"__root_ptr",
-									str(1)
+									str(1),
+									""
 								)
 						recipe_out += trigger+"\n"
 						out.write(recipe_out)
@@ -1963,7 +2188,7 @@ the 'container_of' invocation chain.\n   The invocation chain was as follows:\n{
 							out.write(trigger+"\n")
 							return "enum %s*"%(AT.str)
 				elif AT.classname=="pointer":
-					ptrtp = self.generate_flatten_pointer_trigger(out,AT,ATPD,gvname,handle_flexible_size,0,0,T.size//AT.size)
+					ptrtp = self.generate_flatten_pointer_trigger(out,AT,ATPD,gv,handle_flexible_size,0,0,T.size//AT.size)
 					return ptrtp
 				elif AT.classname=="record":
 					if ATPD:
@@ -1971,7 +2196,8 @@ the 'container_of' invocation chain.\n   The invocation chain was as follows:\n{
 							ATPD.name,
 							AT.size//8,
 							"__root_ptr",
-							str(T.size/AT.size)
+							str(T.size/AT.size),
+							""
 						)
 						out.write(trigger+"\n")
 						return "%s*"%(ATPD.name)
@@ -1982,7 +2208,8 @@ the 'container_of' invocation chain.\n   The invocation chain was as follows:\n{
 								anonstruct_type_name,
 								AT.size//8,
 								"__root_ptr",
-								str(T.size//AT.size)
+								str(T.size//AT.size),
+								""
 							)
 							out.write(trigger+"\n")
 							return "%s*"%(anonstruct_type_name)
@@ -1993,7 +2220,8 @@ the 'container_of' invocation chain.\n   The invocation chain was as follows:\n{
 									AT.str,
 									AT.size//8,
 									"__root_ptr",
-									str(T.size//AT.size)
+									str(T.size//AT.size),
+									""
 								)
 							except Exception as e:
 								print(json.dumps(T.json(),indent=4))
@@ -2019,7 +2247,8 @@ the 'container_of' invocation chain.\n   The invocation chain was as follows:\n{
 								AATPD.name,
 								AAT.size//8,
 								"__root_ptr",
-								str(T.size/AAT.size)
+								str(T.size/AAT.size),
+								""
 							)
 							out.write(trigger+"\n")
 							return "%s*"%(AATPD.name)
@@ -2030,7 +2259,8 @@ the 'container_of' invocation chain.\n   The invocation chain was as follows:\n{
 									anonstruct_type_name,
 									AAT.size//8,
 									"__root_ptr",
-									str(T.size//AAT.size)
+									str(T.size//AAT.size),
+									""
 								)
 								out.write(trigger+"\n")
 								return "%s*"%(anonstruct_type_name)
@@ -2041,7 +2271,8 @@ the 'container_of' invocation chain.\n   The invocation chain was as follows:\n{
 										AAT.str,
 										AAT.size//8,
 										"__root_ptr",
-										str(T.size//AAT.size)
+										str(T.size//AAT.size),
+										""
 									)
 								except Exception as e:
 									print(json.dumps(T.json(),indent=4))

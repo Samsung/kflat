@@ -32,6 +32,14 @@
 				'size_expr': <str> /* We have either 'count' or 'size_expr' (takes precedence) attribute */
 			},
 			(...)
+		},
+		"custom_global_element_count_map": {
+			<ghash>: {
+				/* element count info */
+				'count': <int>
+				'size_expr': <str> /* We have either 'count' or 'size_expr' (takes precedence) attribute */
+			},
+			(...)
 		}
 	},
 	"OT_info": {
@@ -133,8 +141,67 @@
 			<mStr>: [(<int>,<int>,<str>),...] /* dereference offset and number of non-literal variables used in dereference expr.
 												 (including original expression) */
 		},
+		"global_deref_map": {
+			<ghash>: [(<int>,<int>,<str>),...] /* dereference offset and number of non-literal variables used in dereference expr.
+												 (including original expression) */
+		},
 		"assign_list": {
-			<mStr>: ...
+			<mStr>: [ <str>, ... ]	/* List of expressions representing assignments/initializations with the member expression on the RHS */
+		},
+		"global_assign_list": {
+			<ghash>: [ <str>, ... ]	/* List of expressions representing assignments/initializations with the pointer global variables on the RHS */
+		},
+		"me_calls": {
+			/* Information regarding member expressions that were passed to any function invocation */
+			<mStr>: [ /* Member expression passed to a function */
+				[
+					<int>,	/* Function ID where the call was made */
+					<int>,  /* ID of the called function */
+					<int>,  /* Index of the called argument */
+					<str>	/* Full expression for the called argument */
+				]
+				(...)
+			],
+			(...)
+		},
+		"me_refcalls": {
+			/* Information regarding member expressions that were passed to any function invocation through pointer */
+			<mStr>: [ /* Member expression passed to a function */
+				[
+					<int>,	/* Function ID where the call was made */
+					<int>,  /* index of the refcall information within a given function */
+					<int>,  /* Index of the called argument */
+					<str>	/* Full expression for the called argument */
+				]
+				(...)
+			],
+			(...)
+		},
+		"g_calls": {
+			/* Information regarding pointer global variables that were passed to any function invocation */
+			<ghash>: [ /* Global pointer variable passed to a function */
+				[
+					<int>,	/* Function ID where the call was made */
+					<int>,  /* ID of the called function */
+					<int>,  /* Index of the called argument */
+					<str>	/* Full expression for the called argument */
+				]
+				(...)
+			],
+			(...)
+		},
+		"g_refcalls": {
+			/* Information regarding pointer global variables that were passed to any function invocation through pointer */
+			<ghash>: [ /* Global pointer variable passed to a function */
+				[
+					<int>,	/* Function ID where the call was made */
+					<int>,  /* index of the refcall information within a given function */
+					<int>,  /* Index of the called argument */
+					<str>	/* Full expression for the called argument */
+				]
+				(...)
+			],
+			(...)
 		},
 		"string_members": {
 			<mStr>: [ <str>, ...], /* list of call expressions passed to the c-string parameters */
