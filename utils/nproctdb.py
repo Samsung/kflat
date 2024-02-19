@@ -1836,8 +1836,8 @@ the 'container_of' invocation chain.\n   The invocation chain was as follows:\n{
 				T,
 				TPD,
 				ptrNestedRefName(gv.name,ptrLevel),
-				element_count_expr,
-				element_count_extra_msg,
+				element_count_expr if ptrLevel==1 else str(1),
+				element_count_extra_msg if ptrLevel==1 else "",
 				ptrLevel,
 				handle_flexible_size
 			)
@@ -3229,21 +3229,15 @@ def main():
 			print ("%s:%s"%('s' if RG.ftdb.types[x[0]].classname=='record' else 't',x[1]))
 		sys.exit(0)
 
-	os.system("setterm -cursor off")
 	gen_count = 0
-
 	while len(deps-deps_done)>0:
 		T,typename = deps.pop()
 		if (T,typename) not in deps_done:
 			deps |= RG.generate_flatten_harness(T,typename)
 			gen_count+=1
-			sys.stdout.write("\r%d"%(gen_count))
-			sys.stdout.flush()
 			deps_done.add((T,typename))
 			anon_typedefs+=RG.anon_typedefs
 			record_typedefs|=RG.record_typedefs
-	sys.stdout.write("\r")
-	os.system("setterm -cursor on")
 
 	print ("--- Generated flattening descriptions for %d types:\n"
 			"\t[%d record recipes, %d record type recipes, %d typename recipes]\n"
