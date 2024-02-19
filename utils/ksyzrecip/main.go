@@ -111,21 +111,21 @@ func compileErrorHandler(pos ast.Pos, msg string) {
 	}
 }
 
-func shouldQueue(typ prog.Type) (bool, prog.Type) {
+func shouldQueue(typ prog.Type) (bool, bool, prog.Type) {
+	var isPointer bool = false
 again:
 	switch typ.(type) {
 	case *prog.StructType:
-		return true, typ
-		break
+		return true, isPointer, typ
 	case *prog.UnionType:
-		return true, typ
-		break
+		return true, isPointer, typ
 	case *prog.PtrType:
 		typ = typ.(*prog.PtrType).Elem
+		isPointer = true
 		goto again
 	}
 
-	return false, nil
+	return false, isPointer, nil
 }
 
 func recordMap(typ prog.Type, fn func(RecordType, RecordKind)) {
@@ -203,6 +203,7 @@ func generateRecipes(ioctls []*prog.Syscall) {
 
 		// Map containing every type which should have its own flattening function.
 		types := make(map[string]prog.Type)
+		traversed := make(map[string]int)
 		typQueue := make([]prog.Type, 1)
 		typQueue[0] = insideType
 
@@ -212,7 +213,10 @@ func generateRecipes(ioctls []*prog.Syscall) {
 			iter = typ
 			typQueue = append(typQueue[:0], typQueue[1:]...)
 			if _, ok := types[typ.Name()]; ok {
-				continue
+				val, ok := traversed[typ.Name()]
+				if ok && val > 1 {
+					continue
+				}
 			}
 
 			// We don't queue pointers, but the entry might just be a pointer so this is here just in case.
@@ -226,18 +230,16 @@ func generateRecipes(ioctls []*prog.Syscall) {
 			recordMap(iter, func(typ RecordType, _ RecordKind) {
 				for _, field := range typ.RecordFields() {
 					// Queue up only records and if field is a pointer to a record, dereference it and queue it
-					ok, t := shouldQueue(field.Type)
+					ok, pointer, t := shouldQueue(field.Type)
 					if ok {
 						typQueue = append(typQueue, t)
+						if pointer {
+							types[t.TemplateName()] = t
+						}
 					}
 				}
 			})
-
-			if t, ok := hasPointer(typ); ok {
-				for _, typp := range t {
-					types[typp.Name()] = typp
-				}
-			}
+			traversed[iter.TemplateName()] += 1
 		}
 
 		// Add the root type
