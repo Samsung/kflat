@@ -231,12 +231,6 @@ func generateRecipes(ioctls []*prog.Syscall) {
 						typQueue = append(typQueue, t)
 					}
 				}
-
-				// Casting our own RecordType to syzkaller prog.Type, I probably will have typQueue to contain only our own defined types
-				progTyp := toProgType(typ)
-				if _, ok := hasPointer(progTyp); ok {
-					types[progTyp.Name()] = progTyp
-				}
 			})
 
 			if t, ok := hasPointer(typ); ok {
@@ -286,7 +280,7 @@ func generateRecipes(ioctls []*prog.Syscall) {
 				}
 				f.WriteString(fmt.Sprintf(formatStr, k.TemplateName(), calculateActualSize(k)))
 				needExpansion(k, f)
-				f.WriteString(");\n")
+				f.WriteString(");\n\n")
 			})
 		}
 	}
@@ -327,6 +321,7 @@ func needExpansion(t prog.Type, w io.Writer) {
 			for _, field := range typ.RecordFields() {
 				ptr, ok := field.Type.(*prog.PtrType)
 				if !ok {
+					typQueue = append(typQueue, field.Type)
 					fieldOffset += calculateActualSize(field.Type)
 					continue
 				}
@@ -335,10 +330,10 @@ func needExpansion(t prog.Type, w io.Writer) {
 					var formatString string
 					switch kind {
 					case KIND_STRUCT:
-						formatString = "\n\tAGGREGATE_FLATTEN_STRUCT_SELF_CONTAINED(%s, %d, %s, %d);\n"
+						formatString = "\n\tAGGREGATE_FLATTEN_STRUCT_SELF_CONTAINED(%s, %d, %s, %d);"
 						break
 					case KIND_UNION:
-						formatString = "\n\tAGGREGATE_FLATTEN_UNION_SELF_CONTAINED(%s, %d, %s, %d);\n"
+						formatString = "\n\tAGGREGATE_FLATTEN_UNION_SELF_CONTAINED(%s, %d, %s, %d);"
 						break;
 					}
 
@@ -353,6 +348,7 @@ func needExpansion(t prog.Type, w io.Writer) {
 			}
 		})
 	}
+	w.Write([]byte("\n"))
 }
 
 func removeDir(path string) error {
