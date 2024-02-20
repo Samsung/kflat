@@ -43,9 +43,16 @@ static bool __used x86_read_ua(void) {
 
 #ifdef CONFIG_ARM64
 
+#include <asm/processor.h>
+
+static inline bool arm64_is_canonical_addr(void *addr) {
+    unsigned long _addr = (unsigned long) addr;
+    return is_ttbr0_addr(_addr) || is_ttbr1_addr(_addr);
+}
+
 static inline bool arm64_is_kernel_addr(void *addr) {
-    unsigned long upper = ((unsigned long) addr) >> 63;
-    return upper == 1;
+    unsigned long _addr = (unsigned long) addr;
+    return is_ttbr1_addr(_addr);
 }
 
 /* ARM assembler doesn't understand MRS Xt, PAN for some reason, so we have to assemble 

@@ -500,7 +500,9 @@ size_t kdump_test_address(void* addr, size_t size) {
 #ifdef CONFIG_X86_64
     if(!x86_test_addr_canonical(addr))
         return 0;  
-
+#elif defined(CONFIG_ARM64)
+    if(!arm64_is_canonical_addr(addr))
+        return 0;
 #endif
 
     is_kernel_addr = arch_is_kernel_addr(addr);
