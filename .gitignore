@@ -16,6 +16,9 @@
 *.bc
 *.bin
 
+build/
+Kbuild
+
 modules.order
 Module.symvers
 .vscode/
@@ -33,3 +36,4 @@ recipes/output
 tests/tests_list.h
 tests/kflat_tests_list.h
 tests/uflat_tests_list.h
+tests/tests_list_gen.sh

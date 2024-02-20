@@ -2,7 +2,7 @@
  * Samsung R&D Poland - Mobile Security Group (srpol.mb.sec@samsung.com)
  */
 
-#include "common.h"
+#include "common_tools.h"
 
 #include <errno.h>
 #include <stdarg.h>

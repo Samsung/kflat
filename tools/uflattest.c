@@ -24,8 +24,8 @@
 
 #include "uflat.h"
 
-#include "../tests/uflat_tests_list.h"
-#include "common.h"
+#include "uflat_tests_list.h"
+#include "common_tools.h"
 
 
 struct args {
@@ -484,5 +484,5 @@ int main(int argc, char** argv) {
                     OUTPUT_COLOR(LOG_INFO_COLOR), OUTPUT_COLOR(LOG_DEFAULT_COLOR));
     }
 
-    return success < count;
+    return count - success;
 }

@@ -23,10 +23,10 @@
 #include <ucontext.h>
 #include <unistd.h>
 
-#include "common.h"
+#include "common_tools.h"
 #include "kflat_uapi.h"
 
-#include "../tests/kflat_tests_list.h"
+#include "kflat_tests_list.h"
 
 
 #define KFLAT_NODE      "/sys/kernel/debug/kflat"
@@ -540,11 +540,11 @@ int main(int argc, char** argv) {
         log_info("Summary: %d/%d tests succeeded", success, count);
         if(success < count)
             log_error("%d tests %sFAILED%s", count - success, 
-                    OUTPUT_COLOR(LOG_ERR_COLOR), OUTPUT_COLOR(LOG_DEFAULT_COLOR));
+                    OUTPUT_COLOR(LOG_ERR_COLOR), OUTPUT_COLOR(LOG_DEFAULT_COLOR)); 
         else
             log_info("All tests %spassed%s", 
                     OUTPUT_COLOR(LOG_INFO_COLOR), OUTPUT_COLOR(LOG_DEFAULT_COLOR));
     }
 
-    return 0;
+    return count - success;
 }

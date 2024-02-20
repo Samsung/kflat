@@ -1,0 +1,9 @@
+# Directory names and target names (defined in each recipe's individual CMakeLists.txt) must match
+set(EXTERNAL_RECIPES change_me)
+
+foreach(dir ${EXTERNAL_RECIPES})
+    add_subdirectory(${dir})
+endforeach()
+
+add_custom_target(external_recipes)
+add_dependencies(external_recipes ${EXTERNAL_RECIPES})
