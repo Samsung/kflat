@@ -1,4 +1,0 @@
-obj-m += userspace_flattening.o
-obj-m += ioctl_module/
-EXTRA_CFLAGS := -I${PWD}/include/ -Wno-unused-local-typedefs -DFLATTEN_KERNEL_BSP
-KASAN_SANITIZE := n

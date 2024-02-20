@@ -1,0 +1,9 @@
+KBUILD_EXTRA_SYMBOLS=@CMAKE_BINARY_DIR@/core/Module.symvers
+
+KCOV_INSTRUMENT	:= n
+KASAN_SANITIZE 	:= n
+
+ccflags-y := -std=gnu99 -Wno-unused-local-typedef -DFLATTEN_KERNEL_BSP -I@CMAKE_SOURCE_DIR@/include/
+obj-m += @RECIPE_SOURCE_NAME@.o
+
+@CUSTOM_EXTRA_OPTS@

@@ -1,2 +1,0 @@
-EXTRA_CFLAGS := -I${PWD}/include/
-obj-m += ioctl_module.o

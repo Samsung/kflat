@@ -1,0 +1,27 @@
+# Samsung R&D Poland - Mobile Security Group
+
+TOPDIR := @CMAKE_SOURCE_DIR@
+ccflags-y := -std=gnu99 -Wno-unused-local-typedefs -I@CMAKE_SOURCE_DIR@/include/ $(patsubst %,-D%,$(KFLAT_OPTS)) -DFLATTEN_KERNEL_BSP -g
+
+LINUX_INCLUDES := ${LINUX_INCLUDES} @CMAKE_SOURCE_DIR@/include/
+
+# Disable KCOV and KASAN for whole KFLAT kernel module
+KCOV_INSTRUMENT		:= n
+KASAN_SANITIZE 		:= n
+
+# Build kflat core module
+kflat_core-y = kflat.o kflat_impl.o probing.o kdump.o flatten_impl.o probing_@CMAKE_SYSTEM_PROCESSOR@.o
+
+# Build kflat tests
+ccflags-y += -I${TOPDIR}/tests -D__TESTER__
+
+common_test_files = $(wildcard $(src)/tests/*.c)
+common_filenames = $(notdir $(common_test_files))
+kflat_test_files = $(wildcard $(src)/tests/kflat/*.c)
+kflat_filenames = $(notdir $(kflat_test_files))
+out_files = $(addprefix tests/, $(common_filenames:.c=.o))
+out_files += $(addprefix tests/kflat/, $(kflat_filenames:.c=.o))
+kflat_core-y += $(out_files)
+
+# Create .ko file
+obj-m := kflat_core.o
