@@ -1314,7 +1314,8 @@ We then assume that this pointer is pointing to a single element of a given type
 		if record_count_tuple[1] is not None:
 			return (record_count_tuple[1],'')
 		else:
-			detect_element_count_expr = "\n  AGGREGATE_FLATTEN_DETECT_OBJECT_SIZE_SELF_CONTAINED(%s,%d,%d)/%s"%(ptrNestedRefName(refname,ptrLevel),refoffset//8,refsize//8,refsize//8)
+			size_in_bytes = max(1, refsize//8)
+			detect_element_count_expr = "\n  AGGREGATE_FLATTEN_DETECT_OBJECT_SIZE_SELF_CONTAINED(%s,%d,%d)/%s"%(ptrNestedRefName(refname,ptrLevel),refoffset//8,size_in_bytes,size_in_bytes)
 			if record_count_tuple[0] is not None:
 				if record_count_tuple[4]!='default':
 					return (str(record_count_tuple[0]),'')
@@ -1391,7 +1392,8 @@ We then assume that this pointer is pointing to a single element of a given type
 		if record_count_tuple[1] is not None:
 			return (record_count_tuple[1],'')
 		else:
-			detect_element_count_expr = "\n  FLATTEN_DETECT_OBJECT_SIZE(%s,%s)/%s"%(ptrname,PTE.size//8,PTE.size//8)
+			size_in_bytes = max(1, PTE.size // 8)
+			detect_element_count_expr = "\n  FLATTEN_DETECT_OBJECT_SIZE(%s,%s)/%s"%(ptrname,size_in_bytes,size_in_bytes)
 			if record_count_tuple[0] is not None:
 				if record_count_tuple[4]!='default':
 					return (str(record_count_tuple[0]),'')
