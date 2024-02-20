@@ -1,17 +1,10 @@
 # Userspace memory flattening
 A recipe created to test the user memory flattening.
 ## Building
-In the `kflat/` directory run  
-```bash
-make -j32
-```
-and in the `kflat/recipes/userspace_flattening/` run
-```bash
-g++ -I../../lib/ -I../../include/ -o ioctl_client ioctl_client.cpp ../../lib/libExecFlat.a
-```
+The `ioctl_module` and the `client_app` should be build automatically whenever the `userspace_flattening` target is built. 
 
 ## Running
-Load kernel modules (from the `kflat/` directory):
+Load kernel modules (from the CMake build directory):
 ```bash
 insmod core/kflat_core.ko
 insmod recipes/userspace_flattening/userspace_flattening.ko

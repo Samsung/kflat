@@ -10,24 +10,14 @@ This kernel module is build alongside all other files in this repo - simply ente
 directory of KFLAT repo and run `make` command as described in README.md. After that,
 there should be file `task_current_recipe.ko` present in this directory.
 
-Building userspace test app is a bit more complex as it has to be done manually.
-
-```bash
-CFLAGS="-I../../include -I../../lib -I../../lib/include_priv --static"
-
-# Target: x86_64
-g++ $CFLAGS -o task_current_client task_current_client.cpp ../../lib/libunflatten_x86_64.a -lstdc++
-
-# Target: ARM64
-aarch64-linux-gnu-g++ $CFLAGS -o task_current_client task_current_client.cpp ../../lib/libunflatten_arm64.a -lstdc++
-```
+The userspace app will be build automtically whenever the `task_current` target is built.
 
 ## Run
 
 Load modules `kflat_core.ko` and `task_current_recipe.ko`. Next, use tool `tools/executor` to invoke recipe.
 
 ```bash
-$ tools/executor -o task_struct.bin -f -s task_struct_example
+$ tools/executor -f -o task_struct.bin MANUAL task_struct_example
 ```
 
 Finally, execute `./task_current_client <output_file>` app to test flattening and display

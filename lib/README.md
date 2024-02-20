@@ -13,13 +13,26 @@ For detailed instructions for each of these libraries, please refer to the follo
 
 ## Building
 
-Both of these libraries are built during full Kflat repository build (i.e. when running `make` without targets in the root project
-directory). Apart from that, you can build only selected library with commands:
+Both of these libraries are built during full Kflat repository build. Apart from that, you can build only selected library with commands:
 
 ```sh
+mkdir -p build && cd build
+cmake ..
 # Build Uflat
-make uflat
-
+cmake --build . --target uflat
 # Build Unflattten library
-make library
+cmake --build . --target unflatten
+```
+
+If you want to build the klee libraries, you might have to specify the path where the `clang++-13` is located, as well as the path to the klee libc++ with commands 
+```bash
+cmake -DKLEE_CLANGXX_PATH=<path> -DKLEE_LIBCXX_INSTALL=<path> ..
+cmake --build . --target klee_libs
+```
+
+If you want to build the libraries with DFSAN, you need to specify the path where the `clang-15` is located:
+
+```bash
+cmake -DDFSAN_CLANG_PATH==<path> ..
+cmake --build . --target dfsan_libs
 ```

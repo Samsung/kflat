@@ -59,20 +59,39 @@ KFLAT_RECIPE_MODULE("<Description of your module>");
 
 ## Creating module
 
-To add new kflat recipe, upload `.c`/`.h` files to the new directory and add Kbuild file with the following content:
+To add new kflat recipe, upload `.c`/`.h` files to the new directory and copy the CMakeLists.txt.template file (rename it to CMakeLists.txt).
+The CMakeLists.txt should look as follows:
+```cmake
+set(KBUILD_CMD $(MAKE) M=${CMAKE_CURRENT_BINARY_DIR} src=${CMAKE_CURRENT_SOURCE_DIR} ${KBUILD_FLAGS} modules)
+# Edit these two lines
+set(RECIPE_SOURCE_NAME edit_me)
+set(TARGET_NAME edit_me)
 
-```make
-obj-m += your-c-file-1.o your-c-file-2.o
-EXTRA_CFLAGS := -I${PWD}/include/
+configure_file(${CMAKE_SOURCE_DIR}/cmake/Kbuild.recipe_template.in ${CMAKE_CURRENT_SOURCE_DIR}/Kbuild @ONLY)
+
+add_custom_command(
+    OUTPUT ${RECIPE_SOURCE_NAME}
+    COMMAND ${KBUILD_CMD}
+    WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+    VERBATIM
+)set(RECIPES random_read memory_map drm_framebuffer task_current userspace_flattening)
+
+add_custom_target(${TARGET_NAME} ALL DEPENDS kflat_core ${RECIPE_SOURCE_NAME})
 ```
+Let's say we want to create a new recipe called `my_kflat_example`. The source file is `recipes/my_kflat_example/my_kflat_example_recipe.c`.
+Then we should set `RECIPE_SOURCE_NAME` to `my_kflat_example_recipe` and `TARGET_NAME` to `my_kflat_example`. The directory name conaining sources and the TARGET_NAME should be the same.
 
-Next, update Kbuild file present in this directory by appending the name of newly created directory to `obj-m` statement. 
-
+Next, we need to update the `recipes/CMakeLists.txt` by adding the target to `RECIPES`:
 ```diff
-  obj-m += random_read/
-+ obj-m += your-directory/
+- set(RECIPES random_read memory_map drm_framebuffer task_current userspace_flattening)
++ set(RECIPES random_read memory_map drm_framebuffer task_current userspace_flattening my_kflat_example)
 ```
-Finally, build the module by invoking `make` command in the root directory of this project.
+
+Finally, build the module by invoking `cmake .. && cmake --build . --target my_kflat_example` command in the cmake build directory of this project.
+
+Note: CMake seems to get confused when you set `RECIPE_SOURCE_NAME` and `TARGET_NAME` to the same value, so don't do it.
+
+If you need to build e.g. additional userspace client applications to trigger the recipe, you can also do it in the CMakeLists.txt. Make sure to add the app as the recipe's dependency, so it will be build automatically whenever the recipe is build. See the `userspace_flattening` example for reference.
 
 ## Appendix
 

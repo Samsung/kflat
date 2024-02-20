@@ -12,7 +12,9 @@ apt install linux-headers
 Next, download KFLAT repository and simply run `make` to build it for your current kernel using default compiler.
 ```bash
 git clone https://github.com/samsung/kflat && cd kflat
-make -j8
+mkdir build && cd build
+cmake ..
+cmake --build . -j32
 ```
 
 Once these commands succeed you should end up with `kflat_core.ko` kernel module in `core/` directory.

@@ -20,26 +20,42 @@ In order to build kflat framework you're gonna need:
 - the source of targeted linux kernel
 - the C compiler used to build this kernel
 - the C++ compiler for the target architecture - for instance, `aarch64-linux-gnu-g++`
+- CMake in version >= 3.15
 
 After collecting the above requirements, you can build kflat for your target architecture by using commands below:
 
-**ARM64:**
+### x86_64:
 ```sh
-export KERNEL_DIR="<path to kernel source>"
-export CLANG_DIR="<path to clang directory>"
-make KDIR=$KERNEL_DIR CCDIR=$CLANG_DIR ARCH=arm64
+mkdir build && cd build
+cmake ..
+# to build all
+cmake --build .
+# or to build only a specific target (e.g. executor)
+cmake --build . --target executor
 ```
 
-**x86_64**:
+### ARM64:
+First, you need to edit the `cmake/arm64_cross_compile.cmake` by specifying the paths to KDIR and CLANG_DIR.
 ```sh
-export KERNEL_DIR="<path to kernel source>"
-export CLANG_DIR="<path to clang directory>"
-make KDIR=$KERNEL_DIR CCDIR=$CLANG_DIR ARCH=x86_64
+mkdir build_arm && cd build_arm
+cmake -DCMAKE_TOOLCHAIN_FILE=../cmake/arm64_cross_compile.cmake ..
+# to build all
+cmake --build .
+# or to build only a specific target (e.g. executor)
+cmake --build . --target executor
+```
+
+You can also list all available targets with
+```sh
+cmake --build . --target help
 ```
 
 There are some extra build parameters than can be set:
 - `KFLAT_OPTS` - enable extra/testing features in kflat_core module, like `KFLAT_GET_OBJ_SUPPORT`,
 - `KLEE_LIBCXX_INSTALL` - if you wish to build kflat library with support for KLEE symbolic execution engine, specify here the path to libc++ library built for KLEE.
+
+## Testing
+The tests can be run manually with the `kflattest`, `uflattest` binaries located in the tools/ directory. You can also use the build-in CMake testing feature by running the `ctest` (or `ctest --verbose` if you want to see the result of every single test) command in the CMake build directory.
 
 ## Project layout
 

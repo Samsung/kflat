@@ -10,18 +10,7 @@ This kernel module is build alongside all other files in this repo - simply ente
 root directory of KFLAT repository and run `make` command from README.md. After that, there should
 be file `memory_map_recipe.ko` present in this directory.
 
-Building userspace test app is a bit more complicated as it has to be done manually. See
-below example commands for cross-compiling for ARM64 and for native compiling for x86_64.
-
-```bash
-CFLAGS="-I../../include -I../../lib -I../../lib/include_priv --static"
-
-# Target: x86_64
-g++ $CFLAGS -o client_app client_app.cpp ../../lib/libunflatten_x86_64.a -lstdc++
-
-# Target: ARM64
-aarch64-linux-gnu-g++ $CFLAGS -o client_app client_app.cpp ../../lib/libunflatten_arm64.a -lstdc++
-```
+The userspace app will be build automtically whenever the `memory_map` target is built.
 
 ## Run
 
