@@ -85,7 +85,7 @@ add_custom_target(unflatten DEPENDS unflatten_static unflatten_shared)
 
 # These targets require a specific compiler, so they have to be built manually by custom commands.
 find_program(clang++-13_FOUND clang++-13 NOCACHE PATH ${KLEE_CLANGXX_PATH})
-if (KLEE_LIBCXX_INSTALL)
+if (KLEE_LIBCXX_INSTALL AND clang++-13_FOUND)
     set(KLEE_COMPILER ${clang++-13_FOUND})
     set(KLEE_FLAGS -emit-llvm -D KLEE_SUPPORT -c -std=c++11  -nostdinc++)
     set(KLEE_INCLUDES -I${CMAKE_SOURCE_DIR}/include -I${CMAKE_SOURCE_DIR}/lib/include_priv -I${KLEE_LIBCXX_INSTALL}/include/c++/v1/)
