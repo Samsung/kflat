@@ -32,7 +32,7 @@ if(NOT CMAKE_CROSSCOMPILING)
 endif()
 
 # Flags passed to the make command when building kernel modules
-set(KBUILD_FLAGS -C ${KDIR}  CC=${CMAKE_C_COMPILER} LD=${CMAKE_LINKER})
+set(KBUILD_FLAGS -C ${KDIR} CC=${CMAKE_C_COMPILER} LD=${CMAKE_LINKER})
 if(CMAKE_SYSTEM_PROCESSOR MATCHES arm64)
     list(
         APPEND KBUILD_FLAGS 

@@ -93,6 +93,91 @@ Note: CMake seems to get confused when you set `RECIPE_SOURCE_NAME` and `TARGET_
 
 If you need to build e.g. additional userspace client applications to trigger the recipe, you can also do it in the CMakeLists.txt. Make sure to add the app as the recipe's dependency, so it will be build automatically whenever the recipe is build. See the `userspace_flattening` example for reference.
 
+## Building modules outside of the kflat project
+If you want to build kflat recipes outside of the kflat project diretory, you can use the `RECIPE_DIRS` variable.
+
+First, you need to create a root directory with `CMakeLists.txt` based on the template `kflat/cmake/CMakeLists.txt.external_recipes_root`. 
+
+Next, put directories with recipes inside the root directory. In each recipe's directory there must a `CMakeLists.txt` file based on the template `kflat/cmake/CMakeLists.txt.recipe_template`.
+
+Let's consider the following directory structure:
+
+```
+external/
+├─ example1/
+│  ├─ example1_recipe.c
+│  ├─ CMakeLists.txt
+├─ example2/
+│  ├─ example2_recipe.c
+│  ├─ CMakeLists.txt
+├─ CMakeLists.txt
+```
+
+The `CmakeLists.txt` files should be as follows:
+
+#### external/CMakeLists.txt:
+```cmake
+# Directory names and target names (defined in each recipe's individual CMakeLists.txt) must match
+set(EXTERNAL_RECIPES example1 example2)
+
+foreach(dir ${EXTERNAL_RECIPES})
+    add_subdirectory(${dir})
+endforeach()
+
+add_custom_target(external_recipes)
+add_dependencies(external_recipes ${EXTERNAL_RECIPES})
+```
+
+#### external/example1/CMakeLists.txt
+```cmake
+set(KBUILD_CMD $(MAKE) M=${CMAKE_CURRENT_BINARY_DIR} src=${CMAKE_CURRENT_SOURCE_DIR} ${KBUILD_FLAGS} modules)
+set(RECIPE_SOURCE_NAME example1_recipe)
+set(TARGET_NAME example1)
+
+configure_file(${CMAKE_SOURCE_DIR}/cmake/Kbuild.recipe_template.in ${CMAKE_CURRENT_SOURCE_DIR}/Kbuild @ONLY)
+
+add_custom_command(
+    OUTPUT ${RECIPE_SOURCE_NAME}
+    COMMAND ${KBUILD_CMD}
+    WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+    VERBATIM
+)
+
+add_custom_target(${TARGET_NAME} ALL DEPENDS kflat_core ${RECIPE_SOURCE_NAME})
+```
+
+#### external/example2/CMakeLists.txt
+```cmake
+set(KBUILD_CMD $(MAKE) M=${CMAKE_CURRENT_BINARY_DIR} src=${CMAKE_CURRENT_SOURCE_DIR} ${KBUILD_FLAGS} modules)
+set(RECIPE_SOURCE_NAME example2_recipe)
+set(TARGET_NAME example2)
+
+configure_file(${CMAKE_SOURCE_DIR}/cmake/Kbuild.recipe_template.in ${CMAKE_CURRENT_SOURCE_DIR}/Kbuild @ONLY)
+
+add_custom_command(
+    OUTPUT ${RECIPE_SOURCE_NAME}
+    COMMAND ${KBUILD_CMD}
+    WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+    VERBATIM
+)
+
+add_custom_target(${TARGET_NAME} ALL DEPENDS kflat_core ${RECIPE_SOURCE_NAME})
+```
+
+Now, you can build all the recipes in `RECIPE_DIRS` by running
+```bash
+# in kflat/build
+cmake -DRECIPE_DIRS=/path/to/external ..
+cmake --build . -j32 --target external_recipes 
+```
+
+or you can build specific recipes by setting the target to their `TARGET_NAME`. The following:
+```bash
+# in kflat/build
+cmake -DRECIPE_DIRS=/path/to/external ..
+cmake --build . -j32 --target example1
+```
+will only build the recipe located in `external/example1`.
 ## Appendix
 
 ### Accessing function arguments
