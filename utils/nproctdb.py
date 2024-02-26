@@ -46,7 +46,7 @@ def ptrNestedRefNameOrRoot(refname, ptrLevel, nestedPtr=False, refoffset=0):
 		return "__" + "_".join(refname.split(".")) + "_" + str(ptrLevel)
 	return "__root_ptr"
 
-def isAnonRecordDependent(RT, depT) -> bool:
+def isAnonRecordDependent(RT, depT, ftdb) -> bool:
 	if RT.id == depT.id:
 		return True
 	elif (depT.classname == "const_array" or depT.classname == "incomplete_array") and depT.refs[0] == RT.id:
@@ -54,6 +54,11 @@ def isAnonRecordDependent(RT, depT) -> bool:
 		return True
 	elif depT.classname == "pointer" and depT.refs[0] == RT.id:
 		return True
+	else:
+		if depT.classname == "const_array" or depT.classname == "incomplete_array":
+			depT = ftdb.types[depT.refs[0]]
+			if depT.classname == "const_array" or depT.classname == "incomplete_array" and depT.refs[0] == RT.id:
+				return True
 	return False
 
 def prepend_non_empty_lines(s,v):
@@ -664,6 +669,46 @@ LINUXINCLUDE := ${{LINUXINCLUDE}}
 		self.anchor_list = set([])
 		self.char_type = self.get_char_type()
 
+	def _find_member_offset(self,RT,member_to_find,ftdb):
+
+		real_refs = list()
+		ignore_count=0
+		for i in range(len(RT.refnames)-RT.attrnum):
+			if i in RT.decls and ( RT.refnames[i]!="__!anonrecord__" or (i+1<len(RT.refs) and 
+				isAnonRecordDependent(ftdb.types[RT.refs[i]],ftdb.types[RT.refs[i+1]],ftdb))):
+				ignore_count+=1
+				continue
+			real_refs.append( (RT.refs[i],RT.refnames[i],RT.memberoffsets[i-ignore_count],[],[]) )
+		while len(real_refs)>0:
+			mTID,mName,mOff,mOffLst,rfnLst = real_refs.pop(0)
+			refname = ".".join(rfnLst+[mName])
+			moffset = sum(mOffLst+[mOff])
+			MT = ftdb.types[mTID]
+			if MT.classname=="typedef":
+				MT = self.walkTPD(MT,ftdb)
+			if MT.classname=="record":
+				if member_to_find==refname:
+					return moffset
+				internal_real_refs = list()
+				if not member_to_find.startswith(refname):
+					continue
+				ignore_count=0
+				for i in range(len(MT.refnames)-MT.attrnum):
+					if i in MT.decls and ( MT.refnames[i]!="__!anonrecord__" or (i+1<len(MT.refs) and 
+						isAnonRecordDependent(ftdb.types[MT.refs[i]],ftdb.types[MT.refs[i+1]],ftdb))):
+						ignore_count+=1
+						continue
+					else:
+						member_list = list()
+						if mName!="__!anonrecord__":
+							member_list.append(mName)
+						internal_real_refs.append( (MT.refs[i],MT.refnames[i],MT.memberoffsets[i-ignore_count],mOffLst+[mOff],rfnLst+member_list) )
+				real_refs = internal_real_refs+real_refs
+				continue
+			if member_to_find==refname:
+				return moffset
+		return None
+
 	def parse_arguments(self, args: List[str], globals_file: Optional[str] = None, func: Optional[str] = None) -> Tuple[list, list, set]:
 		"""
 		Accepted input format:
@@ -799,12 +844,37 @@ LINUXINCLUDE := ${{LINUXINCLUDE}}
 		def trig_info_offset_calculate(offset):
 			if isinstance(offset,int):
 				return str(offset)
-			sizeof_pattern = re.compile("@\{[st]\:[\w]+\}")
+			sizeof_pattern = re.compile("@\{\s*[st]\:[\w]+\s*\}")
+			offsetof_pattern = re.compile("\$\{\s*[\w]+\s*,\s*[st]\:[\w]+\s*\}")
 			m = sizeof_pattern.search(offset)
 			while m:
 				dep, size, classname = _find_RI_for_func(m.group()[2:-1].split(":")[1])
-				offset = offset[:m.span()[0]] + f'((size_t){size})' + offset[m.span()[0] + m.span()[1]-m.span()[0]:]
+				offset = offset[:m.span()[0]] + f'((size_t){size})' + offset[m.span()[1]:]
 				m = sizeof_pattern.search(offset)
+			m = offsetof_pattern.search(offset)
+			while m:
+				offsetof_params = m.group()[2:-1]
+				offT = offsetof_params.split(",")
+				if len(offT)!=2:
+					print(f"EE- Invalid offsetof specification string: '{offsetof_params}'")
+					exit(1)
+				member = offT[0]
+				record_string = offT[1]
+				dep, size, classname = _find_RI_for_func(record_string.split(":")[1])
+				RT = self.ftdb.types[dep[0]]
+				if RT.classname=='typedef':
+					RT = self.walkTPD(RT)
+				offval = self._find_member_offset(RT,member,self.ftdb)
+				if offval is None:
+					print(f"EE- Failed to compute record offset for member '{member}' @ '{record_string}'")
+					exit(1)
+				__prefix,__tag = record_string.split(":")
+				if __prefix=='s':
+					tp = f'struct {__tag}'
+				else:
+					tp = f'{__tag}'
+				offset = offset[:m.span()[0]] + f'((size_t){offval//8}/*offsetof({member},{tp})*/)' + offset[m.span()[1]:]
+				m = offsetof_pattern.search(offset)
 			return offset
 
 		trigger_info_map = {}
@@ -992,10 +1062,12 @@ LINUXINCLUDE := ${{LINUXINCLUDE}}
 			self.not_safe_count+=1
 		return safe_info
 
-	def walkTPD(self,TPD):
+	def walkTPD(self,TPD,ftdb=None):
+		if ftdb is None:
+			ftdb = self.ftdb
 		T = self.ftdb.types[TPD.refs[0]]
 		if T.classname=="typedef":
-			return self.walkTPD(T)
+			return self.walkTPD(T,ftdb)
 		else:
 			return T
 
@@ -2407,7 +2479,7 @@ the 'container_of' invocation chain.\n   The invocation chain was as follows:\n{
 				#  summary: ignore all "__!recorddecl__" from decls and "__!anonrecord__" if there's the same refs entry that follows
 				for i in range(len(TRT.refnames)-TRT.attrnum):
 					if i in TRT.decls and ( TRT.refnames[i]!="__!anonrecord__" or (i+1<len(TRT.refs) and 
-							isAnonRecordDependent(self.ftdb.types[TRT.refs[i]],self.ftdb.types[TRT.refs[i+1]]))):
+							isAnonRecordDependent(self.ftdb.types[TRT.refs[i]],self.ftdb.types[TRT.refs[i+1]],self.ftdb))):
 						ignore_count+=1
 						continue
 					
@@ -2611,7 +2683,7 @@ the 'container_of' invocation chain.\n   The invocation chain was as follows:\n{
 					ignore_count=0
 					for i in range(len(RT.refnames)-RT.attrnum):
 						if i in RT.decls and ( RT.refnames[i]!="__!anonrecord__" or (i+1<len(RT.refs) and 
-								isAnonRecordDependent(self.ftdb.types[RT.refs[i]],self.ftdb.types[RT.refs[i+1]]))):
+								isAnonRecordDependent(self.ftdb.types[RT.refs[i]],self.ftdb.types[RT.refs[i+1]],self.ftdb))):
 							ignore_count+=1
 							continue
 						else:
