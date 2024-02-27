@@ -77,7 +77,7 @@ bool check_kfence_address(void* ptr, void** start, void** end) {
  * 	found in mm/slab.h
  */
 static inline bool _kmem_cache_debug_flags(struct kmem_cache *s, slab_flags_t flags) {
-#ifdef CONFIG_SLUB_DEBUG_ON
+#ifdef CONFIG_SLUB_DEBUG
 		return s->flags & flags;
 #else
 	return false;
