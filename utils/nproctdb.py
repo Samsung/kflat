@@ -29,6 +29,14 @@ __authors__ = "Samsung R&D Poland - Mobile Security Group (srpol.mb.sec@samsung.
 
 
 ##################################
+# Static variables
+##################################
+
+OFFSET_KIND_SYMBOLIC=1
+OFFSET_KIND_CONCRETE=2
+OFFSET_KIND_MIXED=3
+
+##################################
 # Global helpers
 ##################################
 def indent(s, n=1):
@@ -204,7 +212,8 @@ class RecipeGenerator(object):
 	# 4 - record count
 	# 5 - safe info
 	# 6 - extra message
-	template_flatten_struct_pointer_recipe = "{6}FLATTEN_{0}_ARRAY_SELF_CONTAINED({1},{2},{3},{4}); {5}"
+	# 7 - shift value
+	template_flatten_struct_pointer_recipe = "{6}FLATTEN_{0}_ARRAY_SHIFTED_SELF_CONTAINED({1},{2},{3},{4},{7}); {5}"
 	
 	# 0 - typename
 	# 1 - typesize
@@ -212,7 +221,8 @@ class RecipeGenerator(object):
 	# 3 - record count
 	# 4 - safe info
 	# 5 - extra message
-	template_flatten_struct_type_pointer_recipe = "{5}FLATTEN_STRUCT_TYPE_ARRAY_SELF_CONTAINED({0},{1},{2},{3}); {4}"
+	# 6 - shift value
+	template_flatten_struct_type_pointer_recipe = "{5}FLATTEN_STRUCT_TYPE_ARRAY_SHIFTED_SELF_CONTAINED({0},{1},{2},{3},{6}); {4}"
 	
 
 	# 0 - typename
@@ -278,6 +288,17 @@ class RecipeGenerator(object):
 	template_flatten_pointer_recipe = """{8}AGGREGATE_FLATTEN_TYPE_ARRAY_SELF_CONTAINED({0},{1},{2},{3});\nFOREACH_POINTER({0},{4},{5},{3},{6}
 {7}
 );"""
+
+	# 0 -
+	# 1 -
+	# 2 -
+	# 3 - element count
+	# 4 - safe info
+	# 5 - internal pointer flattening recipe
+	# 6 - extra message
+	template_flatten_pointer_storage_recipe = """{6}FOREACH_POINTER({0},{1},{2},{3},{4}
+{5}
+);"""
 	
 	# 0 - 
 	# 1 - 
@@ -332,6 +353,31 @@ class RecipeGenerator(object):
 	# 3 - member offset
 	# 4 - safe info
 	template_flatten_struct_type_flexible_recipe = "AGGREGATE_FLATTEN_STRUCT_TYPE_FLEXIBLE_SELF_CONTAINED({0},{1},{2},{3}); {4}"
+
+	# 0 - typename
+	# 1 - typesize
+	# 2 - refname
+	# 3 - member offset
+	template_flatten_type_array_flexible_recipe = "AGGREGATE_FLATTEN_TYPE_ARRAY_FLEXIBLE_SELF_CONTAINED({0},{1},{2},{3}); {4}"
+
+	# 0 - member pointer typestring
+	# 1 - member array element size
+	# 2 - member array offset
+	# 3 - member array refname
+	# 4 - 
+	# 5 - 
+	# 6 - recipe body
+	# 7 - extra message
+	# 8 - safe info
+	template_flatten_pointer_array_flexible_recipe = \
+"""{7}AGGREGATE_FLATTEN_TYPE_ARRAY_FLEXIBLE_SELF_CONTAINED({0},{1},{3},{2}); {8}
+  FOREACH_POINTER(
+    {0},
+    {4},
+    {5},
+    (AGGREGATE_FLATTEN_DETECT_OBJECT_SIZE_SELF_CONTAINED({3},{2},{1})/{1}),
+  {6}
+  );"""
 
 	# 0 - sizeof(struct list_head)
 	# 1 - 'list_head' member name
@@ -504,8 +550,12 @@ static void* {1} = NULL;"""
 	# 3 - flattening commands
 	# 4 - unique hash of global variable
 	# 5 - pointer to be flattened
+	# 6 - definition of the global
+	# 7 - global hash
 	template_output_global_handler = """
 	// Dump global {0}
+	// hash: '{7}'
+	/* {6} */
 	do {{
 		void* addr = {4}; /* Addr set by pre_handler */
 		if(addr == NULL) {{
@@ -582,7 +632,7 @@ LINUXINCLUDE := ${{LINUXINCLUDE}}
 
 	FLATTEN_STRUCT_BLACKLIST = set(["kflat","hrtimer_clock_base"])
 	FLATTEN_STRUCT_TYPE_BLACKLIST = set([])
-	
+
 	def __init__(self,args):
 		if args.database.endswith('.json') and not os.path.exists(args.database + '.img'):
 				
@@ -669,6 +719,9 @@ LINUXINCLUDE := ${{LINUXINCLUDE}}
 		self.anchor_list = set([])
 		self.char_type = self.get_char_type()
 
+		self.sizeof_pattern = re.compile("@\{\s*[st]\:[\w]+\s*\}")
+		self.offsetof_pattern = re.compile("\$\{\s*[\w]+\s*,\s*[st]\:[\w]+\s*\}")
+
 	def _find_member_offset(self,RT,member_to_find,ftdb):
 
 		real_refs = list()
@@ -708,6 +761,136 @@ LINUXINCLUDE := ${{LINUXINCLUDE}}
 			if member_to_find==refname:
 				return moffset
 		return None
+
+	def _find_enum_type_by_tag(self,tag,ftdb=None):
+		if ftdb is None:
+			ftdb = self.ftdb
+		results = [
+			x
+			for x in ftdb.types
+			if x.classname == 'enum' and x.str == tag and not x.isConst()
+		]
+		if len(results)==0:
+			print(f"EE- Failed to locate enum type with tag - '{tag}'")
+			exit(1)
+		if len(results)>1:
+			print(f"EE- Failed to uniquely identify enum type with tag - '{tag}'")
+			exit(1)
+		return results[0]
+
+	def _find_record_type_by_tag(self,tag,ftdb=None):
+		if ftdb is None:
+			ftdb = self.ftdb
+		results = [
+			x
+			for x in ftdb.types
+			if x.classname == 'record' and x.str == tag and not x.isConst()
+		]
+		if len(results) == 0:
+			print(f"EE- Failed to locate structure type with tag - '{tag}'")
+			exit(1)
+		elif len(results) > 1:
+			print(f"EE- Failed to uniquely identify structure type with tag - '{tag}'")
+			exit(1)
+		return results[0]
+
+	def _find_record_type_by_typestring(self,typestring,ftdb=None):
+		if ftdb is None:
+			ftdb = self.ftdb
+		prefix,tag = typestring.split(":")
+		if prefix=='s':
+			RT = self._find_record_type_by_tag(tag)
+		elif prefix=='t':
+			TPD = self._find_typedef_type_by_name(tag)
+			RT = self.walkTPD(TPD)
+			if RT.classname!='record':
+				print(f"EE- Couldn't resolve a typestring to record type - '{typestring}'")
+		else:
+			print(f"EE- Invalid prefix in record typestring - '{typestring}'")
+		return RT
+
+	def _find_typedef_type_by_name(self,name,ftdb=None):
+		if ftdb is None:
+			ftdb = self.ftdb
+		results = [
+			x
+			for x in ftdb.types
+			if x.classname == 'typedef' and x.name == name and not x.isConst()
+		]
+		if len(results) == 0:
+			print(f"EE- Failed to locate typedef'ed type with name - '{name}'")
+			exit(1)
+		elif len(results) > 1:
+			print(f"EE- Failed to uniquely identify typedef'ed type with name - '{name}'")
+			exit(1)
+		return results[0]
+
+	def _find_builtin_type_by_name(self,name,ftdb=None):
+		if ftdb is None:
+			ftdb = self.ftdb
+		results = [
+			x
+			for x in ftdb.types
+			if x.classname == 'builtin' and x.str == name and not x.isConst()
+		]
+		if len(results) == 0:
+			print(f"EE- Failed to locate builtin type - '{name}'")
+			exit(1)
+		elif len(results) > 1:
+			# Just pick one (for builtin types)
+			pass
+		return results[0]
+
+	def _type_offset_calculate(self,offset,kind=OFFSET_KIND_MIXED,ftdb=None):
+		if ftdb is None:
+			ftdb = self.ftdb
+		if isinstance(offset,int):
+			return str(offset)
+		m = self.sizeof_pattern.search(offset)
+		while m:
+			__prefix,__tag = m.group()[2:-1].split(":")
+			if __prefix=='s':
+				size = self._find_record_type_by_tag(__tag).size//8
+				tp = f'struct {__tag}'
+			else:
+				size = self._find_typedef_type_by_name(__tag).size//8
+				tp = f'{__tag}'
+			if kind==OFFSET_KIND_CONCRETE:
+				replacement_string = f'((size_t){size})'
+			elif kind==OFFSET_KIND_SYMBOLIC:
+				replacement_string = f'(sizeof({tp}))'
+			else:
+				replacement_string = f'((size_t){size}/*sizeof({tp})*/)'
+			offset = offset[:m.span()[0]] + replacement_string + offset[m.span()[1]:]
+			m = self.sizeof_pattern.search(offset)
+		m = self.offsetof_pattern.search(offset)
+		while m:
+			offsetof_params = m.group()[2:-1]
+			offT = offsetof_params.split(",")
+			if len(offT)!=2:
+				print(f"EE- Invalid offsetof specification string: '{offsetof_params}'")
+				exit(1)
+			member = offT[0]
+			record_string = offT[1]
+			RT = self._find_record_type_by_typestring(record_string,ftdb)
+			offval = self._find_member_offset(RT,member,ftdb)
+			if offval is None:
+				print(f"EE- Failed to compute record offset for member '{member}' @ '{record_string}'")
+				exit(1)
+			__prefix,__tag = record_string.split(":")
+			if __prefix=='s':
+				tp = f'struct {__tag}'
+			else:
+				tp = f'{__tag}'
+			if kind==OFFSET_KIND_CONCRETE:
+				replacement_string = f'((size_t){offval//8})'
+			elif kind==OFFSET_KIND_SYMBOLIC:
+				replacement_string = f'(offsetof({member},{tp}))'
+			else:
+				replacement_string = f'((size_t){offval//8}/*offsetof({member},{tp})*/)'
+			offset = offset[:m.span()[0]] + replacement_string + offset[m.span()[1]:]
+			m = self.offsetof_pattern.search(offset)
+		return offset
 
 	def parse_arguments(self, args: List[str], globals_file: Optional[str] = None, func: Optional[str] = None) -> Tuple[list, list, set]:
 		"""
@@ -841,41 +1024,15 @@ LINUXINCLUDE := ${{LINUXINCLUDE}}
 					return trig_info
 			return None
 
-		def trig_info_offset_calculate(offset):
-			if isinstance(offset,int):
-				return str(offset)
-			sizeof_pattern = re.compile("@\{\s*[st]\:[\w]+\s*\}")
-			offsetof_pattern = re.compile("\$\{\s*[\w]+\s*,\s*[st]\:[\w]+\s*\}")
-			m = sizeof_pattern.search(offset)
-			while m:
-				dep, size, classname = _find_RI_for_func(m.group()[2:-1].split(":")[1])
-				offset = offset[:m.span()[0]] + f'((size_t){size})' + offset[m.span()[1]:]
-				m = sizeof_pattern.search(offset)
-			m = offsetof_pattern.search(offset)
-			while m:
-				offsetof_params = m.group()[2:-1]
-				offT = offsetof_params.split(",")
-				if len(offT)!=2:
-					print(f"EE- Invalid offsetof specification string: '{offsetof_params}'")
-					exit(1)
-				member = offT[0]
-				record_string = offT[1]
-				dep, size, classname = _find_RI_for_func(record_string.split(":")[1])
-				RT = self.ftdb.types[dep[0]]
-				if RT.classname=='typedef':
-					RT = self.walkTPD(RT)
-				offval = self._find_member_offset(RT,member,self.ftdb)
-				if offval is None:
-					print(f"EE- Failed to compute record offset for member '{member}' @ '{record_string}'")
-					exit(1)
-				__prefix,__tag = record_string.split(":")
-				if __prefix=='s':
-					tp = f'struct {__tag}'
-				else:
-					tp = f'{__tag}'
-				offset = offset[:m.span()[0]] + f'((size_t){offval//8}/*offsetof({member},{tp})*/)' + offset[m.span()[1]:]
-				m = offsetof_pattern.search(offset)
-			return offset
+		def trig_info_additional_deps(trig_info):
+			deps_list = set()
+			if 'deps' in trig_info:
+				deps = trig_info["deps"]
+				if isinstance(deps,str):
+					deps = [deps]
+				for x in deps:
+					deps_list.add(_find_RI_for_str(x))
+			return deps_list
 
 		trigger_info_map = {}
 		if func and "trigger_list" in self.config["base_config"]:
@@ -919,8 +1076,9 @@ LINUXINCLUDE := ${{LINUXINCLUDE}}
 					if trig_info and int(pos)-1==trig_info["arg_index"]:
 						# Config file tells us to use specific type for this argument
 						dep, size, classname = _find_RI_for_func(trig_info["arg_type"].split(":")[1])
-						func_args_to_dump.append((trig_info["arg_type"].split(":")[1], int(pos), size, classname, trig_info_offset_calculate(trig_info["offset"]),True))
+						func_args_to_dump.append((trig_info["arg_type"].split(":")[1], int(pos), size, classname, self._type_offset_calculate(trig_info["offset"],OFFSET_KIND_MIXED),True))
 						deps.add(dep)
+						deps|=trig_info_additional_deps(trig_info)
 						continue
 				dep, size, classname = _find_RI_for_func(arg)
 				func_args_to_dump.append((arg, int(pos), size, classname, 0))
@@ -938,8 +1096,9 @@ LINUXINCLUDE := ${{LINUXINCLUDE}}
 							dep, size, classname = _find_RI_for_func(trig_info["arg_type"].split(":")[1])
 							if isinstance(func_args_to_dump[-1],tuple):
 								func_args_to_dump[-1] = [func_args_to_dump[-1]]
-							func_args_to_dump[-1].append((trig_info["arg_type"].split(":")[1], int(pos), size, classname, trig_info_offset_calculate(trig_info["offset"]),True))
+							func_args_to_dump[-1].append((trig_info["arg_type"].split(":")[1], int(pos), size, classname, self._type_offset_calculate(trig_info["offset"],OFFSET_KIND_MIXED),True))
 							deps.add(dep)
+							deps|=trig_info_additional_deps(trig_info)
 
 		if globals_file:
 			ofid_map = {}
@@ -1134,10 +1293,35 @@ LINUXINCLUDE := ${{LINUXINCLUDE}}
 			self.anon_enum_id_map[T.id] = anonenum_type_name
 		return anonenum_type_name
 
-	def generate_flatten_record(self,out,rT,pteEXT,pteEXTmsg,refname,refoffset,tab,element_count_expr,element_count_extra_msg,TPDrT=None,nestedPtr=False,safe=False):
+	# T - const/incomplete array type
+	# returns:
+	#   el_count: total number of elements in the multidimensional array; if there's incomplete array in the first dimension this returns -1
+	#			  in case the element type has size 0 (i.e. empty struct of size 0) the element count is 0 regardless of number of elements
+	#   AT: array element type
+	#   ATPD: if the array element type is a typedef this is the original typedef type
+	#   dN: number of array dimensions
+	def resolve_multidimentional_array_type(self,T):
+		dN=0
+		Tsz = T.size
+		if T.classname=='incomplete_array':
+			Tsz=-1
+		while T.classname=='const_array' or T.classname=='incomplete_array':
+			AT = self.ftdb.types[T.refs[0]]
+			ATPD = None
+			if AT.classname=="typedef":
+				ATPD = AT
+				AT = self.walkTPD(AT)
+			T = AT
+			dN+=1
+		return -1 if Tsz==-1 else Tsz//AT.size if AT.size!=0 else 0,AT,ATPD,dN
+
+	def generate_flatten_record(self,out,rT,pteEXT,pteEXTmsg,refname,refoffset,tab,element_count_expr,element_count_extra_msg,TPDrT=None,nestedPtr=False,ptr_in_array=False,safe=False):
 		PTEoff = 0
 		if pteEXT is not None and pteEXT[0]>=0:
-			PTEoff=-pteEXT[1]
+			if isinstance(pteEXT[1],int):
+				PTEoff=-pteEXT[1]
+			else:
+				PTEoff="-(%s)"%(pteEXT[1][0])
 		if TPDrT:
 			if not nestedPtr:
 				recipe = indent(RecipeGenerator.template_flatten_struct_type_member_recipe.format(
@@ -1154,10 +1338,11 @@ LINUXINCLUDE := ${{LINUXINCLUDE}}
 				recipe = indent(RecipeGenerator.template_flatten_struct_type_pointer_recipe.format(
 						TPDrT.name,
 						TPDrT.size//8,
-						refname,
+						refname if not ptr_in_array else ptrNestedRefName(refname,1),
 						element_count_expr,
 						self.safeInfo(safe),
 						prepend_non_empty_lines("".join([u for u in [pteEXTmsg,element_count_extra_msg] if u!=""]),"  "),
+						PTEoff
 					),tab)
 			out.write(recipe+"\n")
 			self.struct_deps.add((TPDrT.id,TPDrT.name))
@@ -1182,17 +1367,18 @@ LINUXINCLUDE := ${{LINUXINCLUDE}}
 					recipe = indent(RecipeGenerator.template_flatten_struct_type_pointer_recipe.format(
 							anonstruct_type_name,
 							rT.size//8,
-							refname,
+							refname if not ptr_in_array else ptrNestedRefName(refname,1),
 							element_count_expr,
 							self.safeInfo(safe),
 							prepend_non_empty_lines("".join([u for u in [pteEXTmsg,element_count_extra_msg] if u!=""]),"  "),
+							PTEoff
 						),tab)
 				out.write(recipe+"\n")
 				self.struct_deps.add((rT.id,anonstruct_type_name))
 				return anonstruct_type_name
 			else:
 				if not nestedPtr:
-					assert rT.isunion is False or PTEoff==0, "Invalid shift size != 0 for union member"
+					assert rT.isunion is False or (isinstance(PTEoff,int) and PTEoff==0), "Invalid shift size != 0 (or code expression) for union member"
 					recipe = indent(RecipeGenerator.template_flatten_struct_member_recipe.format(
 							"STRUCT" if rT.isunion is False else "UNION",
 							rT.str,
@@ -1209,10 +1395,11 @@ LINUXINCLUDE := ${{LINUXINCLUDE}}
 							"STRUCT" if rT.isunion is False else "UNION",
 							rT.str,
 							rT.size//8,
-							refname,
+							refname if not ptr_in_array else ptrNestedRefName(refname,1),
 							element_count_expr,
 							self.safeInfo(safe),
 							prepend_non_empty_lines("".join([u for u in [pteEXTmsg,element_count_extra_msg] if u!=""]),"  "),
+							PTEoff
 						),tab)
 				if rT.classname=="record_forward":
 					if len([x for x in self.ftdb.types if x.classname=="record" and x.str==rT.str])<=0:
@@ -1221,7 +1408,7 @@ LINUXINCLUDE := ${{LINUXINCLUDE}}
 				self.struct_deps.add((rT.id,rT.str))
 				return "struct %s"%(rT.str)
 
-	def get_element_count(self,mStr):
+	def get_element_count(self,mStr,ptr_in_array=False):
 
 			# Normally we cannot know whether the pointer points to a single struct or an array of structs (or other types)
 			# Try to conclude that from information in config file, otherwise we will try to detect it at runtime
@@ -1240,13 +1427,13 @@ LINUXINCLUDE := ${{LINUXINCLUDE}}
 					if mStr in ecM:
 						haveCount = True
 						element_count_nfo = ecM[mStr]
-						# We should have either 'count' or 'size_expr' attributes
-						if 'count' in element_count_nfo:
-							record_count_tuple[0] = element_count_nfo['count']
-						if 'size_expr' in element_count_nfo:
-							record_count_tuple[1] = element_count_nfo['size_expr']
+						if isinstance(element_count_nfo,int):
+							record_count_tuple[0] = element_count_nfo
+						else:
+							record_count_tuple[1] = (self._type_offset_calculate(element_count_nfo,OFFSET_KIND_CONCRETE),self._type_offset_calculate(element_count_nfo,OFFSET_KIND_SYMBOLIC))
 						record_count_tuple[4] = 'direct'
-			if not haveCount:
+
+			if not haveCount and not ptr_in_array:
 				# Ok, so try to conclude this information from precomputed data
 				if 'ptr_config' in self.config:
 					# First check if in dereference expression this member is never used with offset > 0 (or with any variables used in the offset expression)
@@ -1293,16 +1480,12 @@ LINUXINCLUDE := ${{LINUXINCLUDE}}
 						# Also it's not used at the right-hand side of any assignment expression
 						# Finally it's not been passed as an argument to any function
 						# Let's then assume that we point to a single element of a given type
-						extra_msg = "/* We've concluded that this pointer is not used in any dereference expression with offset > 0.\n\
-Also it's not used at the right-hand side of any assignment expression.\n\
-Finally it's not been passed as an argument to any function.\n\
-We then assume that this pointer is pointing to a single element of a given type */\n"
 						record_count_tuple = [1,None,None,'','derived']
 
 			return record_count_tuple
 
 
-	def get_global_element_count(self,ghash):
+	def get_global_element_count(self,ghash,ptr_in_array=False):
 
 		# Normally we cannot know whether the global pointer points to a single element or an array of elements (or other types)
 		# Try to conclude that from information in config file, otherwise we will try to detect it at runtime
@@ -1321,12 +1504,13 @@ We then assume that this pointer is pointing to a single element of a given type
 				if ghash in ecM:
 					haveCount = True
 					element_count_nfo = ecM[ghash]
-					# We should have either 'count' or 'size_expr' attributes
-					if 'count' in element_count_nfo:
-						record_count_tuple[0] = element_count_nfo['count']
-					if 'size_expr' in element_count_nfo:
-						record_count_tuple[1] = element_count_nfo['size_expr']
+					if isinstance(element_count_nfo,int):
+						record_count_tuple[0] = element_count_nfo
+					else:
+						record_count_tuple[1] = (self._type_offset_calculate(element_count_nfo,OFFSET_KIND_CONCRETE),self._type_offset_calculate(element_count_nfo,OFFSET_KIND_SYMBOLIC))
 					record_count_tuple[4] = 'direct'
+		if ptr_in_array:
+			return record_count_tuple
 		if not haveCount:
 			# Ok, so try to conclude this information from precomputed data
 			if 'ptr_config' in self.config:
@@ -1374,31 +1558,41 @@ We then assume that this pointer is pointing to a single element of a given type
 					# Also it's not used at the right-hand side of any assignment expression
 					# Finally it's not been passed as an argument to any function
 					# Let's then assume that we point to a single element of a given type
-					extra_msg = "/* We've concluded that this global pointer is not used in any dereference expression with offset > 0.\n\
-Also it's not used at the right-hand side of any assignment expression.\n\
-Finally it's not been passed as an argument to any function.\n\
-We then assume that this pointer is pointing to a single element of a given type */\n"
 					record_count_tuple = [1,None,None,'','derived']
 
 		return record_count_tuple
 
-	def construct_element_count_expression(self,record_count_tuple,refname,mStr,refoffset,refsize,ptrLevel):
+	def construct_element_count_expression(self,record_count_tuple,refname,mStr,refoffset,refsize,ptrLevel,ptr_in_array):
 		if record_count_tuple[1] is not None:
-			return (record_count_tuple[1],'')
+			# Count expression given by a user
+			extra_msg = "/* User provided the following expression as a count expression: '%s' */\n"%(record_count_tuple[1][1])
+			return (record_count_tuple[1][0],extra_msg)
 		else:
 			size_in_bytes = max(1, refsize//8)
-			detect_element_count_expr = "\n  AGGREGATE_FLATTEN_DETECT_OBJECT_SIZE_SELF_CONTAINED(%s,%d,%d)/%s"%(ptrNestedRefName(refname,ptrLevel),refoffset//8,size_in_bytes,size_in_bytes)
+			if not ptr_in_array:
+				detect_element_count_expr = "\n  AGGREGATE_FLATTEN_DETECT_OBJECT_SIZE_SELF_CONTAINED(%s,%d,%d)/%d"%(ptrNestedRefName(refname,ptrLevel),refoffset//8,size_in_bytes,size_in_bytes)
+			else:
+				detect_element_count_expr = "\n  FLATTEN_DETECT_OBJECT_SIZE(%s,%d)/%d"%(ptrNestedRefName(refname,1),size_in_bytes,size_in_bytes)
 			if record_count_tuple[0] is not None:
-				if record_count_tuple[4]!='default':
-					return (str(record_count_tuple[0]),'')
+				if record_count_tuple[4]=='direct':
+					# Count given by a user
+					extra_msg = "/* User provided the following value as a count expression: %d */\n"%(record_count_tuple[0])
+					return (str(record_count_tuple[0]),extra_msg)
+				elif record_count_tuple[4]=='derived':
+					# We concluded that we point to a single element of an array
+					extra_msg = "/* We've concluded that this pointer is not used in any dereference expression with offset > 0.\n\
+Also it's not used at the right-hand side of any assignment expression.\n\
+Finally it's not been passed as an argument to any function.\n\
+We then assume that this pointer is pointing to a single element of a given type */\n"
+					return (str(record_count_tuple[0]),extra_msg)
 				else:
 					# We don't have information about the number of elements the pointer points to
 					# Try to detect the object size pointed to by this pointer and conclude the number
 					#  of elements based on that
 					# When it fails adhere to the simple default of single element
-					detect_extra_msg = "/* We couldn't find the number of elements this pointer is pointing to (also no direct information in config file exists).\n\
+					detect_extra_msg = "/* We couldn't find the number of elements this pointer ('%s') is pointing to (also no direct information in config file exists).\n\
    We'll try to detect the number of elements based on the object size pointed to by this pointer (assuming it's on the heap).\n\
-   When it fails we'll default to a single element pointed to by it */\n"
+   When it fails we'll default to a single element pointed to by it */\n"%(mStr)
 					return (detect_element_count_expr,detect_extra_msg)
 			else:
 				if record_count_tuple[3]=='deref':
@@ -1462,13 +1656,24 @@ We then assume that this pointer is pointing to a single element of a given type
 	def construct_global_element_count_expression(self,record_count_tuple,gv,PTE,ptrname,ptrLevel):
 
 		if record_count_tuple[1] is not None:
-			return (record_count_tuple[1],'')
+			# Count expression given by user
+			extra_msg = "/* User provided the following expression as a count expression: '%s' */\n"%(record_count_tuple[1][1])
+			return (record_count_tuple[1][0],extra_msg)
 		else:
 			size_in_bytes = max(1, PTE.size // 8)
 			detect_element_count_expr = "\n  FLATTEN_DETECT_OBJECT_SIZE(%s,%s)/%s"%(ptrname,size_in_bytes,size_in_bytes)
 			if record_count_tuple[0] is not None:
-				if record_count_tuple[4]!='default':
-					return (str(record_count_tuple[0]),'')
+				if record_count_tuple[4]=='direct':
+					# Count given by a user
+					extra_msg = "/* User provided the following value as a count expression: %d */\n"%(record_count_tuple[0])
+					return (str(record_count_tuple[0]),extra_msg)
+				elif record_count_tuple[4]=='derived':
+					# We concluded that we point to a single element of an array
+					extra_msg = "/* We've concluded that this global pointer is not used in any dereference expression with offset > 0.\n\
+Also it's not used at the right-hand side of any assignment expression.\n\
+Finally it's not been passed as an argument to any function.\n\
+We then assume that this pointer is pointing to a single element of a given type */\n"
+					return (str(record_count_tuple[0]),extra_msg)
 				else:
 					# We don't have information about the number of elements the pointer points to
 					# Try to detect the object size pointed to by this pointer and conclude the number
@@ -1533,9 +1738,237 @@ We then assume that this pointer is pointing to a single element of a given type
   			"\n".join(ambiguous_exprs)
   	)
 				else:
-					msg = "/* Couldn't conclude the number of elements pointer points to as this was a nested pointer at higher level than 0\n"
+					msg = "/* Couldn't conclude the number of elements pointer points to as this was a nested pointer at higher level than 0.\n"
 				msg += "   We will try to detect the array size at runtime. When it fails we will dump a single element pointed to by this pointer (default)\n */\n"
 				return (detect_element_count_expr,msg)
+
+	def construct_PTE_extra_msg(self,pteEXT,mStr,refname):
+
+		ptenfo = None
+		if pteEXT[2]=='container_of':
+			ptenfo = (
+							 		"'container_of' expression(s)",
+									pteEXT[3] if pteEXT[0]>=0 else "\n".join(["E: %s -> '%s' @ %d"%(x['expr'],x['tps'],x['offset']) for x in pteEXT[3]])
+							 )
+		if pteEXT[2]=='pvoid':
+			ptenfo = (
+									"pointer to void analysis",
+									"\n".join(["     %s"%(x) for x in pteEXT[3]]) if pteEXT[0]>=0 else 
+									"\n".join( [ "E: %s -> '%s'"%(expr,self.ftdb.types[int(TID)].hash) for TID,expr in 
+										list(itertools.chain.from_iterable([(k,e) for e in V] for k,V in pteEXT[3].items())) ] )
+							 )
+		if pteEXT[2]=='custom' or pteEXT[2]=='custom_string':
+			ptenfo = (
+									"custom information from config file",
+									pteEXT[3]
+							 )
+
+		if pteEXT[0]<0:
+			if pteEXT[2]=='pvoid' and len(pteEXT[3])==1:
+				# Looks like void* is not actually a pointer
+				pteEXTmsg = "/* It was detected that the member '{0}' of type 'void*' is not actually a pointer but the type with '{1}' hash.\n\
+The ambiguous entry is as follows:\n\
+{2}\n\
+*/\n".format(
+	"%s [%s]"%(refname,mStr),
+	self.ftdb.types[int(list(pteEXT[3].keys())[0])].hash,
+	ptenfo[1]
+)
+			else:
+				# Ambiguity
+				pteEXTmsg = "/* It was detected that the member '{0}' points ambiguously to a number of distinct types. We tried to conclude that using {1}.\n\
+The ambiguous entries are as follows:\n\
+{2}\n\
+*/\n".format(
+	"%s [%s]"%(refname,mStr),
+	ptenfo[0],
+	ptenfo[1]
+)
+		else:
+			if pteEXT[2]!='string':
+				# The pointer points to other type than the original type
+				tp_chain_msg = ""
+				if len(pteEXT)>4:
+					tp_chain_msg = "   It was further detected that the type the member points to was additionally embedded into more enclosing types accessed using \
+the 'container_of' invocation chain.\n   The invocation chain was as follows:\n{0}\n".format(
+				   		"\n".join(["     {0}@{1}: {2} -> {3} : {4} @ {5}".format(
+						            x[0].split("____")[1],
+						            x[0].split("____")[2],
+						            x[1]['tpargs'] if 'tpargs' in x[1] else x[1]['tpvars'] if 'tpvars' in x[1] else '',
+						            x[1]['tps'],
+						            x[1]['offset'],
+						            x[1]['expr']
+				        ) for x in pteEXT[4]])
+	)
+
+				pteEXTmsg = "/* It was detected that the member\n\
+ '{0}'\n\
+points to the other type than specified in the member type specification.\n\
+Type hash of the new pointee type is\n\
+ '{1}'\n\
+with offset {4} and we concluded that using {2}.\n\
+The expression(s)/custom info we concluded it from was:\n\
+ {3}\n\
+{5} */\n".format(
+ 		"%s [%s]"%(refname,mStr),
+ 		self.ftdb.types[pteEXT[0]].hash,
+ 		ptenfo[0],
+ 		ptenfo[1],
+ 		pteEXT[1] if isinstance(pteEXT[1], int) else "'%s'"%(pteEXT[1][1]),
+ 		tp_chain_msg
+ 	)
+			else:
+	 			# We have a c-string member
+	 			pteEXTmsg = "/* It was detected that the member\n\
+'{0}'\n\
+ is a c-string (null terminated char array).\n\
+ The call expression(s) that we concluded it from were:\n\
+{1}\n\
+*/\n".format(
+  	"%s [%s]"%(refname,mStr),
+	"\n".join(["     %s"%(x) for x in pteEXT[3]])
+  )
+		return pteEXTmsg
+
+	def real_pointee_type(self,mStr,PTE,ptr_in_array=False):
+
+		havePte = False
+		PTEExt = None
+		if 'base_config' in self.config:
+			if 'custom_ptr_map' in self.config['base_config']:
+				custom_ptr_map = self.config['base_config']['custom_ptr_map']
+				if mStr in custom_ptr_map:
+					havePte = True
+					# Our config file tells us exactly to which type this pointer points to
+					cT = custom_ptr_map[mStr]
+					tpstr = cT["typestring"]
+					if tpstr!='cstring':
+						if ":" in tpstr:
+							prefix,tag = tpstr.split(":")
+							if prefix=='s':
+								Tp = self._find_record_type_by_tag(tag)
+							elif prefix=='t':
+								Tp = self._find_typedef_type_by_name(tag)
+							elif prefix=='e':
+								Tp = self._find_enum_type_by_tag(tag)
+						else:
+							Tp = self._find_builtin_type_by_name(tpstr)
+					offval = 0
+					if "offset" in cT:
+						offval = cT['offset']
+						if not isinstance(offval,int):
+							offval = (self._type_offset_calculate(offval,OFFSET_KIND_CONCRETE),self._type_offset_calculate(offval,OFFSET_KIND_SYMBOLIC))
+					PTEExt = (Tp.id if tpstr!='cstring' else self.char_type.id,offval,'custom' if tpstr!='cstring' else 'custom_string',cT['info'])
+					PTE=Tp if tpstr!='cstring' else self.char_type
+			if 'custom_string_members' in self.config['base_config']:
+				custom_string_members = self.config['base_config']['custom_string_members']
+				if not havePte and mStr in custom_string_members:
+					unfo = custom_string_members[mStr]
+					havePte = True
+					# Our config file tells us this member points to a null-terminated c-string
+					PTEExt = (self.char_type.id,0,'custom_string',unfo)
+					PTE = self.char_type
+
+		if ptr_in_array:
+			return PTE,PTEExt
+
+		if not havePte and 'ptr_config' in self.config:
+
+			if 'container_of_map' in self.config['ptr_config']:
+				container_of_map = self.config['ptr_config']['container_of_map']
+				if mStr in container_of_map:
+					havePte = True
+					# This member was used in the 'container_of' macro
+					cL = container_of_map[mStr]
+					if len(cL)==1:
+						PTEExt = (cL[0]['tpid'],cL[0]['offset'],'container_of',cL[0]['expr'])
+						PTE = self.ftdb.types[cL[0]['tpid']]
+					else:
+						PTEExt = (-1,0,'container_of',cL)
+
+			if 'string_members' in self.config['ptr_config']:
+				string_members = self.config['ptr_config']['string_members']
+				if not havePte and mStr in string_members:
+					mL = string_members[mStr]
+					havePte = True
+					# This member really points to a null-terminated c-string
+					PTEExt = (self.char_type.id,0,'string',mL)
+					PTE = self.char_type
+
+			if 'pvoid_map' in self.config['ptr_config']:
+				pvoid_map = self.config['ptr_config']['pvoid_map']
+				if not havePte and mStr in pvoid_map:
+					havePte = True
+					# This member was used as a different type than 'void*'
+					vM = pvoid_map[mStr]
+					if len(vM)==1:
+						tp = self.ftdb.types[int(list(vM.keys())[0])]
+						if tp.classname=='pointer':
+							PTEExt = (tp.refs[0],0,'pvoid',list(set(list(vM.values())[0])))
+							PTE = self.ftdb.types[tp.refs[0]]
+						else:
+							PTEExt = (-1,0,'pvoid',vM)
+					else:
+						PTEExt = (-1,0,'pvoid',vM)
+
+			if (PTEExt is None and (PTE.classname=="record" or PTE.classname=="record_forward" or (PTE.classname=="typedef" and self.walkTPD(PTE).classname=="record"))) or\
+				(PTEExt is not None and PTEExt[2]!='custom' and PTEExt[2]!='string'):
+				# Now check if our pointer member points to inside of an even larger type
+				# Do this by walking the 'container_of_(l/p)arm_map' to check whether any argument
+				#  passed to the 'container_of' invoking function (or 'container_of' on local variable)
+				#  had the type our pointer points to
+				# If so recompute the offset of our pointer inside the larger type
+				if 'container_of_parm_map' in self.config['ptr_config'] and 'container_of_local_map' in self.config['ptr_config']:
+					cpM = self.config['ptr_config']['container_of_parm_map']
+					clM = self.config['ptr_config']['container_of_local_map']
+					tp_chain = list()
+					if PTEExt is None:
+						cPTE = PTE.id
+					else:
+						cPTE = PTEExt[0]
+					while True:
+						nPTE = None
+						for fkey,cinfo in cpM.items():
+							if len(cinfo)>1:
+								# Omit ambiguous entries
+								continue
+							tpargid = self.ftdb.types.entry_by_id(cinfo[0]['tpargid'])
+							if tpargid.classname=='pointer' and tpargid.refs[0]==cPTE:
+								# We look for exactly one match
+								if nPTE is not None:
+									nPTE = None
+									break
+								nPTE = (fkey,cinfo[0])
+						else:
+							if nPTE is None:
+								for fkey,cinfo in clM.items():
+									if len(cinfo)>1:
+										# Omit ambiguous entries
+										continue
+									tpvarid = self.ftdb.types.entry_by_id(cinfo[0]['tpvarid'])
+									if tpvarid.classname=='pointer' and tpvarid.refs[0]==cPTE:
+										# We look for exactly one match
+										if nPTE is not None:
+											nPTE = None
+											break
+										nPTE = (fkey,cinfo[0])
+						if nPTE:
+							# We've found unambiguous entry, save it a look further until no more entries are found
+							tp_chain.append(nPTE)
+							cPTE = nPTE[1]['tpid']
+						else:
+							break
+					if len(tp_chain)>0:
+						if PTEExt is None:
+							ext_kind = 'container_of'
+							ext_msg = 'N/A'
+						else:
+							ext_kind = PTEExt[2]
+							ext_msg = PTEExt[3]
+						PTEExt = (tp_chain[-1][1]['tpid'],sum([x[1]['offset'] for x in tp_chain]),ext_kind,ext_msg,tp_chain)
+						PTE = self.ftdb.types[tp_chain[-1][1]['tpid']]
+
+		return PTE,PTEExt
 
 	# out - 
 	# ptrT - type of the structure member being processed
@@ -1550,105 +1983,22 @@ We then assume that this pointer is pointing to a single element of a given type
 	# TPDptrT - if structure member is a typedef this is the original typedef type otherwise it's None
 	# TPDpteT - if structure member pointer points to a typedef this is the original typedef type otherwise it's None
 	# ptrLevel -
-	def generate_flatten_pointer(self,out,ptrT,pteT,pteEXT,mStr,refname,refoffset,TRT,tab,TPDptrT=None,TPDpteT=None,ptrLevel=0):
+	def generate_flatten_pointer(self,out,ptrT,pteT,pteEXT,mStr,refname,refoffset,TRT,tab,TPDptrT=None,TPDpteT=None,ptrLevel=0,ptr_in_array=False):
 		if ptrLevel<=0:
 			if pteEXT is not None and len(pteEXT)>4:
 				# 'container_of' chain - assume single pointed element
 				record_count_tuple = [1,None,None,'direct','']
 			else:
-				record_count_tuple = self.get_element_count(mStr)
+				record_count_tuple = self.get_element_count(mStr,ptr_in_array)
 		else:
 			# Pointer at the higher level of nesting is ambiguous (cannot extract information from dereference expressions about its usage at this point)
 			record_count_tuple = [None,None,None,'nested','']
-		element_count_expr,element_count_extra_msg = self.construct_element_count_expression(record_count_tuple,refname,mStr,refoffset,pteT.size,ptrLevel)
+		element_count_expr,element_count_extra_msg = self.construct_element_count_expression(record_count_tuple,refname,mStr,refoffset,pteT.size,ptrLevel,ptr_in_array)
 		safe=record_count_tuple[1] is not None or record_count_tuple[0] is not None
 
 		pteEXTmsg = ""
 		if pteEXT is not None:
-			ptenfo = None
-			if pteEXT[2]=='container_of':
-				ptenfo = (
-								 		"'container_of' expression(s)",
-										pteEXT[3] if pteEXT[0]>=0 else "\n".join(["E: %s -> '%s' @ %d"%(x['expr'],x['tps'],x['offset']) for x in pteEXT[3]])
-								 )
-			if pteEXT[2]=='pvoid':
-				ptenfo = (
-										"pointer to void analysis",
-										"\n".join(["     %s"%(x) for x in pteEXT[3]]) if pteEXT[0]>=0 else 
-										"\n".join( [ "E: %s -> '%s'"%(expr,self.ftdb.types[int(TID)].hash) for TID,expr in 
-											list(itertools.chain.from_iterable([(k,e) for e in V] for k,V in pteEXT[3].items())) ] )
-								 )
-			if pteEXT[2]=='custom':
-				ptenfo = (
-										"custom information from config file",
-										pteEXT[3]
-								 )
-
-			if pteEXT[0]<0:
-				if pteEXT[2]=='pvoid' and len(pteEXT[3])==1:
-					# Looks like void* is not actually a pointer
-					pteEXTmsg = "/* It was detected that the member '{0}' of type 'void*' is not actually a pointer but the type with '{1}' hash.\n\
-   The ambiguous entry is as follows:\n\
-{2}\n\
-  */\n".format(
-  	"%s [%s]"%(refname,mStr),
-  	self.ftdb.types[int(list(pteEXT[3].keys())[0])].hash,
-  	ptenfo[1]
-  )
-				else:
-					# Ambiguity
-					pteEXTmsg = "/* It was detected that the member '{0}' points ambiguously to a number of distinct types. We tried to conclude that using {1}.\n\
-   The ambiguous entries are as follows:\n\
-{2}\n\
- */\n".format(
-  	"%s [%s]"%(refname,mStr),
-  	ptenfo[0],
-  	ptenfo[1]
-  )
-			else:
-				if pteEXT[2]!='string':
-					# The pointer points to other type than the original type
-					tp_chain_msg = ""
-					if len(pteEXT)>4:
-						tp_chain_msg = "   It was further detected that the type the member points to was additionally embedded into more enclosing types accessed using \
-the 'container_of' invocation chain.\n   The invocation chain was as follows:\n{0}\n".format(
-					   		"\n".join(["     {0}@{1}: {2} -> {3} : {4} @ {5}".format(
-							            x[0].split("____")[1],
-							            x[0].split("____")[2],
-							            x[1]['tpargs'] if 'tpargs' in x[1] else x[1]['tpvars'] if 'tpvars' in x[1] else '',
-							            x[1]['tps'],
-							            x[1]['offset'],
-							            x[1]['expr']
-					        ) for x in pteEXT[4]])
-   	)
-
-					pteEXTmsg = "/* It was detected that the member\n\
-     '{0}'\n\
-   points to the other type than specified in the member type specification.\n\
-   Type hash of the new pointee type is\n\
-     '{1}'\n\
-   with offset {4} and we concluded that using {2}.\n\
-   The expression(s)/custom info we concluded it from was:\n\
-     {3}\n\
-{5} */\n".format(
-	 		"%s [%s]"%(refname,mStr),
-	 		self.ftdb.types[pteEXT[0]].hash,
-	 		ptenfo[0],
-	 		ptenfo[1],
-	 		pteEXT[1],
-	 		tp_chain_msg
-	 	)
-				else:
-		 			# We have a c-string member
-		 			pteEXTmsg = "/* It was detected that the member\n\
-    '{0}'\n\
-	 is a c-string (null terminated char array).\n\
-	 The call expression(s) that we concluded it from were:\n\
-{1}\n\
- */\n".format(
-	  	"%s [%s]"%(refname,mStr),
- 	"\n".join(["     %s"%(x) for x in pteEXT[3]])
-	  )
+			pteEXTmsg = self.construct_PTE_extra_msg(pteEXT,mStr,refname)
 		
 		if pteT.classname=="attributed" and "__attribute__((noderef))" in pteT.attrcore:
 			out.write(indent("/* Member '%s' points to __user memory */"%(refname),tab)+"\n")
@@ -1669,16 +2019,22 @@ the 'container_of' invocation chain.\n   The invocation chain was as follows:\n{
 					element_count_expr,
 					element_count_extra_msg,
 					TPDpteT,
-					ptrLevel>0,
+					ptrLevel>0 or ptr_in_array,
+					ptr_in_array,
 					safe
 			)+"*"
 		elif pteT.classname=="incomplete_array" or pteT.classname=="const_array":
 			# Pointer to array
-			out.write(indent("/* TODO: implement flattening member '%s' */"%(refname),tab)+"\n")
+			out.write(indent("/* TODO: implement flattening member '%s' (too complicated; I'm not that smart yet) */\n  /* Member type: %s */\n"%(refname,ptrT.hash),tab)+"\n")
 			self.complex_members.append((TPDptrT,TRT,refname))
 			self.simple = False
 			return None
 		elif pteT.classname=="pointer":
+			if ptr_in_array:
+				out.write(indent("/* TODO: implement flattening member '%s' (too complicated; I'm not that smart yet) */\n  /* Member type: %s */\n"%(refname,ptrT.hash),tab)+"\n")
+				self.complex_members.append((TPDptrT,TRT,refname))
+				self.simple = False
+				return None
 			# We have pointer to pointer
 			PTE = self.ftdb.types[pteT.refs[0]]
 			TPDE = None
@@ -1688,6 +2044,9 @@ the 'container_of' invocation chain.\n   The invocation chain was as follows:\n{
 			ptrout = io.StringIO()
 			# We assume that the nested pointer points to the type specified in its type specification (we don't have detailed member information at this level)
 			ptrtp = self.generate_flatten_pointer(ptrout,pteT,PTE,None,mStr,refname,refoffset,TRT,tab,TPDpteT,TPDE,ptrLevel+1)
+			if ptrtp is None or ptrtp=="":
+				# We have multi-level pointers to function or pointers to incomplete arrays (strange things like that); ask the user to write this flattening recipe
+				return None
 			out.write(RecipeGenerator.template_flatten_pointer_recipe.format(
 				ptrtp,
 				refname,
@@ -1700,16 +2059,13 @@ the 'container_of' invocation chain.\n   The invocation chain was as follows:\n{
 				prepend_non_empty_lines("".join([u for u in [pteEXTmsg,element_count_extra_msg] if u!=""]),"  ")
 			)+"\n")
 			self.simple = False
-			if ptrtp is None or ptrtp=="":
-				# We have multi-level pointers to function or pointers to incomplete arrays (strange things like that); ask the user to write this flattening recipe
-				return None
 			return ptrtp+"*"
 		elif pteT.classname=="enum" or pteT.classname=="enum_forward":
 			# pointer to enum
 			if pteT.str=="":
 				anonenum_type_name = self.get_anonenum_typename(pteT)
 				self.anon_typedefs.append((pteT.id,anonenum_type_name))
-				if ptrLevel<=0:
+				if ptrLevel<=0 and not ptr_in_array:
 					out.write(indent(RecipeGenerator.template_flatten_compound_type_array_member_recipe.format(
 						anonenum_type_name,
 						ptrNestedRefName(refname,ptrLevel),
@@ -1723,14 +2079,14 @@ the 'container_of' invocation chain.\n   The invocation chain was as follows:\n{
 					out.write(indent(RecipeGenerator.template_flatten_compound_type_array_pointer_recipe.format(
 						anonenum_type_name,
 						pteT.size//8,
-						ptrNestedRefName(refname,ptrLevel),
+						ptrNestedRefName(refname,ptrLevel) if not ptr_in_array else ptrNestedRefName(refname,1),
 						element_count_expr,
 						self.safeInfo(safe),
 						prepend_non_empty_lines("".join([u for u in [pteEXTmsg,element_count_extra_msg] if u!=""]),"  "),
 					),tab)+"\n")
 				return anonenum_type_name+"*"
 			else:
-				if ptrLevel<=0:
+				if ptrLevel<=0 and not ptr_in_array:
 					out.write(indent(RecipeGenerator.template_flatten_compound_type_array_member_recipe.format(
 						"enum %s"%(pteT.str),
 						ptrNestedRefName(refname,ptrLevel),
@@ -1744,7 +2100,7 @@ the 'container_of' invocation chain.\n   The invocation chain was as follows:\n{
 					out.write(indent(RecipeGenerator.template_flatten_compound_type_array_pointer_recipe.format(
 						"enum %s"%(pteT.str),
 						pteT.size//8,
-						ptrNestedRefName(refname,ptrLevel),
+						ptrNestedRefName(refname,ptrLevel) if not ptr_in_array else ptrNestedRefName(refname,1),
 						element_count_expr,
 						self.safeInfo(safe),
 						prepend_non_empty_lines("".join([u for u in [pteEXTmsg,element_count_extra_msg] if u!=""]),"  "),
@@ -1754,14 +2110,14 @@ the 'container_of' invocation chain.\n   The invocation chain was as follows:\n{
 			return "enum %s*"%(pteT.str)
 		elif pteT.classname=="function":
 			# pointer to function
-			if ptrLevel<=0:
+			if ptrLevel<=0 and not ptr_in_array:
 				out.write(indent(RecipeGenerator.template_flatten_fptr_member_recipe.format(
 					ptrNestedRefName(refname,ptrLevel),
 					refoffset//8
 				),tab)+"\n")
 			else:
 				out.write(indent(RecipeGenerator.template_flatten_fptr_pointer_recipe.format(
-					ptrNestedRefName(refname,ptrLevel)
+					ptrNestedRefName(refname,ptrLevel) if not ptr_in_array else ptrNestedRefName(refname,1),
 				),tab)+"\n")
 			return "void*"
 		elif pteT.classname=="builtin" and pteT.str=="void":
@@ -1779,7 +2135,7 @@ the 'container_of' invocation chain.\n   The invocation chain was as follows:\n{
 				elif record_count_tuple[0] is not None:
 					pvd_element_count_expr = str(record_count_tuple[0])
 					detect_msg = ""
-			if ptrLevel<=0:
+			if ptrLevel<=0 and not ptr_in_array:
 				out.write(indent(RecipeGenerator.template_flatten_type_array_member_recipe.format(
 					"unsigned char",
 					ptrNestedRefName(refname,ptrLevel),
@@ -1791,7 +2147,7 @@ the 'container_of' invocation chain.\n   The invocation chain was as follows:\n{
 			else:
 				out.write(indent(RecipeGenerator.template_flatten_type_array_pointer_recipe.format(
 					"unsigned char",
-					ptrNestedRefName(refname,ptrLevel),
+					ptrNestedRefName(refname,ptrLevel) if not ptr_in_array else ptrNestedRefName(refname,1),
 					pvd_element_count_expr,
 					self.safeInfo(False),
 					detect_msg
@@ -1804,10 +2160,10 @@ the 'container_of' invocation chain.\n   The invocation chain was as follows:\n{
 			# This might still be a C string
 			have_c_string = False
 			if pteT.classname=="builtin" and "char" in pteT.str:
-				if pteEXT is not None and pteEXT[2]=='string':
+				if pteEXT is not None and (pteEXT[2]=='string' or pteEXT[2]=='custom_string'):
 					# char* - treat it as if it was a C string
 					have_c_string = True
-					if ptrLevel<=0:
+					if ptrLevel<=0 and not ptr_in_array:
 						out.write(indent(RecipeGenerator.template_flatten_string_member_recipe.format(
 							ptrNestedRefName(refname,ptrLevel),
 							refoffset//8,
@@ -1816,7 +2172,7 @@ the 'container_of' invocation chain.\n   The invocation chain was as follows:\n{
 						),tab)+"\n")
 					else:
 						out.write(indent(RecipeGenerator.template_flatten_string_pointer_recipe.format(
-							ptrNestedRefName(refname,ptrLevel),
+							ptrNestedRefName(refname,ptrLevel) if not ptr_in_array else ptrNestedRefName(refname,1),
 							self.safeInfo(True),
 							prepend_non_empty_lines("".join([u for u in [pteEXTmsg,''] if u!=""]),"  ")
 						),tab)+"\n")
@@ -1824,7 +2180,7 @@ the 'container_of' invocation chain.\n   The invocation chain was as follows:\n{
 					return "char*"
 			if not have_c_string:
 				# Ok, treat it as a pointer to ordinary built-in
-				if ptrLevel<=0:
+				if ptrLevel<=0 and not ptr_in_array:
 					out.write(indent(RecipeGenerator.template_flatten_type_array_member_recipe.format(
 						pteT.str,
 						ptrNestedRefName(refname,ptrLevel),
@@ -1836,7 +2192,7 @@ the 'container_of' invocation chain.\n   The invocation chain was as follows:\n{
 				else:
 					out.write(indent(RecipeGenerator.template_flatten_type_array_pointer_recipe.format(
 						pteT.str,
-						ptrNestedRefName(refname,ptrLevel),
+						ptrNestedRefName(refname,ptrLevel) if not ptr_in_array else ptrNestedRefName(refname,1),
 						element_count_expr,
 						self.safeInfo(safe),
 						prepend_non_empty_lines("".join([u for u in [pteEXTmsg,element_count_extra_msg] if u!=""]),"  ")
@@ -1894,10 +2250,10 @@ the 'container_of' invocation chain.\n   The invocation chain was as follows:\n{
 		out.write(recipe+"\n")
 		return "struct %s"%(T.str)
 
-	def generate_flatten_pointer_trigger(self,out,T,TPD,gv,handle_flexible_size=False,tab=0,ptrLevel=0,arrsize=1):
+	def generate_flatten_pointer_trigger(self,out,T,TPD,gv,handle_flexible_size=False,tab=0,ptrLevel=0,arrsize=1,ptr_in_array=False):
 
 		if ptrLevel==1:
-			record_count_tuple = self.get_global_element_count(gv.hash)
+			record_count_tuple = self.get_global_element_count(gv.hash,ptr_in_array)
 			element_count_expr,element_count_extra_msg = self.construct_global_element_count_expression(record_count_tuple,gv,T,ptrNestedRefName(gv.name,ptrLevel),ptrLevel)
 
 		if T.classname=="attributed" and "__attribute__((noderef))" in T.attrcore:
@@ -1930,7 +2286,7 @@ the 'container_of' invocation chain.\n   The invocation chain was as follows:\n{
 				TPDE = PTE
 				PTE = self.walkTPD(PTE)
 			ptrout = io.StringIO()
-			ptrtp = self.generate_flatten_pointer_trigger(ptrout,PTE,TPDE,gv,handle_flexible_size,tab+1,ptrLevel+1)
+			ptrtp = self.generate_flatten_pointer_trigger(ptrout,PTE,TPDE,gv,handle_flexible_size,tab+1,ptrLevel+1,arrsize,ptr_in_array)
 			out.write(RecipeGenerator.template_flatten_pointer_array_recipe.format(
 				ptrtp,
 				ptrNestedRefName(gv.name,ptrLevel+1),
@@ -2237,44 +2593,37 @@ the 'container_of' invocation chain.\n   The invocation chain was as follows:\n{
 			elif T.classname=="const_array":
 				if T.size<=0:
 					return None
-				AT = self.ftdb.types[T.refs[0]]
-				ATPD = None
-				if AT.classname=="typedef":
-					ATPD = AT
-					AT = self.walkTPD(AT)
+				el_count,AT,ATPD,dN = self.resolve_multidimentional_array_type(T)
 				if AT.classname=="builtin":
-					trigger = RecipeGenerator.template_flatten_type_array_pointer_recipe.format(AT.str,"__root_ptr",str(T.size//AT.size),"","")
+					trigger = RecipeGenerator.template_flatten_type_array_pointer_recipe.format(AT.str,"__root_ptr",str(el_count),"","")
 					out.write(trigger+"\n")
-					return AT.str+"*"
+					return AT.str+"[...]"
 				elif AT.classname=="enum":
 					if ATPD:
-						trigger = RecipeGenerator.template_flatten_compound_type_array_pointer_recipe.format(ATPD.name,AT.size//8,"__root_ptr",str(T.size//AT.size),"","")
+						trigger = RecipeGenerator.template_flatten_compound_type_array_pointer_recipe.format(ATPD.name,AT.size//8,"__root_ptr",str(el_count),"","")
 						out.write(trigger+"\n")
-						return ATPD.name+"*"
+						return ATPD.name+"[...]"
 					else:
 						if AT.str=="":
 							anonenum_type_name = self.get_anonenum_typename(AT)
-							trigger = RecipeGenerator.template_flatten_compound_type_array_pointer_recipe.format(anonenum_type_name,AT.size//8,"__root_ptr",str(T.size//AT.size),"","")
+							trigger = RecipeGenerator.template_flatten_compound_type_array_pointer_recipe.format(anonenum_type_name,AT.size//8,"__root_ptr",str(el_count),"","")
 							out.write(trigger+"\n")
-							return anonenum_type_name+"*"
+							return anonenum_type_name+"[...]"
 						else:
-							trigger = RecipeGenerator.template_flatten_compound_type_array_pointer_recipe.format("enum %s"%(AT.str),AT.size//8,"__root_ptr",str(T.size//AT.size),"","")
+							trigger = RecipeGenerator.template_flatten_compound_type_array_pointer_recipe.format("enum %s"%(AT.str),AT.size//8,"__root_ptr",str(el_count),"","")
 							out.write(trigger+"\n")
-							return "enum %s*"%(AT.str)
-				elif AT.classname=="pointer":
-					ptrtp = self.generate_flatten_pointer_trigger(out,AT,ATPD,gv,handle_flexible_size,0,0,T.size//AT.size)
-					return ptrtp
+							return "enum %s[...]"%(AT.str)
 				elif AT.classname=="record":
 					if ATPD:
 						trigger = RecipeGenerator.template_flatten_struct_type_array_pointer_self_contained.format(
 							ATPD.name,
 							AT.size//8,
 							"__root_ptr",
-							str(T.size/AT.size),
+							str(el_count),
 							""
 						)
 						out.write(trigger+"\n")
-						return "%s*"%(ATPD.name)
+						return "%s[...]"%(ATPD.name)
 					else:
 						if AT.str=="":
 							anonstruct_type_name = self.get_anonstruct_typename(AT)
@@ -2282,11 +2631,11 @@ the 'container_of' invocation chain.\n   The invocation chain was as follows:\n{
 								anonstruct_type_name,
 								AT.size//8,
 								"__root_ptr",
-								str(T.size//AT.size),
+								str(el_count),
 								""
 							)
 							out.write(trigger+"\n")
-							return "%s*"%(anonstruct_type_name)
+							return "%s[...]"%(anonstruct_type_name)
 						else:
 							try:
 								trigger = RecipeGenerator.template_flatten_struct_array_pointer_self_contained.format(
@@ -2294,7 +2643,7 @@ the 'container_of' invocation chain.\n   The invocation chain was as follows:\n{
 									AT.str,
 									AT.size//8,
 									"__root_ptr",
-									str(T.size//AT.size),
+									str(el_count),
 									""
 								)
 							except Exception as e:
@@ -2303,60 +2652,10 @@ the 'container_of' invocation chain.\n   The invocation chain was as follows:\n{
 								print(gvname)
 								raise e
 							out.write(trigger+"\n")
-							return "%s %s*"%("struct" if AT.isunion is False else "union",AT.str)
-				elif AT.classname=="const_array":
-					# pointer to 2 dimensional array (TODO: think of better way to do this than making another nested level of code)
-					AAT = self.ftdb.types[AT.refs[0]]
-					AATPD = None
-					if AAT.classname=="typedef":
-						AATPD = AAT
-						AAT = self.walkTPD(AAT)
-					if AAT.classname=="builtin":
-						trigger = RecipeGenerator.template_flatten_type_array_pointer_recipe.format(AAT.str,"__root_ptr",str(T.size//AAT.size),"","")
-						out.write(trigger+"\n")
-						return AT.str+"*[]"
-					elif AAT.classname=="record":
-						if AATPD:
-							trigger = RecipeGenerator.template_flatten_struct_type_array_pointer_self_contained.format(
-								AATPD.name,
-								AAT.size//8,
-								"__root_ptr",
-								str(T.size/AAT.size),
-								""
-							)
-							out.write(trigger+"\n")
-							return "%s*"%(AATPD.name)
-						else:
-							if AAT.str=="":
-								anonstruct_type_name = self.get_anonstruct_typename(AAT)
-								trigger = RecipeGenerator.template_flatten_struct_type_array_pointer_self_contained.format(
-									anonstruct_type_name,
-									AAT.size//8,
-									"__root_ptr",
-									str(T.size//AAT.size),
-									""
-								)
-								out.write(trigger+"\n")
-								return "%s*"%(anonstruct_type_name)
-							else:
-								try:
-									trigger = RecipeGenerator.template_flatten_struct_array_pointer_self_contained.format(
-										"STRUCT" if AAT.isunion is False else "UNION",
-										AAT.str,
-										AAT.size//8,
-										"__root_ptr",
-										str(T.size//AAT.size),
-										""
-									)
-								except Exception as e:
-									print(json.dumps(T.json(),indent=4))
-									print(json.dumps(AAT.json(),indent=4))
-									print(gvname)
-									raise e
-								out.write(trigger+"\n")
-								return "%s %s*"%("struct" if AAT.isunion is False else "union",AAT.str)
-					else:
-						out.write("/* TODO: implement flatten trigger for type '{0}' */\n".format(T.hash))
+							return "%s %s[...]"%("struct" if AT.isunion is False else "union",AT.str)
+				elif AT.classname=="pointer":
+					ptrtp = self.generate_flatten_pointer_trigger(out,AT,ATPD,gv,handle_flexible_size,0,0,el_count,True)
+					return ptrtp
 				else:
 					print(f"EE- Unsupported harness - {AT.id}; {AT.classname}")
 					return None
@@ -2766,6 +3065,27 @@ the 'container_of' invocation chain.\n   The invocation chain was as follows:\n{
 					RT = self.walkTPD(RT)
 				
 				iout = io.StringIO()
+				def handle_overlapping_members():
+					if 'OT_info' in self.config and 'overlapping_members' in self.config['OT_info']:
+						if mStr in self.config['OT_info']['overlapping_members']:
+							# This member overlaps with some other member(s)
+							ovnfo = self.config['OT_info']['overlapping_members'][mStr]
+							if ovnfo['use'] is True:
+								return True
+							elif ovnfo['ignore'] is True:
+								# Skip this union member
+								return False
+							else:
+								ovLst = ovnfo['overlap_list']
+								iout.write("/* member '%s' overlaps with %d other members */\n"%(refname,len(ovLst)-1))
+								iout.write("/* List of overlapping members:\n")
+								iout.write("\n".join([" * %s@%d[%d]"%(x[0],x[1]//8,x[2]//8) for x in ovLst])+" */\n")
+								iout.write("/* Please provide custom recipe or indicate used member in config file */\n")
+								self.ptr_in_union.append((TPD,TRT,refname))
+								self.simple = False
+								return False
+					return True
+
 				if RT.classname=="enum" or RT.classname=="builtin":
 					# No need to do anything
 					pass
@@ -2775,34 +3095,19 @@ the 'container_of' invocation chain.\n   The invocation chain was as follows:\n{
 					# None if PTE points to the original type
 					# [0] pointee_TID (-1 if there was ambiguity in the result (PTE is not replaced))
 					# [1] offset
-					# [2] kind ('container_of', 'pvoid', 'string' or 'custom')
+					# [2] kind ('container_of', 'pvoid', 'string', 'custom' or 'custom_string')
 					# [3] extra
 					#		for 'container_of' this is the container_of expression; in case of ambiguity this is the full container_of_map entry list
 					#		for 'pvoid' this is a list of 'void*' cast expressions; in case of ambiguity this is full pvoid_map entry list
 					#		for 'string' this is a list of call expressions passed to the c-string parameters (no ambiguity possible)
 					#		for 'custom' this is the custom info from config file (no ambiguity)
+					#		for 'custom_string' this is the custom info from config file (no ambiguity)
 					# [4] more extra
 					#       for 'pvoid' this is 'container_of_parm_map' element information of 'container_of' calling functions in the surrounding type chain
 
 					# Handle overlapping members
-					if 'OT_info' in self.config and 'overlapping_members' in self.config['OT_info']:
-						if mStr in self.config['OT_info']['overlapping_members']:
-							# This member overlaps with some other member(s)
-							ovnfo = self.config['OT_info']['overlapping_members'][mStr]
-							if ovnfo['use'] is True:
-								pass
-							elif ovnfo['ignore'] is True:
-								# Skip this union member
-								continue
-							else:
-								ovLst = ovnfo['overlap_list']
-								iout.write("/* member '%s' overlaps with %d other members */\n"%(refname,len(ovLst)-1))
-								iout.write("/* List of overlapping members:\n")
-								iout.write("\n".join([" * %s@%d[%d]"%(x[0],x[1]//8,x[2]//8) for x in ovLst])+" */\n")
-								iout.write("/* Please provide custom recipe or indicate used member in config file */\n")
-								self.ptr_in_union.append((TPD,TRT,refname))
-								self.simple = False
-								continue
+					if not handle_overlapping_members():
+						continue
 					
 					# PTE - type the structure member pointer points to
 					# TPDE - if structure member pointer points to a typedef this is the original typedef type otherwise it's None
@@ -2818,112 +3123,7 @@ the 'container_of' invocation chain.\n   The invocation chain was as follows:\n{
 					# Check if the member pointer points to a different type than specified in the structure
 					#  (either through the use of 'container_of' macro or source type casting constructs)
 					#  (or we point to the type directly through the config file)
-					havePte = False
-					if 'base_config' in self.config:
-						if 'custom_ptr_map' in self.config['base_config']:
-							custom_ptr_map = self.config['base_config']['custom_ptr_map']
-							if mStr in custom_ptr_map:
-								havePte = True
-								# Our config file tells us exactly to which type this pointer points to
-								cT = custom_ptr_map[mStr]
-								PTEExt = (cT['tpid'],cT['offset'],'custom',cT['info'])
-								PTE=self.ftdb.types[cT['tpid']]
-
-					if not havePte and 'ptr_config' in self.config:
-
-						if 'container_of_map' in self.config['ptr_config']:
-							container_of_map = self.config['ptr_config']['container_of_map']
-							if mStr in container_of_map:
-								havePte = True
-								# This member was used in the 'container_of' macro
-								cL = container_of_map[mStr]
-								if len(cL)==1:
-									PTEExt = (cL[0]['tpid'],cL[0]['offset'],'container_of',cL[0]['expr'])
-									PTE = self.ftdb.types[cL[0]['tpid']]
-								else:
-									PTEExt = (-1,0,'container_of',cL)
-						
-						if 'string_members' in self.config['ptr_config']:
-							string_members = self.config['ptr_config']['string_members']
-							if not havePte and mStr in string_members:
-								mL = string_members[mStr]
-								havePte = True
-								# This member really points to a null-terminated c-string
-								PTEExt = (self.char_type.id,0,'string',mL)
-								PTE = self.char_type
-
-						if 'pvoid_map' in self.config['ptr_config']:
-							pvoid_map = self.config['ptr_config']['pvoid_map']
-							if not havePte and mStr in pvoid_map:
-								havePte = True
-								# This member was used as a different type than 'void*'
-								vM = pvoid_map[mStr]
-								if len(vM)==1:
-									tp = self.ftdb.types[int(list(vM.keys())[0])]
-									if tp.classname=='pointer':
-										PTEExt = (tp.refs[0],0,'pvoid',list(set(list(vM.values())[0])))
-										PTE = self.ftdb.types[tp.refs[0]]
-									else:
-										PTEExt = (-1,0,'pvoid',vM)
-								else:
-									PTEExt = (-1,0,'pvoid',vM)
-
-						if (PTEExt is None and (PTE.classname=="record" or PTE.classname=="record_forward" or (PTE.classname=="typedef" and self.walkTPD(PTE).classname=="record"))) or\
-							(PTEExt is not None and PTEExt[2]!='custom' and PTEExt[2]!='string'):
-							# Now check if our pointer member points to inside of an even larger type
-							# Do this by walking the 'container_of_(l/p)arm_map' to check whether any argument
-							#  passed to the 'container_of' invoking function (or 'container_of' on local variable)
-							#  had the type our pointer points to
-							# If so recompute the offset of our pointer inside the larger type
-							if 'container_of_parm_map' in self.config['ptr_config'] and 'container_of_local_map' in self.config['ptr_config']:
-								cpM = self.config['ptr_config']['container_of_parm_map']
-								clM = self.config['ptr_config']['container_of_local_map']
-								tp_chain = list()
-								if PTEExt is None:
-									cPTE = PTE.id
-								else:
-									cPTE = PTEExt[0]
-								while True:
-									nPTE = None
-									for fkey,cinfo in cpM.items():
-										if len(cinfo)>1:
-											# Omit ambiguous entries
-											continue
-										tpargid = self.ftdb.types.entry_by_id(cinfo[0]['tpargid'])
-										if tpargid.classname=='pointer' and tpargid.refs[0]==cPTE:
-											# We look for exactly one match
-											if nPTE is not None:
-												nPTE = None
-												break
-											nPTE = (fkey,cinfo[0])
-									else:
-										if nPTE is None:
-											for fkey,cinfo in clM.items():
-												if len(cinfo)>1:
-													# Omit ambiguous entries
-													continue
-												tpvarid = self.ftdb.types.entry_by_id(cinfo[0]['tpvarid'])
-												if tpvarid.classname=='pointer' and tpvarid.refs[0]==cPTE:
-													# We look for exactly one match
-													if nPTE is not None:
-														nPTE = None
-														break
-													nPTE = (fkey,cinfo[0])
-									if nPTE:
-										# We've found unambiguous entry, save it a look further until no more entries are found
-										tp_chain.append(nPTE)
-										cPTE = nPTE[1]['tpid']
-									else:
-										break
-								if len(tp_chain)>0:
-									if PTEExt is None:
-										ext_kind = 'container_of'
-										ext_msg = 'N/A'
-									else:
-										ext_kind = PTEExt[2]
-										ext_msg = PTEExt[3]
-									PTEExt = (tp_chain[-1][1]['tpid'],sum([x[1]['offset'] for x in tp_chain]),ext_kind,ext_msg,tp_chain)
-									PTE = self.ftdb.types[tp_chain[-1][1]['tpid']]
+					PTE,PTEExt = self.real_pointee_type(mStr,PTE)
 						
 					# Now try to generate some recipes
 					TPDE = None
@@ -2951,128 +3151,197 @@ the 'container_of' invocation chain.\n   The invocation chain was as follows:\n{
 				# RT.classname=="pointer"
 				elif RT.classname=="incomplete_array" or RT.classname=="const_array":
 					self.member_recipe_count+=1
-					AT = self.ftdb.types[RT.refs[0]]
-					TPDAT = None
-					if AT.classname=="typedef":
-						TPDAT = AT
-						AT = self.walkTPD(AT)
-					# We have an array of type AT
+					sz,AT,TPDAT,dN = self.resolve_multidimentional_array_type(RT)
+					# We have an (multidimensional) array of type AT
 					if AT.classname=="record" or AT.classname=="record_forward":
 						if AT.classname=="record_forward":
 							AT = [x for x in self.ftdb.types if x.classname=="record" and x.str==AT.str][0]
-						try:
-							sz = RT.size//AT.size
-						except Exception as e:
-							# Here we can have a constant array of size 0 (cause the underlying type is empty struct of size 0)
-							sz = 0
-						if RT.classname=="const_array" or sz==0:
-							if sz>0:
-								if not TPDAT:
-									if AT.str=="":
-										anonstruct_type_name = self.get_anonstruct_typename(AT)
-										self.anon_typedefs.append((AT.id,anonstruct_type_name))
-										iout.write(indent(RecipeGenerator.template_flatten_struct_type_array_storage_recipe.format(
+						if RT.classname=="const_array" and sz>0:
+							if not TPDAT:
+								if AT.str=="":
+									anonstruct_type_name = self.get_anonstruct_typename(AT)
+									self.anon_typedefs.append((AT.id,anonstruct_type_name))
+									iout.write(indent(RecipeGenerator.template_flatten_struct_type_array_storage_recipe.format(
+										sz,
+										anonstruct_type_name,
+										refname,
+										moffset//8,
+										self.safeInfo(False),
+										AT.size//8
+									),0)+"\n")
+									self.struct_deps.add((AT.id,anonstruct_type_name))
+								else:
+									if AT.isunion is False:
+										iout.write(indent(RecipeGenerator.template_flatten_struct_array_storage_recipe.format(
 											sz,
-											anonstruct_type_name,
+											AT.str,
 											refname,
 											moffset//8,
 											self.safeInfo(False),
 											AT.size//8
 										),0)+"\n")
-										self.struct_deps.add((AT.id,anonstruct_type_name))
 									else:
-										if AT.isunion is False:
-											iout.write(indent(RecipeGenerator.template_flatten_struct_array_storage_recipe.format(
-												sz,
-												AT.str,
-												refname,
-												moffset//8,
-												self.safeInfo(False),
-												AT.size//8
-											),0)+"\n")
-										else:
-											iout.write(indent(RecipeGenerator.template_flatten_union_array_storage_recipe.format(
-												sz,
-												AT.str,
-												refname,
-												moffset//8,
-												self.safeInfo(False),
-												AT.size//8
-											),0)+"\n")
-										self.struct_deps.add((AT.id,AT.str))
-								else:
-									iout.write(indent(RecipeGenerator.template_flatten_struct_type_array_storage_recipe.format(
-										sz,
-										TPDAT.name,
-										refname,
-										moffset//8,
-										self.safeInfo(False),
-										TPDAT.size//8
-									),0)+"\n")
-									self.struct_deps.add((TPDAT.id,TPDAT.name))
-									self.record_typedefs.add((TPDAT.name,AT.str,AT.id))
+										iout.write(indent(RecipeGenerator.template_flatten_union_array_storage_recipe.format(
+											sz,
+											AT.str,
+											refname,
+											moffset//8,
+											self.safeInfo(False),
+											AT.size//8
+										),0)+"\n")
+									self.struct_deps.add((AT.id,AT.str))
 							else:
-								# const/incomplete array of size 0; if it's the last member in the record generate recipe for flexible array member
-								if (mi+1>=proc_members_to_process_num):
-									if not TPDAT:
-										if AT.str=="":
-											anonstruct_type_name = self.get_anonstruct_typename(AT)
-											self.anon_typedefs.append((AT.id,anonstruct_type_name))
-											iout.write(indent(RecipeGenerator.template_flatten_struct_type_flexible_recipe.format(
-												anonstruct_type_name,
-												AT.size//8,
-												refname,
-												moffset//8,
-												self.safeInfo(False)
-											),0)+"\n")
-											self.struct_deps.add((AT.id,anonstruct_type_name))
-											have_flexible_member = True
-										else:
-											if AT.isunion is False:
-												iout.write(indent(RecipeGenerator.template_flatten_struct_flexible_recipe.format(
-													AT.str,
-													AT.size//8,
-													refname,
-													moffset//8,
-													self.safeInfo(False)
-												),0)+"\n")
-											else:
-												iout.write(indent(RecipeGenerator.template_flatten_union_flexible_recipe.format(
-													AT.str,
-													AT.size//8,
-													refname,
-													moffset//8,
-													self.safeInfo(False)
-												),0)+"\n")
-											self.struct_deps.add((AT.id,AT.str))
-											have_flexible_member = True
-									else:
+								iout.write(indent(RecipeGenerator.template_flatten_struct_type_array_storage_recipe.format(
+									sz,
+									TPDAT.name,
+									refname,
+									moffset//8,
+									self.safeInfo(False),
+									TPDAT.size//8
+								),0)+"\n")
+								self.struct_deps.add((TPDAT.id,TPDAT.name))
+								self.record_typedefs.add((TPDAT.name,AT.str,AT.id))
+						else:
+							# const array of size 0 or incomplete array; if it's the last member in the record generate recipe for flexible array member
+							if (mi+1>=proc_members_to_process_num):
+								if not TPDAT:
+									if AT.str=="":
+										anonstruct_type_name = self.get_anonstruct_typename(AT)
+										self.anon_typedefs.append((AT.id,anonstruct_type_name))
 										iout.write(indent(RecipeGenerator.template_flatten_struct_type_flexible_recipe.format(
-											TPDAT.name,
+											anonstruct_type_name,
 											AT.size//8,
 											refname,
 											moffset//8,
 											self.safeInfo(False)
 										),0)+"\n")
-										self.struct_deps.add((TPDAT.id,TPDAT.name))
-										self.record_typedefs.add((TPDAT.name,AT.str,AT.id))
+										self.struct_deps.add((AT.id,anonstruct_type_name))
 										have_flexible_member = True
-									self.flexible_array_members.append((TPD,TRT,refname))
+									else:
+										if AT.isunion is False:
+											iout.write(indent(RecipeGenerator.template_flatten_struct_flexible_recipe.format(
+												AT.str,
+												AT.size//8,
+												refname,
+												moffset//8,
+												self.safeInfo(False)
+											),0)+"\n")
+										else:
+											iout.write(indent(RecipeGenerator.template_flatten_union_flexible_recipe.format(
+												AT.str,
+												AT.size//8,
+												refname,
+												moffset//8,
+												self.safeInfo(False)
+											),0)+"\n")
+										self.struct_deps.add((AT.id,AT.str))
+										have_flexible_member = True
 								else:
-									iout.write("/* TODO: member '%s' is a const/incomplete array of size 0; looks like flexible array member but it's not a last member in the record (what is it then?) */\n"%(refname))
-									self.complex_members.append((TPD,TRT,refname))
-								self.simple = False
-						else:
-							iout.write("/* TODO: implement flattening member '%s' (save internal structure storage for incomplete array?) */\n"%(refname))
-							self.incomplete_array_member_storage.append((TPD,TRT,refname))
+									iout.write(indent(RecipeGenerator.template_flatten_struct_type_flexible_recipe.format(
+										TPDAT.name,
+										AT.size//8,
+										refname,
+										moffset//8,
+										self.safeInfo(False)
+									),0)+"\n")
+									self.struct_deps.add((TPDAT.id,TPDAT.name))
+									self.record_typedefs.add((TPDAT.name,AT.str,AT.id))
+									have_flexible_member = True
+								self.flexible_array_members.append((TPD,TRT,refname))
+							else:
+								iout.write("/* TODO: member '%s' is a const/incomplete array of size 0; looks like flexible array member but it's not a last member in the record (what is it then?) */\n"%(refname))
+								self.complex_members.append((TPD,TRT,refname))
 							self.simple = False
 					elif AT.classname=="enum" or AT.classname=="enum_forward" or AT.classname=="builtin":
-						# Still no need to do anything
-						pass
+						# Need to handle flexible array member
+						if sz<=0:
+							tpname = AT.str
+							if AT.classname=="enum" or AT.classname=="enum_forward":
+								if AT.str=="":
+									tpname = self.get_anonenum_typename(AT)
+									self.anon_typedefs.append((AT.id,tpname))
+								else:
+									tpname = "enum %s"%(AT.str)
+							if (mi+1>=proc_members_to_process_num):
+								iout.write(indent(RecipeGenerator.template_flatten_type_array_flexible_recipe.format(
+									tpname,
+									AT.size//8,
+									refname,
+									moffset//8,
+									self.safeInfo(False)
+								),0)+"\n")
+								have_flexible_member = True
+							else:
+								iout.write("/* TODO: member '%s' is a const/incomplete array of size 0; looks like flexible array member but it's not a last member in the record (what is it then?) */\n"%(refname))
+								self.complex_members.append((TPD,TRT,refname))
+					elif AT.classname=="pointer":
+							# We have an array of pointers
+							# Generally it's the same as normal pointer, just we might have many of them
+							# We assume all pointers in array point to the same kind of things (otherwise custom recipe is needed)
+							# We also only consider custom pointer information from config file (as the data for pointers in the array is mostly invalid)
+							if not handle_overlapping_members():
+								continue
+							PTE = self.ftdb.types[AT.refs[0]]
+							PTE,PTEExt = self.real_pointee_type(mStr,PTE,True)
+							TPDE = None
+							if PTE.classname=="typedef":
+								TPDE = PTE
+								PTE = self.walkTPD(PTE)
+							resolved_record_forward = None
+							if PTE.classname=="record_forward":
+								rTs = [x for x in self.ftdb.types if x.classname=="record" and x.str==PTE.str]
+								if len(rTs)>0:
+									resolved_record_forward = rTs[0]
+							if PTE.size<=0 and PTE.classname=="record":
+								iout.write("/* member '%s' points to multiple structures of size 0 */\n"%(refname))
+							elif PTE.size<=0 and PTE.classname=="record_forward" and resolved_record_forward is not None and resolved_record_forward.size<=0:
+								iout.write("/* member '%s' points to multiple structures of size 0 (through record forward) */\n"%(refname))
+							elif PTE.classname=="record_forward" and resolved_record_forward is None:
+								iout.write("/* member '%s' points to multiple unresolved record forwards '%s' (most likely never used) */\n"%(refname,PTE.str))
+							else:
+								have_member_ptr = True
+								if resolved_record_forward:
+									PTE = resolved_record_forward
+							ptrout = io.StringIO()
+							ptrtp = self.generate_flatten_pointer(ptrout,AT,PTE,PTEExt,mStr,refname,moffset,TRT,0,TPDAT,TPDE,0,True)
+							if ptrtp is None or ptrtp=="":
+								to_fix = True
+								self.complex_pointer_members.append((TPD,TRT,refname))
+							else:
+								if RT.classname=="const_array" and sz>0:
+									r = RecipeGenerator.template_flatten_pointer_storage_recipe.format(
+										ptrtp,
+										ptrNestedRefName(refname,1),
+										ptrNestedRefName(refname,0,True,moffset//8),
+										sz,
+										self.safeInfo(False),
+										indent(ptrout.getvalue().rstrip(),1),
+										""
+									)+"\n"
+									iout.write(r)
+								else:
+									# Flexible array of pointers (really?)
+									if (mi+1>=proc_members_to_process_num):
+										r = RecipeGenerator.template_flatten_pointer_array_flexible_recipe.format(
+											ptrtp,
+											AT.size//8,
+											moffset//8,
+											refname,
+											ptrNestedRefName(refname,1),
+											ptrNestedRefName(refname,0,True,moffset//8),
+											indent(ptrout.getvalue().rstrip(),1),
+											"",
+											self.safeInfo(False)
+										)+"\n"
+										iout.write(r)
+									else:
+										iout.write("/* TODO: member '%s' is a const/incomplete array of size 0; looks like flexible array member but it's not a last member in the record (what is it then?) */\n"%(refname))
+										self.complex_members.append((TPD,TRT,refname))
+							self.simple = False
 					else:
 						# Something else
 						# Keep this program simple and let the user fix it
-						iout.write("/* TODO: implement flattening member '%s' (too complicated; I'm not that smart yet) */\n"%(refname))
+						iout.write("/* TODO: implement flattening member '%s' (too complicated; I'm not that smart yet) */\n  /* Member type: %s */\n"%(refname,RT.hash))
 						self.complex_members.append((TPD,TRT,refname))
 						self.simple = False
 				outv.append(iout.getvalue())
@@ -3346,7 +3615,7 @@ def main():
 
 		# Generate code
 		globals_handler_stream.write(RecipeGenerator.template_output_global_handler.format(
-			var_name, glob[6], glob[4], "\n".join(["\t\t\t"+x for x in out.getvalue().strip().split("\n")]), var_hash, glob_addr
+			var_name, glob[6], glob[4], "\n".join(["\t\t\t"+x for x in out.getvalue().strip().split("\n")]), var_hash, glob_addr, gv.defstring, gv.hash
 		))
 		globals_prehandler_stream.write(RecipeGenerator.template_output_global_pre_handler.format(
 			var_name, var_hash

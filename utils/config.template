@@ -11,34 +11,32 @@
 				"offset": <int>/<str>, /* Offset value for the argument type or offset expression in C code */
 					/* Offset expression should be simple enough so it can be compiled without referencing types;
 						In case of more complicated expressions like  'sizeof(TYPE)', the `sizeof` can be specified using '@{Typestring}' inside the expression */
-				"type": <str> /* Type of the trigger update; either 'update' or 'append' ('update' is the default value); 
+				"type": <str>, /* Type of the trigger update; either 'update' or 'append' ('update' is the default value);
 					when we use 'update' we can update trigger values for cases where recipe generator couldn't detect them properly;
 					when 'append' is used we just add another serialization trigger for the provided data */
+				"deps": [<str>,...] /* Optional field; this indicates list of additional dependencies (defined by typestring) used by the trigger (must be defined in the OT code) */
 			},
 			(...)
 		],
 		"custom_ptr_map": {
 			<mStr>: {
 				/* custom pointer map - telling exactly to which type the given member pointer points to */
-				'tpid': <int>, /* pointee TID */
-				'offset': <int>,
+				'typestring': <str>, /* typestring of the indicated type, i.e. <s:tag>, <t:name>, <e:tag>, 'cstring' or <typename> in case of builtin types, e.g. 'unsigned int' */
+				'offset': <int>, /* In case of record type this is the potential offset within this type */
 				'info': <str> /* custom information */
 			}, (...)
 		},
-		"custom_element_count_map": {
-			<mStr>: {
-				/* element count info */
-				'count': <int>
-				'size_expr': <str> /* We have either 'count' or 'size_expr' (takes precedence) attribute */
-			},
+		"custom_element_count_map": {	/* element count info */
+			<mStr>: <int>/<str>, /* Integer value or code expression that yields a number elements for this member */
 			(...)
 		},
-		"custom_global_element_count_map": {
-			<ghash>: {
-				/* element count info */
-				'count': <int>
-				'size_expr': <str> /* We have either 'count' or 'size_expr' (takes precedence) attribute */
-			},
+		"custom_global_element_count_map": {	/* element count info */
+			<ghash>: <int>/<str>, /* Integer value or code expression that yields a number elements for this global */
+			(...)
+		},
+		"custom_string_members": {
+			/* List of 'char*' members that are actual C-strings */
+			<mStr>: "<str>"	/* custom information provided by the user for each C-string member */
 			(...)
 		}
 	},
