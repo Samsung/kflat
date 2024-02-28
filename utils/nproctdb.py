@@ -569,6 +569,33 @@ static void* {1} = NULL;"""
 	}} while(0);
 """
 
+	# 0 - name of global variable inc. kernel module
+	# 1 - name of global var
+	# 2 - size of global var
+	# 3 - flattening commands
+	# 4 - unique hash of global variable
+	# 5 - pointer to be flattened
+	# 6 - definition of the global
+	# 7 - global hash
+	template_output_per_cpu_global_handler = """
+	// Dump global indirect per_cpu variable {0}
+	// hash: '{7}'
+	/* {6} */
+	do {{
+		void* per_cpu_var = NULL;
+		void* addr = {4}; /* Addr set by pre_handler */
+		if(addr == NULL) {{
+			pr_err("skipping global {0} ...");
+			break;
+		}}
+		per_cpu_var = this_cpu_ptr(*(void**)addr);
+
+		FOR_EXTENDED_ROOT_POINTER(&per_cpu_var, "{1}", {2},
+{3}
+		);
+	}} while(0);
+"""
+
 	# Well, some of the struct types below are pulled in when <linux/module.h> and <linux/kflat.h> headers are included in the generated module source file
 	# So either blacklisting the below or extracting required symbols from both headers above
 	struct_type_blacklist = set([
@@ -3610,11 +3637,14 @@ def main():
 		var_hash = glob[2] + '_' + hashlib.sha1(f'{var_name}_{i}'.encode()).hexdigest()[:8]
 
 		glob_addr = "addr"
-		if gv.name in RG.config['per_cpu_variables']:
+		output_template = RecipeGenerator.template_output_global_handler
+		if gv.name in RG.config['per_cpu_variables']['per_cpu_direct_variables']:
 			glob_addr = 'this_cpu_ptr(addr)'
+		elif gv.name in RG.config['per_cpu_variables']['per_cpu_indirect_variables']:
+			output_template = RecipeGenerator.template_output_per_cpu_global_handler
 
-		# Generate code
-		globals_handler_stream.write(RecipeGenerator.template_output_global_handler.format(
+		# Generate 
+		globals_handler_stream.write(output_template.format(
 			var_name, glob[6], glob[4], "\n".join(["\t\t\t"+x for x in out.getvalue().strip().split("\n")]), var_hash, glob_addr, gv.defstring, gv.hash
 		))
 		globals_prehandler_stream.write(RecipeGenerator.template_output_global_pre_handler.format(
