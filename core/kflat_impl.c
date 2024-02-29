@@ -234,12 +234,22 @@ bool flatten_get_object(struct flat* flat, void* ptr, void** start, void** end) 
 		DBGS("flatten_get_object - discovered kernel start at %llx\n", kernel_end);
 	}
 	if(modules_start == NULL) {
+#ifndef CONFIG_RKP
 		u64* tmp = flatten_global_address_by_name("module_alloc_base");
 		if(tmp != NULL) {
 			modules_start = (void*) *tmp;
 			modules_end = (void*)((uintptr_t)modules_start + MODULES_VSIZE);
 			DBGS("flatten_get_object - discovered modules memory region at %llx - %llx\n", modules_start, modules_end);
 		}
+#else
+		u64* base = flatten_global_address_by_name("robuffer_base");
+		u64* size = flatten_global_address_by_name("robuffer_size");
+		if(base != NULL && size != NULL) {
+			modules_start = (void*) phys_to_virt(*base);
+			modules_end = (void*)((uintptr_t)modules_start + *size);
+			DBGS("flatten_get_object - discovered modules memory region at %llx - %llx\n", modules_start, modules_end);
+		}
+#endif
 	}
 
 	// Is it pointing to kernel binary (.text or .data sections)?
