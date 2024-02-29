@@ -42,12 +42,15 @@ OFFSET_KIND_MIXED=3
 def indent(s, n=1):
 	return "\n".join([" " * n * RecipeGenerator.TABSIZE + x for x in s.split("\n")])
 
-def ptrNestedRefName(refname, ptrLevel, nestedPtr=False, refoffset=0):
+def ptrNestedRefName(refname, ptrLevel, nestedPtr=False, refoffset=0, const_array_member=False):
 	if ptrLevel > 0:
 		return "__" + "_".join(refname.split(".")) + "_" + str(ptrLevel)
 	elif not nestedPtr:
 		return refname
-	return "/*ATTR(%s)*/ OFFATTR(void**,%d)" % (refname, refoffset)
+	if not const_array_member:
+		return "/*ATTR(%s)*/ OFFATTR(void**,%d)" % (refname, refoffset)
+	else:
+		return "/*ATTR(%s)*/ OFFADDR(void**,%d)" % (refname, refoffset)
 
 def ptrNestedRefNameOrRoot(refname, ptrLevel, nestedPtr=False, refoffset=0):
 	if ptrLevel > 0:
@@ -375,7 +378,7 @@ class RecipeGenerator(object):
     {0},
     {4},
     {5},
-    (AGGREGATE_FLATTEN_DETECT_OBJECT_SIZE_SELF_CONTAINED({3},{2},{1})/{1}),
+    (FLATTEN_DETECT_OBJECT_SIZE({5},{1})/{1}),
   {6}
   );"""
 
@@ -3305,7 +3308,7 @@ The expression(s)/custom info we concluded it from was:\n\
 							# We have an array of pointers
 							# Generally it's the same as normal pointer, just we might have many of them
 							# We assume all pointers in array point to the same kind of things (otherwise custom recipe is needed)
-							# We also only consider custom pointer information from config file (as the data for pointers in the array is mostly invalid)
+							# We also only consider custom pointer information from config file (as the data for pointer members is only valid for the plain pointers case)
 							if not handle_overlapping_members():
 								continue
 							PTE = self.ftdb.types[AT.refs[0]]
@@ -3339,7 +3342,7 @@ The expression(s)/custom info we concluded it from was:\n\
 									r = RecipeGenerator.template_flatten_pointer_storage_recipe.format(
 										ptrtp,
 										ptrNestedRefName(refname,1),
-										ptrNestedRefName(refname,0,True,moffset//8),
+										ptrNestedRefName(refname,0,True,moffset//8,True),
 										sz,
 										self.safeInfo(False),
 										indent(ptrout.getvalue().rstrip(),1),
@@ -3355,7 +3358,7 @@ The expression(s)/custom info we concluded it from was:\n\
 											moffset//8,
 											refname,
 											ptrNestedRefName(refname,1),
-											ptrNestedRefName(refname,0,True,moffset//8),
+											ptrNestedRefName(refname,0,True,moffset//8,True),
 											indent(ptrout.getvalue().rstrip(),1),
 											"",
 											self.safeInfo(False)
