@@ -858,6 +858,27 @@ do {	\
 
 #define AGGREGATE_FLATTEN_FUNCTION_POINTER(f) AGGREGATE_FLATTEN_FUNCTION_POINTER_SELF_CONTAINED(f, offsetof(_container_type,f))
 
+/* For each pointer 'v' (of type 'PTRTYPE') in the array of consecutive pointers in memory do some stuff with it
+ * 'p' should actually point to the first element (first pointer) of this array
+ * 's' is the size of the array (number of consecutive pointers)
+ *  For example, if we have an allocated array of pointers of size 10 and the pointer that points to it:
+ *    int** parr = malloc(10*sizeof(int*));
+ *    // initialize the pointers in the array
+ *  We can write:
+ *    FOREACH_POINTER(int*,my_ptr,parr,10,
+ *      // Do some stuff with it
+ *    );
+ *  Beware when you're writing a recipe for an array of pointers inside a structure and you access the member through the offset
+ *  In such case it's different whether we have allocated array vs const array
+ *    struct X {
+ *      int** my_allocated_array; // allocated to 10 elements
+ *      int* my_const_array[10];
+ *    } *pX;
+ *  In the first case the pointer to the first element of the array would be given by:
+ *    OFFATTR(int*,offsetof(struct X,my_allocated_array)) -> (*((int**)((unsigned char*)(pX)+offsetof(struct X,my_allocated_array))))
+ *  However in the second case we would have one indirection less:
+ *    OFFADDR(int*,offsetof(struct X,my_allocated_array)) -> ((int**)((unsigned char*)(pX)+offsetof(struct X,my_const_array)))
+ */ 
 /* TODO: Use ADDR_RANGE_VALID */
 #define FOREACH_POINTER(PTRTYPE,v,p,s,...)	\
 	do {	\
