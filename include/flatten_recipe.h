@@ -509,7 +509,7 @@ do {	\
 #define AGGREGATE_FLATTEN_GENERIC_STORAGE_FLEXIBLE(FULL_TYPE, FLSIZE, OFF, CUSTOM_VAL, TARGET)	\
 	do {									\
 		void* start, *end;					\
-		size_t el_cnt;						\
+		ssize_t el_cnt;						\
 											\
 		bool rv = flatten_get_object(FLAT_ACCESSOR, (void*)_ptr, &start, &end);	\
 		DBGS("flatten_get_object(): %d, start(%lx), end(%lx), size(%zu)\n",rv,start,end,end-start);	\
@@ -525,7 +525,7 @@ do {	\
 #define AGGREGATE_FLATTEN_GENERIC_COMPOUND_TYPE_STORAGE_FLEXIBLE(T,SIZE,OFF)	\
 	do {									\
 		void* start, *end;					\
-		size_t el_cnt;						\
+		ssize_t el_cnt;						\
 		const T* __p;						\
 											\
 		bool rv = flatten_get_object(FLAT_ACCESSOR, (void*)_ptr, &start, &end);	\
