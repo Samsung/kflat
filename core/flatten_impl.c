@@ -1513,7 +1513,7 @@ void flatten_aggregate_generic(struct flat* flat, void* q, const void* _ptr,
 		_fp = (const void*) ( (char*)_p+_shift);
 
 	if (flat->error || !ADDR_RANGE_VALID(_fp, el_size * count)) {
-		DBGS("AGGREGATE_FLATTEN_GENERIC: error(%d), ADDR(%lx)\n", flat->error, (uintptr_t)OFFATTR(void**,_off));
+		DBGS("  \\-> AGGREGATE_FLATTEN_GENERIC: error(%d), ADDR(%lx)\n", flat->error, (uintptr_t)OFFATTR(void**,_off));
 		return;
 	}
 	__node = interval_tree_iter_first(
@@ -1527,7 +1527,7 @@ void flatten_aggregate_generic(struct flat* flat, void* q, const void* _ptr,
 
 	__shifted = flatten_plain_type(flat, _fp, el_size * count);
 	if(__shifted == NULL) {
-		DBGS("AGGREGATE_FLATTEN_GENERIC:flatten_plain_type(): NULL");
+		DBGS("  \\-> AGGREGATE_FLATTEN_GENERIC:flatten_plain_type(): NULL");
 		flat->error = EFAULT;
 		return;
 	}
@@ -1545,7 +1545,7 @@ void flatten_aggregate_generic(struct flat* flat, void* q, const void* _ptr,
 
 	err = fixup_set_insert_force_update(flat, __node, (uint64_t)_ptr - __node->start + _off, __shifted);
 	if (err && err != EEXIST && err != EAGAIN) {
-		DBGS("AGGREGATE_FLATTEN_GENERIC:fixup_set_insert_force_update(): err(%d)\n",err);
+		DBGS("  \\-> AGGREGATE_FLATTEN_GENERIC:fixup_set_insert_force_update(): err(%d)\n",err);
 		flat->error = err;
 		return;
 	}
@@ -1670,7 +1670,7 @@ void flatten_run_iter_harness(struct flat* flat) {
 	while((!flat->error) && (!bqueue_empty(bq))) {
 		int err;
 
-		DBGS("%s: queue iteration, size: %zu el_count: %ld\n",__func__, bqueue_size(bq),bqueue_el_count(bq));
+		DBGS("\n%s: queue iteration, size: %zu el_count: %ld\n",__func__, bqueue_size(bq),bqueue_el_count(bq));
 
 		err = bqueue_pop_front(bq, &job, sizeof(struct flatten_job));
 		if (err) {

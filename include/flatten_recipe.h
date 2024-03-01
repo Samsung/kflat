@@ -620,11 +620,12 @@ do {	\
 /* AGGREGATE_* */
 #define AGGREGATE_FLATTEN_GENERIC(FULL_TYPE,TARGET,N,f,_off,n,CUSTOM_VAL,pre_f,post_f,_shift)	\
 	do {	\
-		DBGS("AGGREGATE_FLATTEN_GENERIC(%s, %s, N:0x%zu, off:0x%zu, n:0x%zu)\n", #FULL_TYPE, #f, N, _off, n);	\
+		size_t count = (n);	\
+		DBGS("AGGREGATE_FLATTEN_GENERIC(%s, %s, N:0x%zu, off:0x%zu, n:0x%zu)\n", #FULL_TYPE, #f, N, _off, count);	\
 		DBGS("  \\-> FULL_TYPE [%lx:%zu -> %lx]\n",(uintptr_t)_ptr,(size_t)_off,(uintptr_t)OFFATTRN(_off,_shift));	\
 		if(((uintptr_t)(pre_f) != 0) || ((uintptr_t)(post_f) != 0))	\
 			DBGS("  \\-> PRE_F[%llx]; POST_F[%llx]\n",(uintptr_t)pre_f, (uintptr_t) post_f);	\
-		flatten_aggregate_generic(FLAT_ACCESSOR, __q, _ptr, N, n, CUSTOM_VAL, _off, _shift, TARGET, pre_f, post_f); \
+		flatten_aggregate_generic(FLAT_ACCESSOR, __q, _ptr, N, count, CUSTOM_VAL, _off, _shift, TARGET, pre_f, post_f); \
 	} while(0)
 
 #define AGGREGATE_FLATTEN_STRUCT_ARRAY_SELF_CONTAINED(T,N,f,_off,n) \
