@@ -1,0 +1,58 @@
+^{linux/types.h}
+!{s:ip}
+
+&{t:table}
+
+&{e:amd_hw_ip_block_type}
+
+&{g:hw_id_map}
+
+void* bhdr = #{mman.discovery_bin};
+void* ihdr = #{mman.discovery_bin} +
+  le16_to_cpu(____ATTR_BY_OFFSET(
+    ____ATTR_PTR_BY_OFFSET(bhdr,${table_list,s:binary_header})+IP_DISCOVERY*@{t:table_info},
+    ${offset,t:table_info},
+    uint16_t
+    ));
+
+uint16_t num_dies = le16_to_cpu(____ATTR_BY_OFFSET(ihdr,${num_dies,s:ip_discovery_header},uint16_t));
+uint16_t die_offset;
+uint16_t num_ips;
+uint16_t ip_offset;
+uint8_t num_base_address;
+void* dhdr;
+void* ip;
+int hw_ip;
+int i, j;
+int* p_g_hw_id_map;
+
+for (i = 0; i < num_dies; i++) {
+  die_offset = le16_to_cpu(____ATTR_BY_OFFSET(
+    ____ATTR_PTR_BY_OFFSET(ihdr,${die_info,s:ip_discovery_header})+i*@{s:die_info},
+    ${die_offset,s:die_info},
+    uint16_t
+  ));
+  dhdr = #{mman.discovery_bin} + die_offset;
+  num_ips = le16_to_cpu(____ATTR_BY_OFFSET(dhdr,${num_ips,s:die_header},uint16_t));
+  ip_offset = die_offset + @{s:die_header};
+  for (j = 0; j < num_ips; j++) {
+    ip = #{mman.discovery_bin} + ip_offset;
+    num_base_address = ____ATTR_BY_OFFSET(ip,${num_base_address,s:ip},uint8_t);
+    p_g_hw_id_map = *{hw_id_map};
+    if (!p_g_hw_id_map) {
+      p_g_hw_id_map = hw_id_map;
+    }
+    for (hw_ip = 0; hw_ip < %{e:amd_hw_ip_block_type:MAX_HWIP}; hw_ip++) {
+      if (p_g_hw_id_map[hw_ip] == le16_to_cpu(____ATTR_BY_OFFSET(ip,${hw_id,s:ip},uint16_t))) {
+        FOREACH_POINTER(
+              uint32_t*,
+              __base_address,
+              #{reg_offset}+hw_ip*((8/*HWIP_MAX_INSTANCE*/)*sizeof(uint32_t**))+____ATTR_BY_OFFSET(ip,${number_instance,s:ip},uint8_t)*sizeof(uint32_t*),
+              1,
+          FLATTEN_STRUCT_ARRAY_SHIFTED_SELF_CONTAINED(ip,@{s:ip}+(num_base_address-1)*sizeof(uint32_t),__base_address,1,-${base_address,s:ip});
+        );
+      }
+    }
+    ip_offset += @{s:ip} + 4 * (____ATTR_BY_OFFSET(ip,${num_base_address,s:ip},uint8_t)-1);
+  }
+}
