@@ -105,9 +105,9 @@ void ExecFlat::run_recipe(
         ExecFlatInterface interface, 
         const fs::path &target, 
         const std::string &recipe, 
-        const fs::path &outfile, 
-        bool debug, 
+        const fs::path &outfile,
         bool use_stop_machine, 
+        bool debug, 
         bool skip_func_body, 
         bool run_recipe_now,
         unsigned int target_timeout,
@@ -131,9 +131,9 @@ void ExecFlat::run_recipe(
 
 void ExecFlat::run_recipe_no_target(
         const std::string &recipe, 
-        const fs::path &outfile, 
+        const fs::path &outfile,
+        bool use_stop_machine,  
         bool debug, 
-        bool use_stop_machine, 
         bool skip_func_body, 
         bool run_recipe_now,
         int poll_timeout
