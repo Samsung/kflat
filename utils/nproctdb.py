@@ -3083,6 +3083,7 @@ The expression(s)/custom info we concluded it from was:\n\
 				self.structs_blacklisted.add((TRT.str,TRT.isunion))
 		have_flexible_member = False
 
+		origin_typestring = Ts
 		custom_include_list = list()
 		if do_recipes:
 			try:
@@ -3162,6 +3163,13 @@ The expression(s)/custom info we concluded it from was:\n\
 					proc_members.append((s,"custom",custom_recipe[1]))
 					self.members_with_custom_recipes.append(mStr)
 					continue
+
+				# Check if we ignore this refname
+				if "ignore_refnames" in self.config["base_config"] and origin_typestring in self.config["base_config"]["ignore_refnames"]:
+					ignored_refnames = self.config["base_config"]["ignore_refnames"][origin_typestring]
+					if refname in ignored_refnames:
+						proc_members.append(("/* member '%s' ['%s'] was ignored by the user */\n"%(refname,mStr),None))
+						continue
 
 				# If some additional processing in recipe generation is needed for anchor type this is the place to go
 				# For example:
@@ -3850,6 +3858,67 @@ The expression(s)/custom info we concluded it from was:\n\
 				print ("WARNING: Multiple record type recipes for typedef '%s'"%(RTR.TPD.name))
 			self.RTRMap[RTR.TPD.name] = RTR
 
+	def compute_argument_triggers(self,func,func_args_to_dump,additional_deps):
+
+		arg_updated_type = False
+		rLst = list()
+		for arg in func_args_to_dump:
+			# (0:res.id, 1:res.str if res.classname == 'record' else res.name), 2:res.size // 8, 3:res.classname, 4:offset)
+			if isinstance(arg,tuple):
+				arg = [arg]
+			if len(arg[0])>5:
+				arg_updated_type = arg[0][5]
+			narg = list(arg[0][:5])+[arg[0][0],arg[0][2],"struct %s"%(arg[0][0]) if arg[0][3]=='record' else arg[0][0]] # += [5:original type string,6:original typesize,7:full original type string]
+			argStr = ("____%s____%d"%(func,narg[1]-1))
+			extra_info = ""
+			if not arg_updated_type:
+				if "ptr_config" in self.config and "container_of_parm_map" in self.config["ptr_config"] and argStr in self.config["ptr_config"]["container_of_parm_map"]:
+					e = self.config["ptr_config"]["container_of_parm_map"][argStr][0]
+					tp = self.ftdb.types.entry_by_id(e["tpid"])
+					narg[2] = tp.size//8
+					narg[3] = tp.classname
+					narg[4] = e["offset"]
+					narg[5] = tp.str if tp.classname == 'record' else tp.name
+					extra_info += "/* It was detected that the function argument no. {0} of the original type '{1}' is a part of a larger type '{2}' at offset {3}. We concluded that from the 'container_of' expression at the following location:\n  {4}".format(
+						narg[1],
+						narg[7],
+						"struct %s"%(narg[5]) if tp.classname == 'record' else narg[5],
+						narg[4],
+						e["expr"]
+					)
+					if "call_id" in e:
+						extra_info += "\n   The conclusion was made based on a call deeper down in the call graph. The first function called was '{0}' */".format(
+							self.ftdb.funcs.entry_by_id(e["call_id"]).name,
+						)
+					else:
+						extra_info += " */"
+					additional_deps.append((tp.id,narg[5]))
+				else:
+					if narg[3]=='record':
+						RT = RG._find_record_type_by_tag(narg[5])
+						additional_deps.append((RT.id,narg[5]))
+					else:
+						TPD = RG._find_typedef_type_by_name(narg[5])
+						additional_deps.append((TPD.id,narg[5]))
+			if len(arg)>1:
+				extra_info += "\n/* It was detected that the config file specified {1} additional triggers for the function argument no. {0}. Additional triggers are reflected in the recipe */".format(
+					narg[1],
+					len(arg)-1
+				)
+			extra_triggers = ""
+			if len(arg)>1:
+				for extra_arg in arg[1:]:
+					extra_triggers+="\n\t\t\t\tFLATTEN_STRUCT_{3}SHIFTED_SELF_CONTAINED({0}, {1}, target, {2});".format(
+						extra_arg[0],
+						extra_arg[2],
+						extra_arg[4],
+						"TYPE_" if extra_arg[3]=='typedef' else ""
+					)
+
+			rLst.append((narg,extra_info,extra_triggers))
+
+		return rLst
+
 ####################################
 # Program Entry point
 ####################################
@@ -3896,6 +3965,9 @@ def main():
 		out = io.StringIO()
 		gv = RG.ftdb.globals[glob[5]]
 		RG.generate_flatten_trigger(gv, out, additional_deps)
+
+	# Now look for additional dependencies or argument triggers
+	argList = RG.compute_argument_triggers(args.func,func_args_to_dump,additional_deps)
 	deps|=set(additional_deps)
 
 	print(f"--- Generating recipes for {len(deps)} structures ...")
@@ -4158,51 +4230,8 @@ def main():
 
 	func_args_stream = io.StringIO()
 	record_type_list = list(set(RG.structs_done_match) - set(RG.structs_missing))
-	arg_updated_type = False
-	for arg in func_args_to_dump:
-		# (0:res.id, 1:res.str if res.classname == 'record' else res.name), 2:res.size // 8, 3:res.classname, 4:offset)
-		if isinstance(arg,tuple):
-			arg = [arg]
-		if len(arg[0])>5:
-			arg_updated_type = arg[0][5]
-		narg = list(arg[0][:5])+[arg[0][0],arg[0][2],"struct %s"%(arg[0][0]) if arg[0][3]=='record' else arg[0][0]] # += [5:original type string,6:original typesize,7:full original type string]
-		argStr = ("____%s____%d"%(args.func,narg[1]-1))
-		extra_info = ""
-		if not arg_updated_type and "ptr_config" in RG.config and "container_of_parm_map" in RG.config["ptr_config"]:
-			if argStr in RG.config["ptr_config"]["container_of_parm_map"]:
-				e = RG.config["ptr_config"]["container_of_parm_map"][argStr][0]
-				tp = RG.ftdb.types.entry_by_id(e["tpid"])
-				narg[2] = tp.size//8
-				narg[3] = tp.classname
-				narg[4] = e["offset"]
-				narg[5] = tp.str if tp.classname == 'record' else tp.name
-				extra_info += "/* It was detected that the function argument no. {0} of the original type '{1}' is a part of a larger type '{2}' at offset {3}. We concluded that from the 'container_of' expression at the following location:\n  {4}".format(
-					narg[1],
-					narg[7],
-					"struct %s"%(narg[5]) if tp.classname == 'record' else narg[5],
-					narg[4],
-					e["expr"]
-				)
-				if "call_id" in e:
-					extra_info += "\n   The conclusion was made based on a call deeper down in the call graph. The first function called was '{0}' */".format(
-						RG.ftdb.funcs.entry_by_id(e["call_id"]).name,
-					)
-				else:
-					extra_info += " */"
-		if len(arg)>1:
-			extra_info += "\n/* It was detected that the config file specified {1} additional triggers for the function argument no. {0}. Additional triggers are reflected in the recipe */".format(
-				narg[1],
-				len(arg)-1
-			)
-		extra_triggers = ""
-		if len(arg)>1:
-			for extra_arg in arg[1:]:
-				extra_triggers+="\n\t\t\t\tFLATTEN_STRUCT_{3}SHIFTED_SELF_CONTAINED({0}, {1}, target, {2});".format(
-					extra_arg[0],
-					extra_arg[2],
-					extra_arg[4],
-					"TYPE_" if extra_arg[3]=='typedef' else ""
-				)
+
+	for narg,extra_info,extra_triggers in argList:
 		for tp in record_type_list:
 			if narg[0]==tp[0] and narg[3]=='record':
 					# 0 - full type of argument

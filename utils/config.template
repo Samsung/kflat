@@ -38,7 +38,13 @@
 			/* List of 'char*' members that are actual C-strings */
 			<mStr>: "<str>"	/* custom information provided by the user for each C-string member */
 			(...)
-		}
+		},
+		"force_detect_object_size": {	/* Telling the recipe generator engine to force detecting the object size a specific pointer points to */
+			<mStr>: <str> /* Custom information provided by the user */
+		},
+		"ignore_refnames": {	/* Telling the recipe generator engine to ignore specific refnames */
+			<record_string>: [<refname>,...]
+		},
 	},
 	"OT_info": {
 		"functions": [ (<str>,<int>,<str>), ...], /* List of functions in the original FTDB which are present in the OT: (function name, function id in original FTDB, function hash) */
