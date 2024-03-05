@@ -246,7 +246,7 @@ static int flatten_stop_machine(struct kflat* kflat, struct probe_regs* regs) {
 	};
 
 	cpumask_clear(&cpumask);
-	cpumask_set_cpu(smp_processor_id(), &cpumask);
+	cpumask_set_cpu(raw_smp_processor_id(), &cpumask);
 
 	err = stop_machine(_stop_machine_func, (void*) &arg, &cpumask);
 	if(err)
