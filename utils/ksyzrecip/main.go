@@ -202,7 +202,7 @@ func generateRecipe(insideType prog.StructType) ([]*FlatHandler, error) {
 					Size: calculateActualSize(t),
 					FieldName: field.Name,
 					Offset: fieldOffset,
-					IsUnion: false,
+					IsUnion: true,
 				}
 				flat.Aggregates = append(flat.Aggregates, *aggregate)
 			}
