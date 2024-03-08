@@ -3873,33 +3873,45 @@ The expression(s)/custom info we concluded it from was:\n\
 			extra_info = ""
 			if not arg_updated_type:
 				if "ptr_config" in self.config and "container_of_parm_map" in self.config["ptr_config"] and argStr in self.config["ptr_config"]["container_of_parm_map"]:
-					e = self.config["ptr_config"]["container_of_parm_map"][argStr][0]
+					cpM = self.config['ptr_config']['container_of_parm_map']
+					e = cpM[argStr][0]
 					tp_chain = list()
+					cPTE = e["tpid"]
 					if 'container_of_local_map' in self.config['ptr_config']:
-						# Check if the argument further undergone the 'container_of' pattern
 						clM = self.config['ptr_config']['container_of_local_map']
-						cPTE = e["tpid"]
+						# Check if the argument further undergone the 'container_of' pattern
 						while True:
 							nPTE = None
-							if nPTE is None:
-								for fkey,cinfo in clM.items():
-									if len(cinfo)>1:
-										# Omit ambiguous entries
-										continue
-									tpvarid = self.ftdb.types.entry_by_id(cinfo[0]['tpvarid'])
-									if tpvarid.classname=='pointer' and tpvarid.refs[0]==cPTE:
-										# We look for exactly one match
-										if nPTE is not None:
-											nPTE = None
-											break
-										nPTE = (fkey,cinfo[0])
+							for fkey,cinfo in cpM.items():
+								if len(cinfo)>1:
+									# Omit ambiguous entries
+									continue
+								tpargid = self.ftdb.types.entry_by_id(cinfo[0]['tpargid'])
+								if tpargid.classname=='pointer' and tpargid.refs[0]==cPTE:
+									# We look for exactly one match
+									if nPTE is not None:
+										nPTE = None
+										break
+									nPTE = (fkey,cinfo[0])
+							else:
+								if nPTE is None:
+									for fkey,cinfo in clM.items():
+										if len(cinfo)>1:
+											# Omit ambiguous entries
+											continue
+										tpvarid = self.ftdb.types.entry_by_id(cinfo[0]['tpvarid'])
+										if tpvarid.classname=='pointer' and tpvarid.refs[0]==cPTE:
+											# We look for exactly one match
+											if nPTE is not None:
+												nPTE = None
+												break
+											nPTE = (fkey,cinfo[0])
 							if nPTE:
 								# We've found unambiguous entry, save it a look further until no more entries are found
 								tp_chain.append(nPTE)
 								cPTE = nPTE[1]['tpid']
 							else:
 								break
-						#PTEExt = (tp_chain[-1][1]['tpid'],sum([x[1]['offset'] for x in tp_chain]),ext_kind,ext_msg,tp_chain)
 					tp = self.ftdb.types.entry_by_id(e["tpid"])
 					tp_offset = e["offset"]
 					extra_info += "/* It was detected that the function argument no. {0} of the original type '{1}' is a part of a larger type '{2}' at offset {3}. We concluded that from the 'container_of' expression at the following location:\n  {4}".format(
@@ -3919,7 +3931,7 @@ The expression(s)/custom info we concluded it from was:\n\
 						tp = self.ftdb.types.entry_by_id(tp_chain[-1][1]['tpid'])
 						tp_offset += sum([x[1]['offset'] for x in tp_chain])
 						extra_info += "\n/* It was further detected that the type the function argument no. {0} points to was additionally embedded into more enclosing types accessed using \
-the 'container_of' invocation chain on local variables.\n   The invocation chain was as follows:\n{1} */".format(
+the 'container_of' invocation chain.\n   The invocation chain was as follows:\n{1} */".format(
 								narg[1],
 					   		"\n".join(["     {0}@{1}: {2} -> {3} : {4} @ {5}".format(
 						            x[0].split("____")[1],
