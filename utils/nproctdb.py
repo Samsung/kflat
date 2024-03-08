@@ -3919,7 +3919,7 @@ The expression(s)/custom info we concluded it from was:\n\
 						tp = self.ftdb.types.entry_by_id(tp_chain[-1][1]['tpid'])
 						tp_offset += sum([x[1]['offset'] for x in tp_chain])
 						extra_info += "\n/* It was further detected that the type the function argument no. {0} points to was additionally embedded into more enclosing types accessed using \
-the 'container_of' invocation chain on local variables.\n   The invocation chain was as follows:\n{1} */\n".format(
+the 'container_of' invocation chain on local variables.\n   The invocation chain was as follows:\n{1} */".format(
 								narg[1],
 					   		"\n".join(["     {0}@{1}: {2} -> {3} : {4} @ {5}".format(
 						            x[0].split("____")[1],
@@ -3950,7 +3950,7 @@ the 'container_of' invocation chain on local variables.\n   The invocation chain
 			extra_triggers = ""
 			if len(arg)>1:
 				for extra_arg in arg[1:]:
-					extra_triggers+="\n\t\t\t\tFLATTEN_STRUCT_{3}SHIFTED_SELF_CONTAINED({0}, {1}, target, {2});".format(
+					extra_triggers+="\n\t\t\t\t\tFLATTEN_STRUCT_{3}SHIFTED_SELF_CONTAINED({0}, {1}, target, {2});".format(
 						extra_arg[0],
 						extra_arg[2],
 						extra_arg[4],
