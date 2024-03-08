@@ -1,3 +1,4 @@
+/* -*- compile-command: "go build" -*- */
 package main
 
 import (
@@ -10,7 +11,7 @@ import (
 	"github.com/google/syzkaller/sys/targets"
 	"os"
 	"path/filepath"
-	"strings"
+	"strings" 
 )
 
 const (
@@ -37,21 +38,21 @@ func compileErrorHandler(pos ast.Pos, msg string) {
 	lastMsg = msg
 }
 
-func shouldQueue(typ prog.Type) (bool, bool, prog.Type) {
+func shouldQueue(typ prog.Type) (bool, prog.Type, bool) {
 	var isPointer bool = false
 again:
 	switch typ.(type) {
 	case *prog.StructType:
-		return true, isPointer, typ
+		return isPointer, typ, true
 	case *prog.UnionType:
-		return true, isPointer, typ
+		return isPointer, typ, true
 	case *prog.PtrType:
 		typ = typ.(*prog.PtrType).Elem
 		isPointer = true
 		goto again
 	}
 
-	return false, isPointer, nil
+	return isPointer, nil, false
 }
 
 func getRecordFields(syzType interface{}) ([]prog.Field, error) {
@@ -67,65 +68,14 @@ func getRecordFields(syzType interface{}) ([]prog.Field, error) {
 	return nil, errors.New("not a record type")
 }
 
-type RecordAggregate struct {
-	TypeName string
-	Size uint64
-	FieldName string
-	Offset uint64
-	IsUnion bool
-}
 
-func (p *RecordAggregate) String() string {
-	if p.IsUnion {
-		return fmt.Sprintf("AGGREGATE_FLATTEN_UNION_SELF_CONTAINED(%s, %d, %s, %d);", p.TypeName, p.Size, p.FieldName, p.Offset)
-	}
 
-	return fmt.Sprintf("AGGREGATE_FLATTEN_STRUCT_SELF_CONTAINED(%s, %d, %s, %d);", p.TypeName, p.Size, p.FieldName, p.Offset)
-}
-
-type FlatHandler struct {
-	Name string
-	Size uint64
-	Aggregates []RecordAggregate
-	IsUnion bool
-}
-
-func (p *FlatHandler) Declaration() string {
-	if p.IsUnion {
-		return fmt.Sprintf("FUNCTION_DECLARE_FLATTEN_UNION_SELF_CONTAINED(%s);", p.Name)
-	}
-
-	return fmt.Sprintf("FUNCTION_DECLARE_FLATTEN_STRUCT_SELF_CONTAINED(%s);", p.Name)
-}
-
-func (p *FlatHandler) Definition() string {
-	var sb strings.Builder
-
-	if p.IsUnion {
-		sb.WriteString(fmt.Sprintf("FUNCTION_DEFINE_FLATTEN_UNION_SELF_CONTAINED(%s, %d", p.Name, p.Size))
-	} else {
-		sb.WriteString(fmt.Sprintf("FUNCTION_DEFINE_FLATTEN_STRUCT_SELF_CONTAINED(%s, %d", p.Name, p.Size))
-	}
-
-	for i, aggregate := range p.Aggregates {
-		if i == 0 {
-			sb.WriteString(",")
-		}
-
-		sb.WriteString("\n\t" + aggregate.String() + "\n")
-	}
-
-	sb.WriteString(");")
-
-	return sb.String()
-}
-
-func generateRecipe(insideType prog.StructType) ([]*FlatHandler, error) {
+func deduceDependantTypes(targetType prog.Type) map[string]prog.Type {
 	// Map containing every type which should have its own flattening function.
 	types := make(map[string]prog.Type)
 	traversed := make(map[string]int)
 	typQueue := make([]prog.Type, 1)
-	typQueue[0] = &insideType
+	typQueue[0] = targetType
 
 	for len(typQueue) > 0 {
 		var iter prog.Type
@@ -133,7 +83,7 @@ func generateRecipe(insideType prog.StructType) ([]*FlatHandler, error) {
 		iter = typ
 		typQueue = append(typQueue[:0], typQueue[1:]...)
 		if _, ok := types[typ.Name()]; ok {
-			val, ok := traversed[typ.Name()]
+			val, ok := traversed[typ.TemplateName()]
 			if ok && val > 1 {
 				continue
 			}
@@ -145,12 +95,12 @@ func generateRecipe(insideType prog.StructType) ([]*FlatHandler, error) {
 			iter = ptr.Elem
 		}
 
-		// We should track also string types.
-		// This function will iterate only over structs and unions, so all other potentially queued types are for sure discarded by now.
+		// This will iterate only over structs and unions, so all other potentially queued types are for sure discarded by now.
 		fields, _ := getRecordFields(iter)
+		// We should queue up array elements type
 		for _, field := range fields {
 			// Queue up only records and if field is a pointer to a record, dereference it and queue it
-			ok, pointer, t := shouldQueue(field.Type)
+			pointer, t, ok := shouldQueue(field.Type)
 			if ok {
 				typQueue = append(typQueue, t)
 				if pointer {
@@ -162,7 +112,48 @@ func generateRecipe(insideType prog.StructType) ([]*FlatHandler, error) {
 		traversed[iter.TemplateName()] += 1
 	}
 
-	// Add the root type
+	return types
+}
+
+func aggregateFromPointer(subType prog.Type, field string, offset uint64) (Aggregate, bool) {
+	switch t := subType.(type) {
+	case *prog.StructType:
+		size := calculateActualSize(t)
+		common := AggregateCommon {
+			TypeName: t.TemplateName(),
+			TypeSize: &size,
+			FieldName: field,
+			FieldOffset: offset,
+		}
+
+		aggregate := &RecordAggregate {
+			AggregateCommon: common,
+			IsUnion: false,
+		}
+		return aggregate, true
+	case *prog.UnionType:
+		size := calculateActualSize(t)
+		common := AggregateCommon {
+			TypeName: t.TemplateName(),
+			TypeSize: &size,
+			FieldName: field,
+			FieldOffset: offset,
+		}
+
+		aggregate := &RecordAggregate {
+			AggregateCommon: common,
+			IsUnion: true,
+		}
+		return aggregate, true
+	}
+
+	return nil, false
+}
+
+func generateRecipe(insideType prog.StructType) ([]*FlatHandler, error) {
+	types := deduceDependantTypes(&insideType)
+
+	// Add the root type as well
 	types[insideType.Name()] = &insideType
 	recipeTypes := make([]*FlatHandler, 0)
 
@@ -173,39 +164,67 @@ func generateRecipe(insideType prog.StructType) ([]*FlatHandler, error) {
 		}
 
 		var fieldOffset uint64 = 0
+
 		flat := &FlatHandler {
 			Name: iter.TemplateName(),
-			Size: calculateActualSize(iter),
+			Size: calculateActualSize(iter).Size,
+			Aggregates: make(map[string]Aggregate),
 		}
 
 		for _, field := range fields {
-			ptrType, ok := field.Type.(*prog.PtrType)
-			if !ok {
-				typQueue = append(typQueue, field.Type)
-				fieldOffset += calculateActualSize(field.Type)
+			switch t := field.Type.(type) {
+			case *prog.PtrType:
+				aggregate, ok := aggregateFromPointer(t.Elem, field.Name, fieldOffset)
+				if !ok {
+					continue
+				}
+
+				flat.Aggregates[field.Name] = aggregate
+			case *prog.ArrayType:
+				break
+			}
+
+			fieldOffset += calculateActualSize(field.Type).Size
+		}
+
+		// syzlang specifications says len[] it can point to a
+		// field in a child of current parent record.
+		// As of 8.04.23, this does not happen in base syzkaller recipes
+		// However, some descriptions use len to refer to its parent.
+		// I don't really know how to express that in terms of KFLAT recipes
+		// so I don't have an idea how to implement this feature.
+		// Here we are considering lengths only on sibling fields.
+		for _, field := range fields {
+			t, ok := field.Type.(*prog.LenType)
+			if !ok || len(t.Path) != 1 || t.Path[0] == "parent" {
 				continue
 			}
 
-			switch t := ptrType.Elem.(type) {
-			case *prog.StructType:
-				aggregate := &RecordAggregate {
-					TypeName: t.TemplateName(),
-					Size: calculateActualSize(t),
-					FieldName: field.Name,
-					Offset: fieldOffset,
-					IsUnion: false,
-				}
-				flat.Aggregates = append(flat.Aggregates, *aggregate)
-			case *prog.UnionType:
-				aggregate := &RecordAggregate {
-					TypeName: t.TemplateName(),
-					Size: calculateActualSize(t),
-					FieldName: field.Name,
-					Offset: fieldOffset,
-					IsUnion: true,
-				}
-				flat.Aggregates = append(flat.Aggregates, *aggregate)
+			// t.BitSize == 0 is len[] (if len's argument is a pointer, turn it into array)
+			// t.BitSize == 8 is bytesize[] (
+			// t.BitSizeN == 8 * N is bytesizeN[] (for N byte words)
+			// !(t.BitSize % 8) is bitsize[]
+
+			aggregate, ok := flat.Aggregates[t.Path[0]]
+			if t.BitSize != 0 || !ok {
+				continue
 			}
+
+			lengthWrapper := &FieldSize {
+				FieldName: field.Name,
+			}
+
+			common := &AggregateCommon {
+				TypeName: aggregate.Name(),
+				FieldName: aggregate.Field(),
+				FieldOffset: aggregate.Offset(),
+				TypeSize: lengthWrapper,
+			}
+			newAggregate := &ArrayAggregate {
+				AggregateCommon: *common, 
+			}
+
+			flat.Aggregates[t.Path[0]] = newAggregate
 		}
 
 		recipeTypes = append(recipeTypes, flat)
@@ -214,18 +233,23 @@ func generateRecipe(insideType prog.StructType) ([]*FlatHandler, error) {
 	return recipeTypes, nil
 }
 
-func calculateActualSize(typ prog.Type) uint64 {
+func calculateActualSize(typ prog.Type) IntegerSize {
+	var size uint64 = 0
+
 	if typ.Varlen() {
-		var size uint64 = 0
 		fields, _ := getRecordFields(typ)
 		for _, field := range fields {
-			size += calculateActualSize(field.Type)
+			size += calculateActualSize(field.Type).Size
 		}
-
-		return size
+	} else {
+		size = typ.Size()
 	}
 
-	return typ.Size()
+	intSize := IntegerSize {
+		Size: size,
+	}
+
+	return intSize
 }
 
 func init() {
