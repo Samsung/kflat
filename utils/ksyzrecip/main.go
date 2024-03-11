@@ -11,7 +11,7 @@ import (
 	"github.com/google/syzkaller/sys/targets"
 	"os"
 	"path/filepath"
-	"strings" 
+	"strings"
 )
 
 const (
@@ -68,8 +68,6 @@ func getRecordFields(syzType interface{}) ([]prog.Field, error) {
 	return nil, errors.New("not a record type")
 }
 
-
-
 func deduceDependantTypes(targetType prog.Type) map[string]prog.Type {
 	// Map containing every type which should have its own flattening function.
 	types := make(map[string]prog.Type)
@@ -119,35 +117,54 @@ func aggregateFromPointer(subType prog.Type, field string, offset uint64) (Aggre
 	switch t := subType.(type) {
 	case *prog.StructType:
 		size := calculateActualSize(t)
-		common := AggregateCommon {
-			TypeName: t.TemplateName(),
-			TypeSize: &size,
-			FieldName: field,
+		common := AggregateCommon{
+			TypeName:    t.TemplateName(),
+			TypeSize:    &size,
+			FieldName:   field,
 			FieldOffset: offset,
 		}
 
-		aggregate := &RecordAggregate {
+		aggregate := &RecordAggregate{
 			AggregateCommon: common,
-			IsUnion: false,
+			IsUnion:         false,
 		}
 		return aggregate, true
 	case *prog.UnionType:
 		size := calculateActualSize(t)
-		common := AggregateCommon {
-			TypeName: t.TemplateName(),
-			TypeSize: &size,
-			FieldName: field,
+		common := AggregateCommon{
+			TypeName:    t.TemplateName(),
+			TypeSize:    &size,
+			FieldName:   field,
 			FieldOffset: offset,
 		}
 
-		aggregate := &RecordAggregate {
+		aggregate := &RecordAggregate{
 			AggregateCommon: common,
-			IsUnion: true,
+			IsUnion:         true,
 		}
 		return aggregate, true
 	}
 
 	return nil, false
+}
+
+func createSizable(arg interface{}) Sizable {
+	switch t := arg.(type) {
+	case uint64:
+		size := &IntegerSize{
+			Size: t,
+		}
+
+		return size
+	case string:
+		size := &FieldSize{
+			FieldName: t,
+		}
+
+		return size
+	}
+
+	return nil
 }
 
 func generateRecipe(insideType prog.StructType) ([]*FlatHandler, error) {
@@ -165,9 +182,10 @@ func generateRecipe(insideType prog.StructType) ([]*FlatHandler, error) {
 
 		var fieldOffset uint64 = 0
 
-		flat := &FlatHandler {
+		flat := &FlatHandler{
 			Name: iter.TemplateName(),
-			Size: calculateActualSize(iter).Size,
+			// hiddev_usage_ref_multi  returns size 4124 from syzkaller????
+			Size:       calculateActualSize(iter).Size,
 			Aggregates: make(map[string]Aggregate),
 		}
 
@@ -181,7 +199,43 @@ func generateRecipe(insideType prog.StructType) ([]*FlatHandler, error) {
 
 				flat.Aggregates[field.Name] = aggregate
 			case *prog.ArrayType:
-				break
+				size := &IntegerSize{
+					Size: t.RangeBegin,
+				}
+				common := &AggregateCommon{
+					TypeName:    t.Elem.TemplateName(), // There should be a map syzkaller types<->C types, (Template)Name() returns the syzkaller name
+					FieldName:   field.Name,
+					FieldOffset: fieldOffset,
+					TypeSize:    size,
+				}
+				aggregate := &ArrayAggregate{
+					AggregateCommon: *common,
+				}
+				flat.Aggregates[field.Name] = aggregate
+			case *prog.BufferType:
+				if t.Kind != prog.BufferString || t.TypeName != "string" {
+					continue
+				}
+
+				var min int = len(t.Values[0])
+				for _, value := range t.Values {
+					if min > len(value) {
+						min = len(value)
+					}
+				}
+
+				common := &AggregateCommon{
+					TypeName:    "char",
+					FieldName:   field.Name,
+					FieldOffset: fieldOffset,
+					TypeSize:    createSizable(uint64(min)),
+				}
+
+				aggregate := &ArrayAggregate{
+					AggregateCommon: *common,
+				}
+
+				flat.Aggregates[field.Name] = aggregate
 			}
 
 			fieldOffset += calculateActualSize(field.Type).Size
@@ -210,18 +264,18 @@ func generateRecipe(insideType prog.StructType) ([]*FlatHandler, error) {
 				continue
 			}
 
-			lengthWrapper := &FieldSize {
+			lengthWrapper := &FieldSize{
 				FieldName: field.Name,
 			}
 
-			common := &AggregateCommon {
-				TypeName: aggregate.Name(),
-				FieldName: aggregate.Field(),
+			common := &AggregateCommon{
+				TypeName:    aggregate.Name(),
+				FieldName:   aggregate.Field(),
 				FieldOffset: aggregate.Offset(),
-				TypeSize: lengthWrapper,
+				TypeSize:    lengthWrapper,
 			}
-			newAggregate := &ArrayAggregate {
-				AggregateCommon: *common, 
+			newAggregate := &ArrayAggregate{
+				AggregateCommon: *common,
 			}
 
 			flat.Aggregates[t.Path[0]] = newAggregate
@@ -245,7 +299,7 @@ func calculateActualSize(typ prog.Type) IntegerSize {
 		size = typ.Size()
 	}
 
-	intSize := IntegerSize {
+	intSize := IntegerSize{
 		Size: size,
 	}
 
@@ -282,10 +336,10 @@ func main() {
 		os.Exit(0)
 	}
 
-	_ = os.Mkdir(outputDir, 0775)
+	os.Mkdir(outputDir, 0775)
 	existingRecipes, _ := filepath.Glob(filepath.Join(outputDir, "*.c"))
 	for _, item := range existingRecipes {
-		_ = os.RemoveAll(item)
+		os.RemoveAll(item)
 	}
 
 	var descFiles []string

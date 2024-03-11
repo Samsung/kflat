@@ -14,9 +14,9 @@ type Aggregate interface {
 }
 
 type AggregateCommon struct {
-	TypeName string
-	TypeSize Sizable
-	FieldName string
+	TypeName    string
+	TypeSize    Sizable
+	FieldName   string
 	FieldOffset uint64
 }
 
@@ -94,10 +94,10 @@ func (p *FieldSize) Specification() string {
 }
 
 type FlatHandler struct {
-	Name string
-	Size uint64
+	Name       string
+	Size       uint64
 	Aggregates map[string]Aggregate
-	IsUnion bool
+	IsUnion    bool
 }
 
 func (p *FlatHandler) Declaration() string {
