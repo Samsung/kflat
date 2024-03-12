@@ -619,6 +619,7 @@ static void* {1} = NULL;"""
 	struct_type_blacklist = set([
 		"kgid_t",
 		"kuid_t",
+		"uuid_t",
 		"Elf64_Sym",
 		"pgd_t",
 		"cpumask_t",
@@ -1684,6 +1685,7 @@ LINUXINCLUDE := ${{LINUXINCLUDE}}
 				self.struct_deps.add((rT.id,anonstruct_type_name))
 				return anonstruct_type_name
 			else:
+				__tag = "struct" if rT.isunion is False else "union"
 				if not nestedPtr:
 					assert rT.isunion is False or (isinstance(PTEoff,int) and PTEoff==0), "Invalid shift size != 0 (or code expression) for union member"
 					recipe = indent(RecipeGenerator.template_flatten_struct_member_recipe.format(
@@ -1713,7 +1715,7 @@ LINUXINCLUDE := ${{LINUXINCLUDE}}
 						recipe = "/* MISSING STRUCT: %s */"%(rT.str)
 				out.write(recipe+"\n")
 				self.struct_deps.add((rT.id,rT.str))
-				return "struct %s"%(rT.str)
+				return "%s %s"%(__tag,rT.str)
 
 	def get_element_count(self,mStr,ptr_in_array=False):
 
@@ -2603,17 +2605,20 @@ The expression(s)/custom info we concluded it from was:\n\
 				PTE = self.walkTPD(PTE)
 			ptrout = io.StringIO()
 			ptrtp = self.generate_flatten_pointer_trigger(ptrout,PTE,TPDE,gv,handle_flexible_size,tab+1,ptrLevel+1,arrsize,ptr_in_array)
-			out.write(RecipeGenerator.template_flatten_pointer_array_recipe.format(
-				ptrtp,
-				ptrNestedRefName(gv.name,ptrLevel+1),
-				ptrNestedRefNameOrRoot(gv.name,ptrLevel),
-				str(arrsize),
-				indent(ptrout.getvalue().rstrip(),tab+1)
-			)+"\n")
 			if ptrtp is None or ptrtp=="":
-				# We have multi-level pointers to function or pointers to incomplete arrays (strange things like that); ask the user to fix this flattening recipe
+				# We have unresolved record forward types or multi-level pointers to function or pointers to incomplete arrays (strange things like that)
+				# Ask the user to fix this flattening recipe
+				out.write(indent("/* TODO: unable to create flattening trigger for global variable '%s' */"%(gv.name),tab)+"\n")
 				return None
-			return ptrtp+"*"
+			else:
+				out.write(RecipeGenerator.template_flatten_pointer_array_recipe.format(
+					ptrtp,
+					ptrNestedRefName(gv.name,ptrLevel+1),
+					ptrNestedRefNameOrRoot(gv.name,ptrLevel),
+					str(arrsize),
+					indent(ptrout.getvalue().rstrip(),tab+1)
+				)+"\n")
+				return ptrtp+"*"
 		elif T.classname=="enum" or T.classname=="enum_forward":
 			# pointer to enum
 			if TPD:

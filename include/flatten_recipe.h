@@ -473,6 +473,10 @@ struct flatten_pointer* FUNC_NAME(struct flat* flat, const void* ptr, uintptr_t 
 	DBGM4(FLATTEN_UNION_ARRAY_SELF_CONTAINED,T,N,p,n);	\
 	FLATTEN_GENERIC(p, N, n, 0, flatten_union_array_##T, 0)
 
+#define FLATTEN_UNION_ARRAY_SHIFTED_SELF_CONTAINED(T,N,p,n,s)	\
+	DBGM5(FLATTEN_UNION_ARRAY_SHIFTED_SELF_CONTAINED,T,N,p,n,s);	\
+	FLATTEN_GENERIC(p, N, n, 0, flatten_union_array_##T, s)
+
 #define FLATTEN_STRUCT_TYPE_ARRAY_SELF_CONTAINED(T,N,p,n)	\
 	DBGM4(FLATTEN_STRUCT_TYPE_ARRAY_SELF_CONTAINED,T,N,p,n);	\
 	FLATTEN_GENERIC(p, N, n, 0, flatten_struct_type_array_##T, 0)
