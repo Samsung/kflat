@@ -5,7 +5,8 @@
 		},
 		"trigger_list": [
 			{  /* There can be many 'append' entries for a specific function but only single 'update' entry */
-				"trigger_fn": <str>/[<str>,...],    /* Name of the trigger function (can be a list for the same entries for multiple functions) */
+				"trigger_fn": <trigger_fn>/[<trigger_fn>,...],    /* Trigger function specification (can be a list for the same entries for multiple functions) */
+																  /* <trigger_fn>: '<function_name>[@<source_file_basename>]' */
 				"arg_index": <int>, /* Index of the trigger function argument */
 				"arg_type": <str>, /* Typestring describing the argument type */
 				"offset": <int>/<str>, /* Offset value for the argument type or offset expression in C code */
@@ -24,6 +25,17 @@
 				'typestring': <str>, /* typestring of the indicated type, i.e. <s:tag>, <t:name>, <e:tag>, 'cstring' or <typename> in case of builtin types, e.g. 'unsigned int' */
 				'offset': <int>, /* In case of record type this is the potential offset within this type */
 				'info': <str> /* custom information */
+			}, (...)
+		},
+		"custom_ptr_map_variants": {
+			/* Custom pointer entries available only in the spefically indicated trigger functions */
+			<trigger_fn>: { /* trigger function specification. i.e. '<function_name>[@<source_file_basename>]' */
+				<mStr>: {
+					/* custom pointer map - telling exactly to which type the given member pointer points to */
+					'typestring': <str>, /* typestring of the indicated type, i.e. <s:tag>, <t:name>, <e:tag>, 'cstring' or <typename> in case of builtin types, e.g. 'unsigned int' */
+					'offset': <int>, /* In case of record type this is the potential offset within this type */
+					'info': <str> /* custom information */
+				}, (...)
 			}, (...)
 		},
 		"custom_element_count_map": {	/* element count info */

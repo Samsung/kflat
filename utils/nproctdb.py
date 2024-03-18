@@ -1414,7 +1414,7 @@ LINUXINCLUDE := ${{LINUXINCLUDE}}
 
 		return func_args_to_dump, globals_to_dump, deps
 
-	def parse_structures_config(self, name: str) -> None:
+	def parse_structures_config(self, name: str, func: Optional[str] = None) -> None:
 
 		try:
 			with open(name, 'r') as f:
@@ -1472,6 +1472,36 @@ LINUXINCLUDE := ${{LINUXINCLUDE}}
 							self.custom_recipe_map[key_str] = (s,include_list)
 						else:
 							print(f"WW- Custom recipe already exists for record '{key_str}' (additional recipe ignored)")
+
+			# Parse custom pointers map
+			self.custom_ptr_map = None
+			if 'custom_ptr_map' in self.config['base_config']:
+				self.custom_ptr_map = self.config['base_config']['custom_ptr_map']
+			if 'custom_ptr_map_variants' in self.config['base_config']:
+				custom_ptr_map_variants = self.config['base_config']['custom_ptr_map_variants']
+				if self.custom_ptr_map is None:
+					self.custom_ptr_map = {}
+				func_info = [fT[3] for fT in self.config["OT_info"]["functions"] if fT[0]==func]
+				if len(func_info)==0:
+					print (f'EE- Cannot find function information in the OT config file for function \'{func}\'')
+					exit(1)
+				if len(func_info)>1:
+					print (f'EE- Cannot uniquely identify function information in the OT config file for function \'{func}\'')
+					exit(1)
+				func_loc = func_info[0].split(":")[0]
+				for trigger_fn,custom_ptr_spec in custom_ptr_map_variants.items():
+					fnT = [x.strip() for x in trigger_fn.split("@")]
+					__fn = fnT[0]
+					__loc = ""
+					if len(fnT)>1:
+						__loc = fnT[1]
+					if __loc!="" and __loc not in func_loc:
+						pass
+					elif __fn!=func:
+						pass
+					else:
+						for mStr,tpnfo in custom_ptr_spec.items():
+							self.custom_ptr_map[mStr] = tpnfo
 
 	def collect_call_tree(self, name: str):
 
@@ -2153,12 +2183,11 @@ The expression(s)/custom info we concluded it from was:\n\
 		havePte = False
 		PTEExt = None
 		if 'base_config' in self.config:
-			if 'custom_ptr_map' in self.config['base_config']:
-				custom_ptr_map = self.config['base_config']['custom_ptr_map']
-				if mStr in custom_ptr_map:
+			if self.custom_ptr_map is not None:
+				if mStr in self.custom_ptr_map:
 					havePte = True
 					# Our config file tells us exactly to which type this pointer points to
-					cT = custom_ptr_map[mStr]
+					cT = self.custom_ptr_map[mStr]
 					tpstr = cT["typestring"]
 					if tpstr!='cstring':
 						if ":" in tpstr:
@@ -2439,13 +2468,15 @@ The expression(s)/custom info we concluded it from was:\n\
 				),tab)+"\n")
 			return "void*"
 		elif pteT.classname=="builtin" and pteT.str=="void":
-			# void* - we couldn't find the real type this void* points to
+			# void* - we couldn't find the real type this void* points to (either due to ambiguity or lack of information)
 			#  Try to detect the object size pointed to by void* (unless we have direct information in config file)
 			#  When it fails dump 1 byte of memory pointed to by it
+			if pteEXT is None or pteEXT[0]>=0:
+				pteEXTmsg = "/* We couldn't find the real type this void* member points to (also no direct information in config file exists). */\n"
 			pvd_element_count_expr = "\n  AGGREGATE_FLATTEN_DETECT_OBJECT_SIZE_SELF_CONTAINED(%s,%d)"%(ptrNestedRefName(refname,ptrLevel),refoffset//8)
-			detect_msg = "/* We couldn't find the real type this void* member points to (also no direct information in config file exists).\n\
-   We'll try to detect the object size pointed to by void* member (assuming it's on the heap).\n\
-   When it fails we'll dump 1 byte of memory pointed to by it */\n"
+			detect_msg = "%s\
+   /* We'll try to detect the object size pointed to by void* member (assuming it's on the heap).\n\
+   When it fails we'll dump 1 byte of memory pointed to by it */\n"%(pteEXTmsg)
 			if record_count_tuple[4]=='direct':
 				if record_count_tuple[1] is not None:
 					pvd_element_count_expr = record_count_tuple[1]
@@ -4007,7 +4038,7 @@ def main():
 
 	RG = RecipeGenerator(args)
 	if args.config:
-		RG.parse_structures_config(args.config)
+		RG.parse_structures_config(args.config, args.func)
 
 	deps_done = set([])
 	anon_typedefs = list()
