@@ -933,6 +933,7 @@ do {	\
 	do {	\
 		struct bqueue* __q;	\
 		struct flat* flat = FLAT_EXTRACTOR; \
+		flat->_root_ptr = (void*)p;	\
 		__q = &FLAT_ACCESSOR->bq;	\
 		bqueue_clear(__q);	\
 					\

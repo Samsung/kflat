@@ -122,6 +122,7 @@ struct flat {
     struct FLCONTROL 	FLCTRL;
 	struct rb_root		root_addr_set;
 	int 				error;
+	void*				_root_ptr;
 
 	/* Iter jobs queue */
 	struct bqueue 		bq;
@@ -264,6 +265,8 @@ static inline void destroy_flatten_pointer(struct flatten_pointer* fp) {
 
 #define PTRNODE(PTRV)	(interval_tree_iter_first(&flat->FLCTRL.imap_root, (uintptr_t)(PTRV), (uintptr_t)(PTRV)))
 #define FLAT_ACCESSOR 	flat
+#define __THIS_STRUCT (_ptr)
+#define __ROOT_PTR (FLAT_ACCESSOR->_root_ptr)
 
 /* Helper functions for recipes */
 static inline void *ptr_clear_2lsb_bits(const void *ptr) {
