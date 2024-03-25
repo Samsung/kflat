@@ -62,7 +62,6 @@ static int kflat_get_cma_object_unit_test(struct flat *flat) {
     results.middle_of_cma_area = is_cma_memory(cma_memory + 4 * PAGE_SIZE) == true;
 
     // Release CMA memory
-    vunmap(cma_memory);
     cma_release(some_cma, area, 8);
 
     kfree(heap_ptr);
