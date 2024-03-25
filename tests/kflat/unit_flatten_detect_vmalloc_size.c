@@ -68,32 +68,32 @@ static int kflat_flatten_detect_vmalloc_size_unit_test(struct flat *flat) {
 	test.invalid_memory_size_2 = FLATTEN_DETECT_OBJECT_SIZE((void*) 0xffffff000000, 0);
 
 	test.heap_ptr_1 = kmalloc(sizeof(int) * 32, GFP_KERNEL);
-	if(test.heap_ptr_1 == NULL) {err = 1; goto out;}
+	if(test.heap_ptr_1 == NULL) {err = -ENOMEM; goto out;}
 	for(int i = 0; i < 32; i++)
 		test.heap_ptr_1[i] = ((i + 0xff1) * 0xff313) % 87623451;
 
 	test.heap_ptr_2 = kmalloc(sizeof(int) * 44, GFP_KERNEL);
-	if(test.heap_ptr_2 == NULL) {err = 1; goto out;}
+	if(test.heap_ptr_2 == NULL) {err = -ENOMEM; goto out;}
 	for(int i = 0; i < 44; i++)
 		test.heap_ptr_2[i] = ((i + 0x6123) * 0x88123) % 5248267;
 
 	test.heap_ptr_3 = kmalloc(sizeof(int) * 256, GFP_KERNEL);
-	if(test.heap_ptr_3 == NULL) {err = 1; goto out;}
+	if(test.heap_ptr_3 == NULL) {err = -ENOMEM; goto out;}
 	for(int i = 0; i < 256; i++)
 		test.heap_ptr_3[i] = ((i + 0x213) * 0xaafc3) % 4447165;
 
 	test.heap_ptr_4 = kmalloc(sizeof(int) * 200000, GFP_KERNEL);
-	if(test.heap_ptr_4 == NULL) {err = 1; goto out;}
+	if(test.heap_ptr_4 == NULL) {err = -ENOMEM; goto out;}
 	for(int i = 0; i < 200000; i++)
 		test.heap_ptr_4[i] = ((i + 0xfffa) * 0x587416) % 741325751;
 
 	test.vmalloc_ptr_1 = vmalloc(sizeof(int) * 10000);
-	if(test.vmalloc_ptr_1 == NULL) {err = 1; goto out;}
+	if(test.vmalloc_ptr_1 == NULL) {err = -ENOMEM; goto out;}
 	for(int i = 0; i < 10000; i++)
 		test.vmalloc_ptr_1[i] = ((i + 0x123) * 0x51231) % 12333121;
 
 	test.vmalloc_ptr_2 = vmalloc(sizeof(int) * 4096);
-	if(test.vmalloc_ptr_2 == NULL) {err = 1; goto out;}
+	if(test.vmalloc_ptr_2 == NULL) {err = -ENOMEM; goto out;}
 	for(int i = 0; i < 4096; i++)
 		test.vmalloc_ptr_2[i] = ((i + 0x11aad) * 0x514777d) % 52862171;
 

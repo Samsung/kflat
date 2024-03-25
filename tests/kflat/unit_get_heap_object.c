@@ -54,6 +54,11 @@ static bool test_kmalloc_size(struct flat *flat, size_t size, size_t min, size_t
 	void *buffer;
     
     buffer = kmalloc(size, GFP_KERNEL);
+    if(buffer == NULL) {
+        flat_errs("get_object test: kmalloc failed on size %lu", size);
+        return false;
+    }
+
 	ret = flatten_get_object(flat, buffer + off, &start, &end);
 	if (!ret)
 		flat_errs("get_object test: flatten_get_object failed to locate heap object of size %lu", size);
