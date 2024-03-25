@@ -24,6 +24,7 @@ ifeq ($(CCDIR),)
 else
   export CC := $(CCDIR)/bin/clang.real
   export LD := $(CCDIR)/bin/ld.lld
+  export EXTRA_ARGS := "LLVM=$(CCDIR)/bin"
 endif
 
 ifeq ($(ARCH),)
@@ -49,8 +50,8 @@ endif
 ifeq ($(WARN_DEFAULT_KDIR), true)
 	$(info KDIR is not specified, defaulting to current kernel headers - $(KDIR))
 endif
-	$(MAKE) -C $(KDIR) M=$(PWD)/core CC=$(CC) LD=$(LD) CFLAGS=$(CFLAGS) OPTS=$(KFLAT_OPTS) modules
-	$(MAKE) -C $(KDIR) M=$(PWD)/recipes CC=$(CC) LD=$(LD) CFLAGS=$(CFLAGS) modules
+	$(MAKE) -C $(KDIR) M=$(PWD)/core CC=$(CC) LD=$(LD) $(EXTRA_ARGS) CFLAGS=$(CFLAGS) OPTS=$(KFLAT_OPTS) modules
+	$(MAKE) -C $(KDIR) M=$(PWD)/recipes CC=$(CC) LD=$(LD) $(EXTRA_ARGS) CFLAGS=$(CFLAGS) modules
 	$(MAKE) -C $(PWD)/lib KLEE_LIBCXX_INSTALL=$(KLEE_LIBCXX_INSTALL) all
 	$(MAKE) -C $(PWD)/tools all
 
