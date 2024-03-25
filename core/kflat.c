@@ -607,7 +607,7 @@ static int kflat_mmap_flatten(struct kflat *kflat, struct vm_area_struct *vma) {
 	kflat->flat.area = area;
 	kflat->flat.size = alloc_size;
 	
-#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 3, 0)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 3, 0) && LINUX_VERSION_CODE != KERNEL_VERSION(6, 1, 25) && LINUX_VERSION_CODE != KERNEL_VERSION(6, 1, 43)
 	vma->vm_flags |= VM_DONTEXPAND;
 #else
 	vm_flags_set(vma, VM_DONTEXPAND);
