@@ -11,6 +11,7 @@
 #include <linux/kernel.h>
 #include <linux/pid.h>
 #include <linux/slab.h>
+#include <linux/version.h>
 
 
 /*******************************************************
@@ -107,6 +108,36 @@ static void probing_post_handler(struct kprobe* p, struct pt_regs* regs, unsigne
     return;
 }
 
+/* Convert name of form "function+10" to symbol name (function) and offset (decimal) (10).
+    Handles also plain "function", in which case offset is 0 */
+static int symbol_to_name_and_offset(const char* symbol, char** pname, unsigned int* poffset) {
+    int ret;
+    char *offset_pos, *name;
+    unsigned int offset = 0;
+
+    name = kstrdup(symbol, GFP_KERNEL);
+    if(name == NULL)
+        return -ENOMEM;
+
+    offset_pos = strchr(name, '+');
+    if(offset_pos == NULL)
+        goto exit;
+    *offset_pos = '\0';
+    
+    ret = kstrtouint(offset_pos + 1, 10, &offset);
+    if(ret) {
+        kfree(name);
+        return ret;
+    }
+
+exit:
+    if(pname)
+        *pname = name;
+    if(poffset)
+        *poffset = offset;
+    return 0;
+}
+
 void probing_init(struct kflat* kflat) {
     struct probe* probing = &kflat->probing;
     memset(probing, 0, sizeof(*probing));
@@ -115,27 +146,47 @@ void probing_init(struct kflat* kflat) {
 
 int probing_arm(struct kflat* kflat, const char* symbol, pid_t callee) {
     int ret = 0;
+    char* target_name;
+    unsigned int target_offset;
     struct probe* probing = &kflat->probing;
     struct kprobe* kprobe = &kflat->probing.kprobe;
+
+    ret = symbol_to_name_and_offset(symbol, &target_name, &target_offset);
+    if(ret) {
+        pr_err("failed to parse input symbol name");
+        return ret;
+    }
 
     mutex_lock(&probing->lock);
     if(probing->is_armed) {
         pr_err("failed to arm new kprobe - already armed");
         ret = -EAGAIN;
+        kfree(target_name);
         goto exit;
     }
     probing->callee_filter = callee;
 
     memset(kprobe, 0, sizeof(*kprobe));
-    kprobe->symbol_name = symbol;
+    kprobe->symbol_name = target_name;
+    kprobe->offset = target_offset;
     kprobe->pre_handler = probing_pre_handler;
     kprobe->post_handler = probing_post_handler;
 
     ret = register_kprobe(kprobe);
     if(ret) {
         pr_err("failed to arm new kprobe - ret(%d)", ret);
+        kfree(target_name);
         goto exit;
     }
+
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 2, 0)
+    if(!(kprobe->flags & KPROBE_FLAG_ON_FUNC_ENTRY)) {
+        pr_err("failed to arm new kprobe - symbol does not point to the start of function");
+        unregister_kprobe(kprobe);
+        kfree(target_name);
+        goto exit;
+    }
+#endif
 
     atomic_set(&probing->triggered, 0);
     probing->is_armed = true;
@@ -156,6 +207,8 @@ void probing_disarm(struct kflat* kflat) {
     atomic_set(&probing->triggered, 0);
     unregister_kprobe(&probing->kprobe);
     probing->is_armed = false;
+    kfree(probing->kprobe.symbol_name);
+    memset(&probing->kprobe, 0, sizeof(struct kprobe));
 
 exit:
     mutex_unlock(&probing->lock);
