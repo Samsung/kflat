@@ -19,6 +19,11 @@ static const char* strs[3] = {
 	"test1", "test_some_else", "literally-anything"
 };
 
+struct linux_list_head {
+	struct linux_list_head* next;
+	struct linux_list_head* prev;
+};
+
 /********************************/
 #ifdef __TESTER__
 /********************************/
@@ -30,6 +35,14 @@ FUNCTION_DEFINE_FLATTEN_STRUCT(replace_test,
 	AGGREGATE_FLATTEN_STRUCT(replace_test, another);
 	AGGREGATE_FLATTEN_STRING(str);
 );
+
+FUNCTION_DECLARE_FLATTEN_STRUCT(linux_list_head);
+FUNCTION_DEFINE_FLATTEN_STRUCT(linux_list_head,
+	AGGREGATE_FLATTEN_STRUCT(linux_list_head, next);
+	AGGREGATE_FLATTEN_STRUCT(linux_list_head, prev);
+);
+
+static struct linux_list_head global_linux_list = {&global_linux_list,&global_linux_list};
 
 static int kflat_unflatten_replace_unit_test(struct flat *flat) {
 
@@ -60,6 +73,10 @@ static int kflat_unflatten_replace_unit_test(struct flat *flat) {
 		FLATTEN_STRUCT(replace_test, &replace_target);
 	);
 
+	FOR_ROOT_POINTER(&global_linux_list,
+		FLATTEN_STRUCT(linux_list_head, &global_linux_list);
+	);
+
 	return 0;
 }
 
@@ -76,10 +93,13 @@ static struct replace_test my_global = {
 	.another = (struct replace_test*) 0x6666
 };
 
+static struct linux_list_head replace_global_linux_list = {(void*)0xCAFECAFE,(void*)0xDEADBEEF};
+
 static int kflat_unflatten_replace_unit_validate(void *memory, size_t size, CUnflatten flatten) {
 
 	struct replace_test* tests = (struct replace_test*)unflatten_root_pointer_seq(flatten, 0);
 	struct replace_test* replace_target = (struct replace_test*)unflatten_root_pointer_seq(flatten, 1);
+	struct linux_list_head* replace_list = (struct linux_list_head*)unflatten_root_pointer_seq(flatten, 2);
 
 	for(int i = 0; i < 10; i++) {
 		ASSERT(!strcmp(tests[i].str, strs[i % 3]));
@@ -111,6 +131,13 @@ static int kflat_unflatten_replace_unit_validate(void *memory, size_t size, CUnf
 	ASSERT_EQ(my_global.old, (struct replace_test*) 0x1234);
 	ASSERT_EQ(my_global.new, (struct replace_test*) 0x4444);
 	ASSERT_EQ(my_global.another, (struct replace_test*) 0x6666);
+
+	// Now replace the list structure to see if internal pointers to itself were properly replaced as well
+	result = unflatten_replace_variable(flatten, replace_list, &replace_global_linux_list, sizeof(struct linux_list_head));
+	ASSERT(result > 0);
+	memcpy(&replace_global_linux_list,replace_list,sizeof(struct linux_list_head));
+	ASSERT(replace_global_linux_list.next==&replace_global_linux_list);
+	ASSERT(replace_global_linux_list.prev==&replace_global_linux_list);
 
 	return KFLAT_TEST_SUCCESS;
 }
