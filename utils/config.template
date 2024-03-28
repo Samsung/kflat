@@ -20,18 +20,20 @@
 			(...)
 		],
 		"custom_ptr_map": {
-			<mStr>: {
+			[@]<mStr>: {
 				/* custom pointer map - telling exactly to which type the given member pointer points to */
+				/* When '@' is placed before the <mStr> only single refnames are considered */
 				'typestring': <str>, /* typestring of the indicated type, i.e. <s:tag>, <t:name>, <e:tag>, 'cstring' or <typename> in case of builtin types, e.g. 'unsigned int' */
 				'offset': <int>, /* In case of record type this is the potential offset within this type */
 				'info': <str> /* custom information */
 			}, (...)
 		},
 		"custom_ptr_map_variants": {
-			/* Custom pointer entries available only in the spefically indicated trigger functions */
+			/* Custom pointer entries available only in the specifically indicated trigger functions */
 			<trigger_fn>: { /* trigger function specification. i.e. '<function_name>[@<source_file_basename>]' */
-				<mStr>: {
+				[@]<mStr>: {
 					/* custom pointer map - telling exactly to which type the given member pointer points to */
+					/* When '@' is placed before the <mStr> only single refnames are considered */
 					'typestring': <str>, /* typestring of the indicated type, i.e. <s:tag>, <t:name>, <e:tag>, 'cstring' or <typename> in case of builtin types, e.g. 'unsigned int' */
 					'offset': <int>, /* In case of record type this is the potential offset within this type */
 					'info': <str> /* custom information */
@@ -45,6 +47,19 @@
 		"custom_global_element_count_map": {	/* element count info */
 			<ghash>: <int>/<str>, /* Integer value or code expression that yields a number elements for this global */
 			(...)
+		},
+		"custom_recipes": {
+			[@]<mStr>: <recipe specification>, /* This specifies recipe for a given member; when '@' is placed before the <mStr> only single refnames are considered */
+			<typestring>: <recipe specification>, /* This specifies full recipe for entire type */
+			(...)
+		},
+		"custom_recipe_variants": {
+			/* Custom recipes available only in the specifically indicated trigger functions */
+			<trigger_fn>: { /* trigger function specification. i.e. '<function_name>[@<source_file_basename>]' */
+				[@]<mStr>: <recipe specification>,
+				<typestring>: <recipe specification>,
+				(...)
+			}, (...)
 		},
 		"custom_string_members": {
 			/* List of 'char*' members that are actual C-strings */

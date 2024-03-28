@@ -78,6 +78,8 @@ def prepend_non_empty_lines(s,v):
 def extra_newline(s):
 	if not s.endswith("\n"):
 		return s+"\n"
+	else:
+		return s
 
 ##################################
 # Error handling
@@ -1010,10 +1012,12 @@ LINUXINCLUDE := ${{LINUXINCLUDE}}
 	def instantiate_this_member_patterns(self,s,record_string,ftdb=None):
 		if ftdb is None:
 			ftdb = self.ftdb
-		RT,TPD = self._find_record_type_by_typestring(record_string,ftdb)
+		RT = None
 		m = self.this_member_pattern.search(s)
 		while m:
 			member = m.group()[2:-1]
+			if RT is None:
+				RT,TPD = self._find_record_type_by_typestring(record_string,ftdb)
 			offset = self._find_member_offset(RT,member,ftdb)
 			if offset is None:
 				print(f"EE- Failed to compute record offset for member '{member}' @ '{record_string}'")
@@ -1438,6 +1442,29 @@ LINUXINCLUDE := ${{LINUXINCLUDE}}
 		# Parse custom recipes
 		if "base_config" in self.config and "custom_recipes" in self.config["base_config"]:
 			custom_recipes = self.config["base_config"]["custom_recipes"]
+			if "custom_recipe_variants" in self.config["base_config"]:
+				custom_recipe_variants = self.config["base_config"]["custom_recipe_variants"]
+				func_info = [fT[3] for fT in self.config["OT_info"]["functions"] if fT[0]==func]
+				if len(func_info)==0:
+					print (f'EE- Cannot find function information in the OT config file for function \'{func}\'')
+					exit(1)
+				if len(func_info)>1:
+					print (f'EE- Cannot uniquely identify function information in the OT config file for function \'{func}\'')
+					exit(1)
+				func_loc = func_info[0].split(":")[0]
+				for trigger_fn,custom_recipe_spec in custom_recipe_variants.items():
+					fnT = [x.strip() for x in trigger_fn.split("@")]
+					__fn = fnT[0]
+					__loc = ""
+					if len(fnT)>1:
+						__loc = fnT[1]
+					if __loc!="" and __loc not in func_loc:
+						pass
+					elif __fn!=func:
+						pass
+					else:
+						for mStr,custom_recipe in custom_recipe_spec.items():
+							custom_recipes[mStr] = custom_recipe
 			if self.gftdb is None:
 				print ("WW- global database not specified. Skipping parsing custom recipes")
 			else:
@@ -1456,9 +1483,9 @@ LINUXINCLUDE := ${{LINUXINCLUDE}}
 							exit(1)
 						m = self.include_config_pattern.search(code)
 					s = self._type_offset_calculate(code,OFFSET_KIND_MIXED,self.gftdb)
-					s = self.instantiate_this_member_patterns(s,":".join(key_str.split(":")[:2]),self.gftdb)
+					s = self.instantiate_this_member_patterns(s,":".join(key_str.split(":")[:2]).lstrip("@"),self.gftdb)
 					s, include_list = self.instantiate_include_patterns(s)
-					s = self.instantiate_adddep_patterns(s,":".join(key_str.split(":")[:2]))
+					s = self.instantiate_adddep_patterns(s,":".join(key_str.split(":")[:2]).lstrip("@"))
 					s = self.instantiate_global_patterns(s)
 					s = self.instantiate_enum_value_patterns(s,self.gftdb)
 					s = self.instantiate_typedef_patterns(s,self.gftdb)
@@ -1466,7 +1493,11 @@ LINUXINCLUDE := ${{LINUXINCLUDE}}
 						if s not in self.custom_recipe_member_map:
 							self.custom_recipe_member_map[key_str] = (s,include_list)
 						else:
-							print(f"WW- Custom recipe already exists for member '{key_str}' (additional recipe ignored)")
+							if not key_str.startswith("@"):
+								print(f"WW- Custom recipe already exists for member '{key_str}' (additional recipe ignored)")
+							else:
+								ks = key_str.lstrip("@")
+								print(f"WW- Custom recipe already exists for member '{ks}' accessible by single refname (additional recipe ignored)")
 					else:
 						if s not in self.custom_recipe_map:
 							self.custom_recipe_map[key_str] = (s,include_list)
@@ -2178,16 +2209,22 @@ The expression(s)/custom info we concluded it from was:\n\
   )
 		return pteEXTmsg
 
-	def real_pointee_type(self,mStr,PTE,ptr_in_array=False):
+	def real_pointee_type(self,mStr,refname,PTE,ptr_in_array=False):
 
 		havePte = False
 		PTEExt = None
 		if 'base_config' in self.config:
 			if self.custom_ptr_map is not None:
-				if mStr in self.custom_ptr_map:
+				cT = None
+				if "@"+mStr in self.custom_ptr_map:
+					# We have custom information for single refnames only
+					if len(refname.split("."))<=1:
+						cT = self.custom_ptr_map["@"+mStr]
+				if cT is None and mStr in self.custom_ptr_map:
+					cT = self.custom_ptr_map[mStr]
+				if cT is not None:
 					havePte = True
 					# Our config file tells us exactly to which type this pointer points to
-					cT = self.custom_ptr_map[mStr]
 					tpstr = cT["typestring"]
 					if tpstr!='cstring':
 						if ":" in tpstr:
@@ -2472,7 +2509,7 @@ The expression(s)/custom info we concluded it from was:\n\
 			#  Try to detect the object size pointed to by void* (unless we have direct information in config file)
 			#  When it fails dump 1 byte of memory pointed to by it
 			if pteEXT is None or pteEXT[0]>=0:
-				pteEXTmsg = "/* We couldn't find the real type this void* member points to (also no direct information in config file exists). */\n"
+				pteEXTmsg = "/* We couldn't find the real type this void* member '%s' <%s> points to (also no direct information in config file exists). */\n"%(refname,mStr)
 			pvd_element_count_expr = "\n  AGGREGATE_FLATTEN_DETECT_OBJECT_SIZE_SELF_CONTAINED(%s,%d)"%(ptrNestedRefName(refname,ptrLevel),refoffset//8)
 			detect_msg = "%s\
    /* We'll try to detect the object size pointed to by void* member (assuming it's on the heap).\n\
@@ -3193,12 +3230,19 @@ The expression(s)/custom info we concluded it from was:\n\
 					RT = self.walkTPD(RT)
 
 				# Check if we have custom recipe for this member
-				if RT.classname!="record" and mStr in self.custom_recipe_member_map:
-					custom_recipe = self.custom_recipe_member_map[mStr]
-					s = f"/* Custom recipe for member '{refname}' */\n{{\n{extra_newline(prepend_non_empty_lines(custom_recipe[0],'  '))}}}\n"
-					proc_members.append((s,"custom",custom_recipe[1]))
-					self.members_with_custom_recipes.append(mStr)
-					continue
+				if RT.classname!="record":
+					custom_recipe = None
+					if "@"+mStr in self.custom_recipe_member_map:
+						# We have recipe for single refnames only
+						if len(refname.split("."))<=1:
+							custom_recipe = self.custom_recipe_member_map["@"+mStr]
+					if custom_recipe is None and mStr in self.custom_recipe_member_map:
+						custom_recipe = self.custom_recipe_member_map[mStr]
+					if custom_recipe is not None:
+						s = f"/* Custom recipe for member '{refname}' */\n{{\n{extra_newline(prepend_non_empty_lines(custom_recipe[0],'  '))}}}\n"
+						proc_members.append((s,"custom",custom_recipe[1]))
+						self.members_with_custom_recipes.append(mStr)
+						continue
 
 				# Check if we ignore this refname
 				if "ignore_refnames" in self.config["base_config"] and origin_typestring in self.config["base_config"]["ignore_refnames"]:
@@ -3499,8 +3543,8 @@ The expression(s)/custom info we concluded it from was:\n\
 					# Check if the member pointer points to a different type than specified in the structure
 					#  (either through the use of 'container_of' macro or source type casting constructs)
 					#  (or we point to the type directly through the config file)
-					PTE,PTEExt = self.real_pointee_type(mStr,PTE)
-						
+					PTE,PTEExt = self.real_pointee_type(mStr,refname,PTE)
+
 					# Now try to generate some recipes
 					TPDE = None
 					if PTE.classname=="typedef":
@@ -3658,7 +3702,7 @@ The expression(s)/custom info we concluded it from was:\n\
 							if not handle_overlapping_members():
 								continue
 							PTE = self.ftdb.types[AT.refs[0]]
-							PTE,PTEExt = self.real_pointee_type(mStr,PTE,True)
+							PTE,PTEExt = self.real_pointee_type(mStr,refname,PTE,True)
 							TPDE = None
 							if PTE.classname=="typedef":
 								TPDE = PTE
@@ -4090,8 +4134,31 @@ def main():
 	# Create maps to quickly access the generated recipes information for a given structure
 	RG.compute_recipe_maps()
 
+	# Check if we want to replace any existing recipe with its custom version
+	for dep_str in RG.custom_recipe_map:
+		prefix,tag = dep_str.split(":")
+		R = None
+		if prefix=='s':
+			if tag in RG.RRMap:
+				R = RG.RRMap[tag]
+		else:
+			if not re.match("^anonstruct_type_\d+_t$",tag):
+				if tag in RG.RTRMap:
+					R = RG.RTRMap[tag]
+			else:
+				if tag in RG.TRMap:
+					R = RG.TRMap[tag]
+		if R is not None:
+			recipe = RG.custom_recipe_map[dep_str]
+			R.recipe = recipe[0]
+			R.simple = False
+			R.to_check = False
+			R.check_union = False
+			R.to_fix = False
+			R.custom_recipe = True
+			R.custom_include_list = recipe[1]
+
 	# For each additional dependency from used custom member recipes that doesn't have generated recipe we need to take it from custom recipes
-	
 	additional_custom_recipe_deps_to_include = set()
 	for mStr in RG.members_with_custom_recipes:
 		additional_custom_recipe_deps_to_include|=RG.resolve_additional_custom_recipe_deps(":".join(mStr.split(":")[:2]))
