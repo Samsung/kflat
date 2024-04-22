@@ -3764,7 +3764,8 @@ The expression(s)/custom info we concluded it from was:\n\
 						iout.write("/* TODO: implement flattening member '%s' (too complicated; I'm not that smart yet) */\n  /* Member type: %s */\n"%(refname,RT.hash))
 						self.complex_members.append((TPD,TRT,refname))
 						self.simple = False
-				outv.append(iout.getvalue())
+				member_disp_match = "/* ------------------------------ \n%s\n    [%s]\n ------------------------------ */\n"%("\n".join([x for x in eT.defstring.split("\n") if mName in x]),refname)
+				outv.append(member_disp_match+iout.getvalue())
 			# for (...) in proc_members
 			out.write('\n'.join([x for x in outv if x.strip()!=""]))
 		# if do_recipes:
