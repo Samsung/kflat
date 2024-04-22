@@ -24,6 +24,11 @@ struct linux_list_head {
 	struct linux_list_head* prev;
 };
 
+struct dbg_dump {
+	const char* dbg_name;
+	unsigned long version;
+};
+
 /********************************/
 #ifdef __TESTER__
 /********************************/
@@ -42,7 +47,14 @@ FUNCTION_DEFINE_FLATTEN_STRUCT(linux_list_head,
 	AGGREGATE_FLATTEN_STRUCT(linux_list_head, prev);
 );
 
+FUNCTION_DECLARE_FLATTEN_STRUCT(dbg_dump);
+FUNCTION_DEFINE_FLATTEN_STRUCT(dbg_dump,
+	AGGREGATE_FLATTEN_STRING(dbg_name);
+);
+
 static struct linux_list_head global_linux_list = {&global_linux_list,&global_linux_list};
+
+static struct dbg_dump *p_dbg_dump;
 
 static int kflat_unflatten_replace_unit_test(struct flat *flat) {
 
@@ -54,6 +66,8 @@ static int kflat_unflatten_replace_unit_test(struct flat *flat) {
 		.new = &tests[5],
 		.another = &replace_target
 	};
+	struct dbg_dump dbg_dump = {"dbg_dump",0xBABADEDE};
+	void* p_dbg_dump_addr = &p_dbg_dump;
 
 	FLATTEN_SETUP_TEST(flat);
 
@@ -64,6 +78,7 @@ static int kflat_unflatten_replace_unit_test(struct flat *flat) {
 		tests[i].old = &tests[(i + 9) % 10];
 		tests[i].another = &replace_target;
 	}
+	p_dbg_dump = &dbg_dump;
 
 	FOR_ROOT_POINTER(&tests[0],
 		FLATTEN_STRUCT(replace_test, &tests[0]);
@@ -75,6 +90,12 @@ static int kflat_unflatten_replace_unit_test(struct flat *flat) {
 
 	FOR_ROOT_POINTER(&global_linux_list,
 		FLATTEN_STRUCT(linux_list_head, &global_linux_list);
+	);
+
+	FOR_EXTENDED_ROOT_POINTER(p_dbg_dump_addr,"p_dbg_dump",sizeof(struct dbg_dump*),
+		FOREACH_POINTER(struct dbg_dump*,__p_dbg_dump_1,__root_ptr,1,
+			FLATTEN_STRUCT(dbg_dump,__p_dbg_dump_1);
+		);
 	);
 
 	return 0;
@@ -138,6 +159,11 @@ static int kflat_unflatten_replace_unit_validate(void *memory, size_t size, CUnf
 	memcpy(&replace_global_linux_list,replace_list,sizeof(struct linux_list_head));
 	ASSERT(replace_global_linux_list.next==&replace_global_linux_list);
 	ASSERT(replace_global_linux_list.prev==&replace_global_linux_list);
+
+	// Check the global pointer
+	struct dbg_dump** p_dbg_dump = (struct dbg_dump**)unflatten_root_pointer_seq(flatten, 3);
+	ASSERT(!strcmp((*p_dbg_dump)->dbg_name, "dbg_dump"));
+	ASSERT_EQ((*p_dbg_dump)->version,0xBABADEDE);
 
 	return KFLAT_TEST_SUCCESS;
 }
