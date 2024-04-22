@@ -40,6 +40,7 @@ struct args {
     bool verbose;
     bool stop_machine;
     const char* output_dir;
+    const char* image_file;
 };
 
 int enable_verbose = 0;
@@ -407,6 +408,7 @@ static struct argp_option options[] = {
     {"debug", 'd', 0, 0, "Enable kflat debug flag"},
     {"skip-check", 's', 0, 0, "Skip saved image validation"},
     {"image-info", 'i', 0, 0, "Print image information before validation"},
+    {"image-file-info", 'I', "IMGFILE", 0, "Print image information for a given file"},
     {"continuous", 'c', 0, 0, "Load memory image in continuous fashion during validation"},
     {"verbose", 'v', 0, 0, "More verbose logs"},
     {"stop-machine", 'm', 0, 0, "Run tests under stop_machine macro"},
@@ -420,6 +422,9 @@ static error_t parse_opt(int key, char* arg, struct argp_state* state) {
     switch(key) {
         case 'o':
             options->output_dir = arg;
+            break;
+        case 'I':
+            options->image_file = arg;
             break;
         case 'l':
             options->list = true;
@@ -485,6 +490,19 @@ int main(int argc, char** argv) {
 
     if(opts.list) {
         list_tests();
+        return 0;
+    }
+
+    if(opts.image_file) {
+        FILE* file = fopen(opts.image_file, "r+b");
+        assert(file != NULL);
+        CUnflatten flatten = unflatten_init(0);
+        ret = unflatten_imginfo(flatten, file);
+        if(ret != 0) {
+            log_error("failed to parse flattened image - %d", ret);
+        }
+        fclose(file);
+        unflatten_deinit(flatten);
         return 0;
     }
 
