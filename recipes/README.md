@@ -64,8 +64,11 @@ The CMakeLists.txt should look as follows:
 ```cmake
 set(KBUILD_CMD $(MAKE) M=${CMAKE_CURRENT_BINARY_DIR} src=${CMAKE_CURRENT_SOURCE_DIR} ${KBUILD_FLAGS} modules)
 # Edit these two lines
-set(RECIPE_SOURCE_NAME edit_me)
-set(TARGET_NAME edit_me)
+set(RECIPE_SOURCE_NAME edit_me0)
+set(TARGET_NAME edit_me1)
+
+list(TRANSFORM RECIPE_SOURCE_NAME APPEND ".o")
+string(REPLACE ";" " " RECIPE_SOURCE_NAME "${RECIPE_SOURCE_NAME}")
 
 configure_file(${CMAKE_SOURCE_DIR}/cmake/Kbuild.recipe_template.in ${CMAKE_CURRENT_SOURCE_DIR}/Kbuild @ONLY)
 
@@ -74,12 +77,13 @@ add_custom_command(
     COMMAND ${KBUILD_CMD}
     WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
     VERBATIM
-)set(RECIPES random_read memory_map drm_framebuffer task_current userspace_flattening)
+)
 
 add_custom_target(${TARGET_NAME} ALL DEPENDS kflat_core ${RECIPE_SOURCE_NAME})
+
 ```
 Let's say we want to create a new recipe called `my_kflat_example`. The source file is `recipes/my_kflat_example/my_kflat_example_recipe.c`.
-Then we should set `RECIPE_SOURCE_NAME` to `my_kflat_example_recipe` and `TARGET_NAME` to `my_kflat_example`. The directory name conaining sources and the TARGET_NAME should be the same.
+Then we should set `RECIPE_SOURCE_NAME` to `my_kflat_example_recipe` and `TARGET_NAME` to `my_kflat_example`. If our module is built from multiple source .c files, then we can pass them like this: `set(RECIPE_SOURCE_NAME src0 src1 src2)` The directory name conaining sources and the TARGET_NAME should be the same.
 
 Next, we need to update the `recipes/CMakeLists.txt` by adding the target to `RECIPES`:
 ```diff

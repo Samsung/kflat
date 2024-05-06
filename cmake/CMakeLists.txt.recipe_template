@@ -1,7 +1,10 @@
 set(KBUILD_CMD $(MAKE) M=${CMAKE_CURRENT_BINARY_DIR} src=${CMAKE_CURRENT_SOURCE_DIR} ${KBUILD_FLAGS} modules)
 # Edit these two lines
-set(RECIPE_SOURCE_NAME edit_me)
-set(TARGET_NAME edit_me)
+set(RECIPE_SOURCE_NAME edit_me0)
+set(TARGET_NAME edit_me1)
+
+list(TRANSFORM RECIPE_SOURCE_NAME APPEND ".o")
+string(REPLACE ";" " " RECIPE_SOURCE_NAME "${RECIPE_SOURCE_NAME}")
 
 configure_file(${CMAKE_SOURCE_DIR}/cmake/Kbuild.recipe_template.in ${CMAKE_CURRENT_SOURCE_DIR}/Kbuild @ONLY)
 

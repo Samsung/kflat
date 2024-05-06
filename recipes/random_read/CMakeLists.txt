@@ -3,6 +3,9 @@ set(KBUILD_CMD $(MAKE) M=${CMAKE_CURRENT_BINARY_DIR} src=${CMAKE_CURRENT_SOURCE_
 set(RECIPE_SOURCE_NAME random_read_recipe)
 set(TARGET_NAME random_read)
 
+list(TRANSFORM RECIPE_SOURCE_NAME APPEND ".o")
+string(REPLACE ";" " " RECIPE_SOURCE_NAME "${RECIPE_SOURCE_NAME}")
+
 configure_file(${CMAKE_SOURCE_DIR}/cmake/Kbuild.recipe_template.in ${CMAKE_CURRENT_SOURCE_DIR}/Kbuild @ONLY)
 
 add_custom_command(
