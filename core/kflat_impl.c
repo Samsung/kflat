@@ -241,14 +241,6 @@ bool flatten_get_object(struct flat* flat, void* ptr, void** start, void** end) 
 			modules_end = (void*)((uintptr_t)modules_start + MODULES_VSIZE);
 			DBGS("flatten_get_object - discovered modules memory region at %llx - %llx\n", modules_start, modules_end);
 		}
-#else
-		u64* base = flatten_global_address_by_name("robuffer_base");
-		u64* size = flatten_global_address_by_name("robuffer_size");
-		if(base != NULL && size != NULL) {
-			modules_start = (void*) phys_to_virt(*base);
-			modules_end = (void*)((uintptr_t)modules_start + *size);
-			DBGS("flatten_get_object - discovered modules memory region at %llx - %llx\n", modules_start, modules_end);
-		}
 #endif
 	}
 
@@ -259,7 +251,7 @@ bool flatten_get_object(struct flat* flat, void* ptr, void** start, void** end) 
 	}
 
 	// Is it pointing to modules section?
-	if(ptr >= modules_start && ptr <= modules_end) {
+	if(modules_start != modules_end && ptr >= modules_start && ptr <= modules_end) {
 		DBGS("flatten_get_object - ptr(%llx) is pointing to modules section\n", ptr);
 		return false;
 	}
