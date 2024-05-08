@@ -646,19 +646,24 @@ static void* {1} = NULL;"""
 		"seqcount_raw_spinlock_t"])
 
 	## Arguments
-	##  - Linux kernel version
+	##  - recipe module name
 	##  - list of object files for the interface module
-	##  - Linux kernel version
+	template_cmake_recipes = """# Auto-generated CMake file
+set(KBUILD_CMD $(MAKE) M=${{CMAKE_CURRENT_BINARY_DIR}} src=${{CMAKE_CURRENT_SOURCE_DIR}} ${{KBUILD_FLAGS}} modules)
+set(RECIPE_SOURCE_NAME {1})
+set(TARGET_NAME {0})
 
-	template_kbuild_recipes = """# SPDX-License-Identifier: GPL-2.0
+string(REPLACE ";" " " RECIPE_SOURCE_NAME "${{RECIPE_SOURCE_NAME}}")
 
-{0}-objs := \\
-{1}
+configure_file(${{CMAKE_SOURCE_DIR}}/cmake/Kbuild.recipe_template.in ${{CMAKE_CURRENT_SOURCE_DIR}}/Kbuild @ONLY)
 
-ccflags-y := -Wno-undefined-internal -Wno-visibility -Wno-gcc-compat -Wno-unused-variable -I${{PWD}}/include/
-
-obj-m = {0}.o
-LINUXINCLUDE := ${{LINUXINCLUDE}}
+add_custom_command(
+    OUTPUT ${{RECIPE_SOURCE_NAME}}
+    COMMAND ${{KBUILD_CMD}}
+    WORKING_DIRECTORY ${{CMAKE_CURRENT_BINARY_DIR}}
+    VERBATIM
+)
+add_custom_target(${{TARGET_NAME}} ALL DEPENDS kflat_core ${{RECIPE_SOURCE_NAME}})
 """
 
 	template_common_recipes = """#ifndef __COMMON_H__
@@ -4448,10 +4453,10 @@ def main():
 			common_code
 		))
 
-	with open(os.path.join(args.output,"Kbuild"),"w") as f:
-		f.write(RecipeGenerator.template_kbuild_recipes.format(
+	with open(os.path.join(args.output,"CMakeLists.txt"),"w") as f:
+		f.write(RecipeGenerator.template_cmake_recipes.format(
 				args.module_name if args.module_name else args.func,
-				" \\\n".join(["    %s"%(x) for x in objs]))
+				" ".join(objs))
 			)
 
 	for k,rTL in drmap.items():
