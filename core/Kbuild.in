@@ -10,7 +10,9 @@ KCOV_INSTRUMENT		:= n
 KASAN_SANITIZE 		:= n
 
 # Build kflat core module
-kflat_core-y = kflat.o kflat_impl.o probing.o kdump.o flatten_impl.o probing_@CMAKE_SYSTEM_PROCESSOR@.o
+kflat_core-y = kflat.o kflat_impl.o probing.o kdump.o flatten_impl.o
+kflat_core-$(CONFIG_ARM64) += probing_arm64.o
+kflat_core-$(CONFIG_X86_64) += probing_x86_64.o
 
 # Build kflat tests
 ccflags-y += -I${TOPDIR}/tests -D__TESTER__
