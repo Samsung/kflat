@@ -1,7 +1,7 @@
 # Samsung R&D Poland - Mobile Security Group
 
 TOPDIR := @CMAKE_SOURCE_DIR@
-ccflags-y := -std=gnu99 -Wno-unused-local-typedefs -I@CMAKE_SOURCE_DIR@/include/ $(patsubst %,-D%,$(KFLAT_OPTS)) -DFLATTEN_KERNEL_BSP -g
+ccflags-y := -std=gnu99 -Wno-unused-local-typedefs -I@CMAKE_SOURCE_DIR@/include/ $(patsubst %,-D%,$(KFLAT_OPTS)) -DFLATTEN_KERNEL_BSP
 
 LINUX_INCLUDES := ${LINUX_INCLUDES} @CMAKE_SOURCE_DIR@/include/
 
