@@ -31,10 +31,9 @@ static void handler(struct kflat* kflat, struct probe_regs* regs) {
     FOR_EXTENDED_ROOT_POINTER(mod, "do_init_module", sizeof(*mod),
         FLATTEN_STRUCT(module, mod);
     );
-    
 }
 
 KFLAT_RECIPE_LIST(
     KFLAT_RECIPE("do_init_module", handler),
 );
-KFLAT_RECIPE_MODULE("Kflat recipe for dumping struct module info.");
+KFLAT_RECIPE_MODULE("Kflat recipe for dumping struct module info when loading.");
