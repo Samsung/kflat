@@ -1,5 +1,5 @@
 set(KBUILD_CMD $(MAKE) M=${CMAKE_CURRENT_BINARY_DIR} src=${CMAKE_CURRENT_SOURCE_DIR} ${KBUILD_FLAGS} modules)
-# Edit these two lines
+
 set(RECIPE_SOURCE_NAME do_init_module_recipe)
 set(TARGET_NAME do_init_module)
 
