@@ -3,7 +3,6 @@
 The flatten image has the following format:
 
 ```
-[imgsz:8B]
 [flatten_header:80B]
 [root_addr_array:n*8B]
 [root_addr_extended_array:m*B]
@@ -13,10 +12,13 @@ The flatten image has the following format:
 [memory:s*B][fptrmap:x*B]
 ```
 
-`imgsz` is the full size of the flatten image file.
-
 The flatten header has the following entries:
 ```
+magic : 8B
+version: 4B
+last_load_addr: 8B
+last_mem_addr: 8B
+image_size: 8B
 memory_size : 8B                 (s)
 ptr_count : 8B                   (k)
 fptr_count : 8B                  (q)
@@ -26,10 +28,11 @@ root_addr_extended_size : 8B     (m)
 this_addr : 8B
 fptrmapsz : 8B                   (x)
 mcount : 8B                      (v)
-magic : 8B
 ```
 
-Most of the above entries describe the size of the corresponding array of data. `this_addr` is an original address of a predefined code location in the original address space which servers as an base for offset computation for function pointer addresses. The magic value is an ASCII coded work `FLATTEN\0`.
+Most of the above entries describe the size of the corresponding array of data. `last_load_addr` is an original address of a predefined code location in the original address space which servers as an base for offset computation for function pointer addresses. The magic value is an ASCII coded work `FLATTEN\0`.
+
+`image_size` is the full size of the flatten image file, including image header.
 
 `root_addr_array` stores a list of root addresses (i.e. the points in the image which can be used to further access the data embedded into the image) stored consecutively as a list of offsets into the `memory` array.
 ```

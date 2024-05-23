@@ -19,6 +19,7 @@
 
 #include <map>
 #include <vector>
+#include <memory>
 #include <string>
 #include <stdexcept>
 #include <set>
@@ -34,6 +35,15 @@ extern "C" {
 #include <flatten_image.h>
 }
 
+#ifdef __has_builtin
+	#if __has_builtin(__builtin_uaddl_overflow)
+		#define __SUPPORTS_BUILTIN_UADDL_OVERFLOW
+	#endif
+	#if __has_builtin(__builtin_umull_overflow)
+		#define __SUPPORTS_BUILTIN_UMULL_OVERFLOW
+	#endif
+#endif
+
 /********************************
  * Private data types
  *******************************/
@@ -48,6 +58,8 @@ struct interval_tree_node {
 
 #define START(node) ((node)->start)
 #define LAST(node)  ((node)->last)
+
+#define WITHIN_MEM_BOUNDS(ptr_, type_) ((char *)(ptr_) >= (char *)FLCTRL.mem && (char *)(ptr_) + sizeof(type_) < (char *)FLCTRL.mem + get_memsz())
 
 INTERVAL_TREE_DEFINE(struct interval_tree_node, rb,
 		     uintptr_t, __subtree_last,
@@ -115,6 +127,31 @@ private:
 		return (double)(timeE.tv_sec - timeS.tv_sec) + (timeE.tv_usec - timeS.tv_usec) / 1000000.0;
 	}
 
+	inline bool check_mul_overflow(size_t variable, size_t mul) const noexcept {
+	#if defined(__SUPPORTS_BUILTIN_UMULL_OVERFLOW)
+		size_t tmp;
+		return __builtin_umull_overflow(variable, mul, &tmp);
+	#elif defined(__SIZEOF_INT128__)
+		__uint128_t result = (__uint128_t)variable * (__uint128_t)mul;
+		return (result >> 64) != 0;
+	#else
+		size_t result = variable * mul;
+		return variable != 0 && result / variable != mul;
+	#endif
+	}
+
+	inline bool add_overflow(size_t a, size_t b, size_t* result) const noexcept {
+	#if defined(__SUPPORTS_BUILTIN_UADDL_OVERFLOW)
+		return __builtin_uaddl_overflow(a, b, result);
+	#else
+		size_t tmp = a + b;
+		if(tmp < a)
+			return true;
+		*result = tmp;
+		return false;
+	#endif
+	}
+
 	/***************************
 	 * LIMITED LOGGING
 	 **************************/
@@ -150,7 +187,8 @@ private:
 			struct interval_tree_node *node = interval_tree_iter_first(
 					&FLCTRL.imap_root,
 					root_addr, root_addr + 8);
-			assert(node != NULL);
+			if (node == NULL)
+				throw std::invalid_argument("Invalid root pointer");
 
 			size_t node_offset = root_addr - node->start;
 			return (char*)node->mptr + node_offset;
@@ -408,6 +446,29 @@ private:
 					"Incompatible version of flattened image. Present (" +
 					std::to_string(FLCTRL.HDR.version) + ") vs Supported (" +
 					std::to_string(KFLAT_IMG_VERSION) + ")");
+		if (FLCTRL.HDR.image_size > opened_mmap_size)
+			throw std::invalid_argument("Image size specified in header differs from the actual one");
+
+		bool overflow = false;
+		overflow |= check_mul_overflow(FLCTRL.HDR.ptr_count, sizeof(size_t));
+		overflow |= check_mul_overflow(FLCTRL.HDR.fptr_count, sizeof(size_t));
+		overflow |= check_mul_overflow(FLCTRL.HDR.root_addr_count, sizeof(size_t));
+		overflow |= check_mul_overflow(FLCTRL.HDR.mcount, 16);
+		if (overflow)
+			throw std::invalid_argument("Count fields in header are greater than maximum size");
+
+		size_t total_size = 0;
+		overflow |= add_overflow(total_size, FLCTRL.HDR.ptr_count * sizeof(size_t), &total_size);
+		overflow |= add_overflow(total_size, FLCTRL.HDR.fptr_count * sizeof(size_t), &total_size);
+		overflow |= add_overflow(total_size, FLCTRL.HDR.root_addr_count * sizeof(size_t), &total_size);
+		overflow |= add_overflow(total_size, FLCTRL.HDR.root_addr_extended_size, &total_size);
+		overflow |= add_overflow(total_size, FLCTRL.HDR.fptrmapsz, &total_size);
+		overflow |= add_overflow(total_size, FLCTRL.HDR.mcount * 16, &total_size);
+		overflow |= add_overflow(total_size, FLCTRL.HDR.memory_size, &total_size);
+		if (overflow)
+			throw std::invalid_argument("Integer overflow when adding fields count in image header");
+		if (total_size > FLCTRL.HDR.image_size)
+			throw std::invalid_argument("Size of memory area with header exceeds size of an image");
 	}
 
 	inline void parse_root_ptrs(void) {
@@ -445,11 +506,15 @@ private:
 		}
 	}
 
-	inline void parse_mem(void) {
-		size_t memsz = FLCTRL.HDR.memory_size + \
+	inline size_t get_memsz() {
+		return FLCTRL.HDR.memory_size + \
 			FLCTRL.HDR.ptr_count * sizeof(size_t) + \
 			FLCTRL.HDR.fptr_count * sizeof(size_t) + \
 			FLCTRL.HDR.mcount * 2 * sizeof(size_t);
+	}
+
+	inline void parse_mem(void) {
+		size_t memsz = get_memsz();
 
 		switch(open_mode) {
 			case UNFLATTEN_OPEN_READ_COPY:
@@ -458,6 +523,8 @@ private:
 				break;
 			case UNFLATTEN_OPEN_MMAP:
 			case UNFLATTEN_OPEN_MMAP_WRITE:
+				if(current_mmap_offset + memsz > opened_mmap_size)
+					throw std::invalid_argument("Truncated file (memory_size > image_size)");
 				FLCTRL.mem = (char*)opened_mmap_addr + current_mmap_offset;
 				current_mmap_offset += memsz;
 				break;
@@ -480,6 +547,8 @@ private:
 			orig_fptrmapmem = fptrmapmem = new char[FLCTRL.HDR.fptrmapsz];
 			read_file(fptrmapmem, 1, FLCTRL.HDR.fptrmapsz);
 		} else {
+			if(current_mmap_offset + FLCTRL.HDR.fptrmapsz > opened_mmap_size)
+					throw std::invalid_argument("Truncated file (fptrmapsz_end > image_size)");
 			orig_fptrmapmem = fptrmapmem = (char*)opened_mmap_addr + current_mmap_offset;
 			current_mmap_offset += FLCTRL.HDR.fptrmapsz;
 		}
@@ -515,25 +584,40 @@ private:
 
 		for (size_t i = 0; i < FLCTRL.HDR.ptr_count; ++i) {
 			void* mem = flatten_memory_start();
+			size_t tmp;
+			/*
+			 * Extract fix location from image by accessing i-th element from ptr_array (which is at the start of 'mem' region).
+			 *  Under each fix location there's an offset (measured from FLCTRL.HDR.last_mem_addr) which specifies where that
+			 *  pointer should point to.
+			 */
 			size_t fix_loc = *((size_t*)FLCTRL.mem + i);
-			uintptr_t ptr = (uintptr_t)( *(void**)((char*)mem + fix_loc) ) - FLCTRL.HDR.last_mem_addr;	// TODO: ???
-			debug("fix_loc: %zu\n", fix_loc);
+			if(fix_loc + sizeof(size_t) > FLCTRL.HDR.memory_size || add_overflow(fix_loc, sizeof(size_t), &tmp))
+				throw std::invalid_argument("Invalid fix location in ptr_array for ptr no. " + std::to_string(i));
+			uintptr_t ptr = *(uintptr_t*)((char*)mem + fix_loc);
+			if(ptr < FLCTRL.HDR.last_mem_addr)
+				throw std::invalid_argument("Invalid fix destination (offset is negative) for ptr no. " + std::to_string(i));
+			ptr -= FLCTRL.HDR.last_mem_addr;
+			if(ptr > FLCTRL.HDR.memory_size)
+				throw std::invalid_argument("Invalid fix destination (offset is larger than memory size) for ptr no. " + std::to_string(i));
 
 			if(continuous_mapping) {
 				*((void**)((unsigned char*)mem + fix_loc)) = (unsigned char*)mem + ptr;
 			} else {
 
 				struct interval_tree_node *node = interval_tree_iter_first(&FLCTRL.imap_root, fix_loc, fix_loc + 8);
-				assert(node != NULL);
+				if (node == NULL)
+					throw std::invalid_argument("Address points to invalid location.");
 
-				size_t node_offset = fix_loc-node->start;
+				size_t node_offset = fix_loc - node->start;
 				struct interval_tree_node *ptr_node = interval_tree_iter_first(&FLCTRL.imap_root, ptr, ptr + 8);
-				assert(ptr_node != NULL);
+				if (ptr_node == NULL)
+					throw std::invalid_argument("Address points to invalid location.");
 
 				/* Make the fix */
-				size_t ptr_node_offset = ptr-ptr_node->start;
+				size_t ptr_node_offset = ptr - ptr_node->start;
 				size_t mptr_size = node->last - node->start + 1;
-				assert(node_offset <= mptr_size - 8);
+				if (node_offset > mptr_size - 8)
+					throw std::invalid_argument("Invalid node offset");
 				*((void**)((char*)node->mptr + node_offset)) = (char*)ptr_node->mptr + ptr_node_offset;
 
 				debug("%lx <- %lx (%hhx)\n", fix_loc, ptr, *(unsigned char*)((char*)ptr_node->mptr + ptr_node_offset));
@@ -578,6 +662,8 @@ public:
 	}
 
 	int imginfo(FILE* f, const char* arg) {
+		if (need_unload)
+			unload();
 		open_file(f, false);
 		read_file(&FLCTRL.HDR, sizeof(struct flatten_header), 1);
 		check_header();
@@ -601,15 +687,16 @@ public:
 		}
 		for (size_t i = 0; i < FLCTRL.HDR.root_addr_extended_count; ++i) {
 			size_t name_size, index, size;
-			read_file(&name_size,sizeof(size_t),1);
+			read_file(&name_size, sizeof(size_t), 1);
 
-			char* name = new char[name_size];
+			char* name = new char[name_size + 1];
+			memset(name, 0, name_size);
 			try {
 				read_file((void*)name, name_size, 1);
 				read_file(&index, sizeof(size_t), 1);
 				read_file(&size, sizeof(size_t), 1);
 				if ((!arg) || (!strcmp(arg,"-r"))) {
-					printf(" %zu [%s:%lu]\n",index,name,size);
+					printf(" %zu [%s:%lu]\n", index, name, size);
 				}
 			} catch(...) {
 				delete[] name;
@@ -628,9 +715,11 @@ public:
 			printf("[ ");
 		}
 		for (size_t i = 0; i < FLCTRL.HDR.ptr_count; ++i) {
-			size_t fix_loc = *((size_t*)FLCTRL.mem + i);
-			if ((!arg) || (!strcmp(arg,"-p"))) {
-				printf("%zu ",fix_loc);
+			size_t *fix_loc = ((size_t*)FLCTRL.mem + i);
+			if (WITHIN_MEM_BOUNDS(fix_loc, size_t)) {
+				if ((!arg) || (!strcmp(arg,"-p"))) {
+					printf("%zu ", *fix_loc);
+				}
 			}
 		}
 		if ((!arg) || (!strcmp(arg,"-p"))) {
@@ -642,9 +731,11 @@ public:
 			printf("[ ");
 		}
 		for (size_t fi = 0; fi < FLCTRL.HDR.fptr_count; ++fi) {
-			size_t fptri = ((uintptr_t*)((char*)FLCTRL.mem + FLCTRL.HDR.ptr_count * sizeof(size_t)))[fi];
-			if ((!arg) || (!strcmp(arg,"-p"))) {
-				printf("%zu ",fptri);
+			size_t *fptri = ((uintptr_t*)((char*)FLCTRL.mem + FLCTRL.HDR.ptr_count * sizeof(size_t))) + fi;
+			if (WITHIN_MEM_BOUNDS(fptri, size_t)) {
+				if ((!arg) || (!strcmp(arg,"-p"))) {
+					printf("%zu ", *fptri);
+				}
 			}
 		}
 		if ((!arg) || (!strcmp(arg,"-p"))) {
@@ -724,27 +815,37 @@ public:
 
 		if ((!arg) || (!strcmp(arg,"-a"))) {
 			printf("# Function pointer map size: %zu\n",FLCTRL.HDR.fptrmapsz);
-			if (FLCTRL.HDR.fptr_count > 0 && FLCTRL.HDR.fptrmapsz > 0) {
-				char* fptrmapmem = (char*) malloc(FLCTRL.HDR.fptrmapsz);
-				assert(fptrmapmem != NULL);
+			// Compare fptrmapsz with sizeof(size_t) because we later dereference and read size_t fptrnum
+			if (FLCTRL.HDR.fptr_count > 0 && FLCTRL.HDR.fptrmapsz >= sizeof(size_t)) {
+				std::unique_ptr<char[]> fptrmapmem(new char[FLCTRL.HDR.fptrmapsz]);
+				size_t offset = 0;
+				
+				if (fptrmapmem == nullptr)
+					throw std::runtime_error("Failed to allocate memory for function pointers");
 
-				read_file(fptrmapmem, 1, FLCTRL.HDR.fptrmapsz);
-				size_t fptrnum = *((size_t*)fptrmapmem);
+				read_file(fptrmapmem.get(), 1, FLCTRL.HDR.fptrmapsz);
+				size_t fptrnum = *((size_t*)fptrmapmem.get());
 				printf("# Function pointer count: %zu\n",fptrnum);
-				fptrmapmem += sizeof(size_t);
+				offset += sizeof(size_t);
 
 				for (size_t kvi=0; kvi < fptrnum; ++kvi) {
-					uintptr_t addr = *((uintptr_t*)fptrmapmem);
-					fptrmapmem += sizeof(uintptr_t);
+					if (offset + sizeof(uintptr_t) >= FLCTRL.HDR.fptrmapsz)
+						break;
+					uintptr_t addr = *((uintptr_t *)(fptrmapmem.get() + offset));
+					offset += sizeof(uintptr_t);
 
-					size_t sz = *((size_t*)fptrmapmem);
-					fptrmapmem += sizeof(size_t);
+					if (offset + sizeof(size_t) >= FLCTRL.HDR.fptrmapsz)
+						break;
 
-					std::string sym((const char*)fptrmapmem, sz);
-					fptrmapmem += sz;
+					size_t sz = *((size_t *)(fptrmapmem.get() + offset));
+					offset += sizeof(size_t);
+
+					if (offset + sz >= FLCTRL.HDR.fptrmapsz)
+						break;
+					std::string sym((const char *)(fptrmapmem.get() + offset), sz);
+					offset += sz;
 					printf("  [%s]: %08lx\n",sym.c_str(),addr);
 				}
-				free(fptrmapmem - FLCTRL.HDR.fptrmapsz);
 			}
 		}
 
@@ -760,6 +861,7 @@ public:
 		// When continous_mapping is disabled we have to always operate on
 		//  local copy of flatten imaged, because memory chunks are not portable
 		open_file(f, continuous_mapping, continuous_mapping);
+		need_unload = true;
 
 		time_mark_start();
 		// Parse header info and load flattened memory
@@ -779,18 +881,24 @@ public:
 		// Convert continous memory into chunked area
 		if(!continuous_mapping) {
 			time_mark_start();
-			size_t* minfoptr = (size_t*)((char*)FLCTRL.mem + FLCTRL.HDR.ptr_count * sizeof(size_t) + FLCTRL.HDR.fptr_count * sizeof(size_t));
-			void* memptr = flatten_memory_start();
+			size_t *minfoptr = (size_t*)((char*)FLCTRL.mem + FLCTRL.HDR.ptr_count * sizeof(size_t) + FLCTRL.HDR.fptr_count * sizeof(size_t));
+			void *memptr = flatten_memory_start();
 			info(" * memory size: %lu\n", FLCTRL.HDR.memory_size);
 
 			for (size_t i = 0; i < FLCTRL.HDR.mcount; ++i) {
 				size_t index = *minfoptr++;
 				size_t size = *minfoptr++;
+				if(index + size < index)
+					throw std::invalid_argument("Size overflow for memory fragment no. " + std::to_string(i));
+				if(index + size > FLCTRL.HDR.memory_size)
+					throw std::invalid_argument("Memory fragment no. " + std::to_string(i) + " doesn't fit in flatten image");
+
 				struct interval_tree_node *node = (struct interval_tree_node*)calloc(1, sizeof(struct interval_tree_node));
 				node->start = index;
 				node->last = index + size - 1;
 				void* fragment = malloc(size);
-				assert(fragment!=NULL);
+				if (fragment == NULL)
+					throw std::bad_alloc();
 				memcpy(fragment, (char*)memptr + index, size);
 				node->mptr = fragment;
 				interval_tree_insert(node, &FLCTRL.imap_root);
@@ -817,7 +925,8 @@ public:
 					*((void**)((char*)mem + fptri)) = (void*)nfptr;
 				} else {
 					struct interval_tree_node *node = interval_tree_iter_first(&FLCTRL.imap_root, fptri, fptri + 8);
-					assert(node != NULL);
+					if (node == NULL)
+						throw std::invalid_argument("Function address points to invalid location.");
 
 					size_t node_offset = fptri-node->start;
 					*((void**)((char*)node->mptr + node_offset)) = (void*)nfptr;
@@ -843,8 +952,6 @@ public:
 		if(!continuous_mapping)
 			info("  Number of allocated fragments: %zu\n", FLCTRL.HDR.mcount);
 		info("  Number of fixed pointers: %lu\n", FLCTRL.HDR.ptr_count);
-
-		need_unload = true;
 		return 0;
 	}
 
@@ -898,8 +1005,10 @@ public:
 			return -1;
 		}
 
-		assert(open_mode != UNFLATTEN_OPEN_MMAP_WRITE);
-		assert(FLCTRL.mem != NULL);
+		if(open_mode == UNFLATTEN_OPEN_MMAP_WRITE)
+			throw std::runtime_error("Unflatten is running in invalid open mode");
+		if(FLCTRL.mem == NULL)
+			throw std::runtime_error("FLCTRL.mem is not initialized");
 		
 		for (size_t i = 0; i < FLCTRL.HDR.ptr_count; ++i) {
 			void* mem = flatten_memory_start();
@@ -915,11 +1024,13 @@ public:
 			} else {
 
 				struct interval_tree_node *node = interval_tree_iter_first(&FLCTRL.imap_root, fix_loc, fix_loc + 8);
-				assert(node != NULL);
+				if (node == NULL)
+					throw std::invalid_argument("Interval tree node could not be extracted");
 				size_t node_offset = fix_loc-node->start;
 
 				struct interval_tree_node *ptr_node = interval_tree_iter_first(&FLCTRL.imap_root, ptr, ptr + 8);
-				assert(ptr_node != NULL);
+				if (ptr_node == NULL)
+					throw std::invalid_argument("Interval tree node could not be extracted");
 				size_t ptr_node_offset = ptr-ptr_node->start;
 
 				void* target = (unsigned char*)ptr_node->mptr + ptr_node_offset;
