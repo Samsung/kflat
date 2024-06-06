@@ -77,6 +77,10 @@ again:
 		return isPointer, typ, true
 	case *prog.UnionType:
 		return isPointer, typ, true
+	case *prog.ArrayType:
+		typ = typ.(*prog.ArrayType).Elem
+		isPointer = true
+		goto again
 	case *prog.PtrType:
 		typ = typ.(*prog.PtrType).Elem
 		isPointer = true
@@ -234,7 +238,6 @@ func generateRecipe(insideType prog.StructType) ([]*FlatHandler, error) {
 					Size: t.RangeBegin,
 				}
 				common := &AggregateCommon{
-					// TODO: There is no consideration it t.Elem is a complex type which should be aggregated as well
 					TypeName:    syzlangTypeToC(t.Elem.TemplateName()),
 					FieldName:   field.Name,
 					FieldOffset: fieldOffset,
