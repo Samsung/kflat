@@ -38,6 +38,37 @@ func compileErrorHandler(pos ast.Pos, msg string) {
 	lastMsg = msg
 }
 
+func syzlangTypeToC(typeName string) string {
+	switch typeName {
+	case "intptr":
+		fallthrough
+	case "int8":
+		fallthrough
+	case "int16":
+		fallthrough
+	case "int32":
+		fallthrough
+	case "int64":
+		fallthrough
+	case "uint8":
+		fallthrough
+	case "uint16":
+		fallthrough
+	case "uint32":
+		fallthrough
+	case "uint64":
+		return typeName + "_t"
+	}
+
+	// Weird syzlang types
+	if strings.Contains(typeName, "[") {
+		return "UNKNOWN_TYPE(" + typeName + ")";
+	}
+
+	// All other types like unions, structs or enums
+	return typeName;
+}
+
 func shouldQueue(typ prog.Type) (bool, prog.Type, bool) {
 	var isPointer bool = false
 again:
@@ -203,7 +234,8 @@ func generateRecipe(insideType prog.StructType) ([]*FlatHandler, error) {
 					Size: t.RangeBegin,
 				}
 				common := &AggregateCommon{
-					TypeName:    t.Elem.TemplateName(), // There should be a map syzkaller types<->C types, (Template)Name() returns the syzkaller name
+					// TODO: There is no consideration it t.Elem is a complex type which should be aggregated as well
+					TypeName:    syzlangTypeToC(t.Elem.TemplateName()),
 					FieldName:   field.Name,
 					FieldOffset: fieldOffset,
 					TypeSize:    size,
