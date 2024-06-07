@@ -4,13 +4,14 @@ package main
 import (
 	"flag"
 	"fmt"
+	"os"
+	"path/filepath"
+	"strings"
+
 	"github.com/google/syzkaller/pkg/ast"
 	"github.com/google/syzkaller/pkg/compiler"
 	"github.com/google/syzkaller/prog"
 	"github.com/google/syzkaller/sys/targets"
-	"os"
-	"path/filepath"
-	"strings"
 )
 
 const (
@@ -25,11 +26,11 @@ const (
 )
 
 var (
-	lastFile  string
-	lastMsg   string
-	outputDir string
-	syzArch   string
-	paths     []string
+	lastFile          string
+	lastMsg           string
+	outputDir         string
+	syzArch           string
+	paths             []string
 	concatenateOutput bool
 )
 
@@ -149,6 +150,7 @@ func main() {
 		f.WriteString(header)
 	}
 
+	var usedRecipes map[string]struct{} = make(map[string]struct{})
 	for _, sc := range p.Syscalls {
 		if !strings.HasPrefix(sc.Name, "ioctl$") || len(sc.Args) < 3 {
 			continue
@@ -179,13 +181,29 @@ func main() {
 		}
 
 		for _, recipe := range recipes {
+			if concatenateOutput {
+				if _, ok := usedRecipes[recipe.Name]; ok {
+					continue
+				}
+			}
+
 			f.WriteString(recipe.Declaration() + "\n")
 		}
 
 		f.WriteString("\n")
 
 		for _, recipe := range recipes {
+			if concatenateOutput {
+				if _, ok := usedRecipes[recipe.Name]; ok {
+					continue
+				}
+			}
+
 			f.WriteString(recipe.Definition() + "\n")
+
+			if concatenateOutput {
+				usedRecipes[recipe.Name] = struct{}{}
+			}
 		}
 	}
 }
