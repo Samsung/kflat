@@ -70,7 +70,7 @@ func (p *ArrayAggregate) Offset() uint64 {
 }
 
 func (p *ArrayAggregate) Specification() string {
-	return fmt.Sprintf("AGGREGATE_FLATTEN_TYPE_ARRAY_SELF_CONTAINED(%s, %s, %d, %s)", p.TypeName, p.FieldName, p.FieldOffset, p.TypeSize.Specification())
+	return fmt.Sprintf("AGGREGATE_FLATTEN_TYPE_ARRAY_SELF_CONTAINED(%s, %s, %d, %s);", p.TypeName, p.FieldName, p.FieldOffset, p.TypeSize.Specification())
 }
 
 type Sizable interface {
