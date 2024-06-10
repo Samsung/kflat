@@ -6,12 +6,8 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 
-	"github.com/google/syzkaller/pkg/ast"
-	"github.com/google/syzkaller/pkg/compiler"
 	"github.com/google/syzkaller/prog"
-	"github.com/google/syzkaller/sys/targets"
 )
 
 const (
@@ -26,22 +22,39 @@ const (
 )
 
 var (
-	lastFile          string
-	lastMsg           string
 	outputDir         string
 	syzArch           string
+	fokaPath          string
 	paths             []string
 	concatenateOutput bool
 )
 
-func compileErrorHandler(pos ast.Pos, msg string) {
-	lastFile = pos.File
-	lastMsg = msg
+func removeAllFilesInDirectory(path string) {
+	existingRecipes, _ := filepath.Glob(filepath.Join(outputDir, "*.c"))
+	for _, item := range existingRecipes {
+		os.RemoveAll(item)
+	}
+}
+
+func globFilesFromPaths(paths []string, glob string) []string {
+	var files []string = nil
+
+	for _, path := range paths {
+		globbed, err := filepath.Glob(filepath.Join(path, glob))
+		if err != nil {
+			return make([]string, 0, 0)
+		}
+
+		files = append(files, globbed...)
+	}
+
+	return files
 }
 
 func init() {
 	flag.StringVar(&outputDir, "output", "recipes_out", "path to directory for generated recipes")
 	flag.StringVar(&syzArch, "arch", "arm64", "targeted arch of syzkaller descriptions (sizes or constants might differ) from sys/targets package")
+	flag.StringVar(&fokaPath, "foka", "foka_v2.json", "path to FOKA output")
 	flag.BoolVar(&concatenateOutput, "concatenate", true, "put all recipes to one file")
 
 	flag.Usage = func() {
@@ -71,73 +84,16 @@ func main() {
 	}
 
 	os.Mkdir(outputDir, 0775)
-	existingRecipes, _ := filepath.Glob(filepath.Join(outputDir, "*.c"))
-	for _, item := range existingRecipes {
-		os.RemoveAll(item)
+	removeAllFilesInDirectory(outputDir)
+
+	descriptions := globFilesFromPaths(paths, "*.txt")
+	constants := globFilesFromPaths(paths, "*.const")
+
+	_, syscalls, _, err := tryCompileFromPaths(descriptions, constants, syzArch)
+	if err != nil {
+		panic(err)
 	}
 
-	var descFiles []string
-	var constFiles []string
-
-	for _, str := range paths {
-		txts, err := filepath.Glob(filepath.Join(str, "*.txt"))
-		cnsts, err := filepath.Glob(filepath.Join(str, "*.const"))
-		if err != nil {
-			panic(err)
-		}
-
-		descFiles = append(descFiles, txts...)
-		constFiles = append(constFiles, cnsts...)
-	}
-
-	var descs *ast.Description = &ast.Description{}
-	var p *compiler.Prog = nil
-	consts := make(map[string]uint64)
-
-	for p == nil {
-		if lastFile != "" && lastMsg != "" {
-			fmt.Fprintf(os.Stderr, "error, retrying without file %s: %s\n", lastFile, lastMsg)
-
-			for i, f := range descFiles {
-				if lastFile == f {
-					descFiles = append(descFiles[:i], descFiles[i+1:]...)
-				}
-			}
-
-			lastFile = ""
-			lastMsg = ""
-
-			descs = &ast.Description{}
-			consts = make(map[string]uint64)
-		}
-
-		for _, f := range descFiles {
-			buf, err := os.ReadFile(f)
-			if err != nil {
-				panic(err)
-			}
-
-			other := ast.Parse(buf, f, func(_ ast.Pos, _ string) {})
-			if other != nil {
-				descs.Nodes = append(descs.Nodes, other.Nodes...)
-			}
-		}
-
-		for _, f := range constFiles {
-			other := compiler.DeserializeConstFile(f, func(_ ast.Pos, _ string) {}).Arch(targets.ARM64)
-			for k, v := range other {
-				consts[k] = v
-			}
-		}
-
-		if len(consts) <= 0 || descs == nil {
-			panic("No descriptions nor const got parsed")
-		}
-
-		p = compiler.Compile(descs, consts, targets.List[targets.Linux][syzArch], compileErrorHandler)
-	}
-
-	prog.RestoreLinks(p.Syscalls, p.Resources, p.Types)
 	var f *os.File = nil
 
 	if concatenateOutput {
@@ -150,9 +106,9 @@ func main() {
 		f.WriteString(header)
 	}
 
-	var usedRecipes map[string]struct{} = make(map[string]struct{})
-	for _, sc := range p.Syscalls {
-		if !strings.HasPrefix(sc.Name, "ioctl$") || len(sc.Args) < 3 {
+	usedRecipes := make(map[string]struct{})
+	for _, sc := range syscalls {
+		if sc.CallName != "ioctl" || len(sc.Args) < 3 {
 			continue
 		}
 
