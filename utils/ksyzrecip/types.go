@@ -49,27 +49,60 @@ func (p *RecordAggregate) Specification() string {
 	return fmt.Sprintf("AGGREGATE_FLATTEN_STRUCT_SELF_CONTAINED(%s, %s, %s, %d);", p.TypeName, p.TypeSize.Specification(), p.FieldName, p.FieldOffset)
 }
 
-type ArrayAggregate struct {
-	AggregateCommon
+type ArrayAggregate interface {
+	Aggregate
 }
 
-func (p *ArrayAggregate) Name() string {
+type RecordArrayAggregate struct {
+	AggregateCommon
+	IsUnion bool
+}
+
+func (p *RecordArrayAggregate) Name() string {
 	return p.TypeName
 }
 
-func (p *ArrayAggregate) Size() Sizable {
+func (p *RecordArrayAggregate) Size() Sizable {
 	return p.TypeSize
 }
 
-func (p *ArrayAggregate) Field() string {
+func (p *RecordArrayAggregate) Field() string {
 	return p.FieldName
 }
 
-func (p *ArrayAggregate) Offset() uint64 {
+func (p *RecordArrayAggregate) Offset() uint64 {
 	return p.FieldOffset
 }
 
-func (p *ArrayAggregate) Specification() string {
+func (p *RecordArrayAggregate) Specification() string {
+	if p.IsUnion {
+		return fmt.Sprintf("AGGREGATE_FLATTEN_UNION_ARRAY_SELF_CONTAINED(%s, %s, %s, %d, %d);", p.TypeName, p.TypeSize.Specification(), p.FieldName, p.FieldOffset, 1)
+	}
+
+	return fmt.Sprintf("AGGREGATE_FLATTEN_STRUCT_ARRAY_SELF_CONTAINED(%s, %s, %s, %d, %d);", p.TypeName, p.TypeSize.Specification(), p.FieldName, p.FieldOffset, 1)
+}
+
+type BuiltinArrayAggregate struct {
+	AggregateCommon
+}
+
+func (p *BuiltinArrayAggregate) Name() string {
+	return p.TypeName
+}
+
+func (p *BuiltinArrayAggregate) Size() Sizable {
+	return p.TypeSize
+}
+
+func (p *BuiltinArrayAggregate) Field() string {
+	return p.FieldName
+}
+
+func (p *BuiltinArrayAggregate) Offset() uint64 {
+	return p.FieldOffset
+}
+
+func (p *BuiltinArrayAggregate) Specification() string {
 	return fmt.Sprintf("AGGREGATE_FLATTEN_TYPE_ARRAY_SELF_CONTAINED(%s, %s, %d, %s);", p.TypeName, p.FieldName, p.FieldOffset, p.TypeSize.Specification())
 }
 

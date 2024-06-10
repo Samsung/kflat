@@ -211,10 +211,22 @@ func generateRecipe(insideType prog.StructType) ([]*FlatHandler, error) {
 					FieldOffset: fieldOffset,
 					TypeSize:    size,
 				}
-				aggregate := &ArrayAggregate{
-					AggregateCommon: *common,
+				switch t.Elem.(type) {
+				case *prog.StructType:
+					flat.Aggregates[field.Name] = &RecordArrayAggregate{
+						AggregateCommon: *common,
+						IsUnion:         false,
+					}
+				case *prog.UnionType:
+					flat.Aggregates[field.Name] = &RecordArrayAggregate{
+						AggregateCommon: *common,
+						IsUnion:         true,
+					}
+				default:
+					flat.Aggregates[field.Name] = &BuiltinArrayAggregate{
+						AggregateCommon: *common,
+					}
 				}
-				flat.Aggregates[field.Name] = aggregate
 			case *prog.BufferType:
 				if t.Kind != prog.BufferString || t.TypeName != "string" {
 					continue
@@ -234,11 +246,9 @@ func generateRecipe(insideType prog.StructType) ([]*FlatHandler, error) {
 					TypeSize:    createSizable(uint64(min)),
 				}
 
-				aggregate := &ArrayAggregate{
+				flat.Aggregates[field.Name] = &BuiltinArrayAggregate{
 					AggregateCommon: *common,
 				}
-
-				flat.Aggregates[field.Name] = aggregate
 			}
 
 			fieldOffset += calculateActualSize(field.Type).Size
@@ -277,11 +287,18 @@ func generateRecipe(insideType prog.StructType) ([]*FlatHandler, error) {
 				FieldOffset: aggregate.Offset(),
 				TypeSize:    lengthWrapper,
 			}
-			newAggregate := &ArrayAggregate{
-				AggregateCommon: *common,
-			}
 
-			flat.Aggregates[t.Path[0]] = newAggregate
+			switch aggregate.(type) {
+			case *RecordArrayAggregate:
+				flat.Aggregates[t.Path[0]] = &RecordArrayAggregate{
+					AggregateCommon: *common,
+					IsUnion:         aggregate.(*RecordArrayAggregate).IsUnion,
+				}
+			case *BuiltinArrayAggregate:
+				flat.Aggregates[t.Path[0]] = &BuiltinArrayAggregate{
+					AggregateCommon: *common,
+				}
+			}
 		}
 
 		recipeTypes = append(recipeTypes, flat)
