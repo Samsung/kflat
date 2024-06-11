@@ -114,6 +114,11 @@ struct kflat {
 	wait_queue_head_t dump_ready_wq;
 };
 
+struct kflat_ksym {
+	unsigned long address;
+	size_t expected_size;
+};
+
 int kflat_recipe_get_all(char *buff, size_t bufsize);
 
 
@@ -128,9 +133,16 @@ void kflat_recipe_put(struct kflat_recipe* recipe);
 void kflat_get(struct kflat *kflat);
 void kflat_put(struct kflat *kflat);
 
-extern unsigned long (*kflat_lookup_kallsyms_name)(const char* name);
+typedef unsigned long (*lookup_kallsyms_name_t)(const char* name);
+typedef int (*module_kallsyms_on_each_symbol_t)(const char *modname, int (*fn)(void *, const char *, unsigned long), void *data);
+typedef int (*kallsyms_on_each_symbol_t)(int (*fn)(void *, const char *, unsigned long), void *data);
+extern lookup_kallsyms_name_t kflat_lookup_kallsyms_name;
+extern module_kallsyms_on_each_symbol_t kflat_module_kallsyms_on_each_symbol;
+extern kallsyms_on_each_symbol_t kflat_kallsyms_on_each_symbol;
+
+int flatten_validate_inmem_size(char *mod_name, unsigned long address, size_t expected_size);
+
 bool flatten_get_object(struct flat* flat, void* ptr, void** start, void** end);
 void* flatten_global_address_by_name(const char* name);
-
 
 #endif /* _LINUX_KFLAT_H */

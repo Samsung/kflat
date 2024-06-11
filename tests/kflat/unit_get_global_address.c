@@ -31,6 +31,7 @@ static int kflat_global_addr_unit_test(struct flat *flat) {
 	results.test_kernel_global_pass = (NULL != flatten_global_address_by_name("iomem_resource"));
 	results.test_module_func_pass = (NULL != flatten_global_address_by_name("kflat_core:kflat_global_addr_unit_test"));
 
+
 	// Send results back to user
 	FOR_ROOT_POINTER(&results,
 		FLATTEN_STRUCT(get_global_result, &results);

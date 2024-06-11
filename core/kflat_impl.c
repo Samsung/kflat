@@ -11,6 +11,7 @@
 #include <linux/module.h>
 #include <linux/version.h>
 #include <linux/vmalloc.h>
+#include <linux/kallsyms.h>
 
 
 #ifdef KFLAT_GET_OBJ_SUPPORT
@@ -28,7 +29,9 @@
 /*******************************************************
  * GLOBAL VARIABLES SUPPORT
  *******************************************************/
-unsigned long (*kflat_lookup_kallsyms_name)(const char* name);
+lookup_kallsyms_name_t kflat_lookup_kallsyms_name;
+module_kallsyms_on_each_symbol_t kflat_module_kallsyms_on_each_symbol;
+kallsyms_on_each_symbol_t kflat_kallsyms_on_each_symbol;
 
 __nocfi void* flatten_global_address_by_name(const char* name) {
 	void* addr;
@@ -46,6 +49,41 @@ __nocfi void* flatten_global_address_by_name(const char* name) {
 }
 EXPORT_SYMBOL_GPL(flatten_global_address_by_name);
 
+/***************************************************************
+ * Detect compilier optimizations that shrink variables' size
+***************************************************************/
+
+static int handler_check_ksym_size(void *data, const char *symbol_name, unsigned long symbol_value) {
+    struct kflat_ksym *ksym = (struct kflat_ksym *) data;
+	if (ksym->address < symbol_value && symbol_value < ksym->address + ksym->expected_size) {
+		return 1;
+	}
+
+    return 0;
+}
+
+/*
+ * 0 == no optimization detected
+ * 1 == optimization detected
+ */
+int flatten_validate_inmem_size(char *mod_name, unsigned long address, size_t expected_size) {
+	struct kflat_ksym ksym;
+	ksym.address = address;
+	ksym.expected_size = expected_size;
+	if (mod_name) {
+		/*  
+		 * Function kflat_module_kallsyms_on_each_symbol iterates over all ksyms and runs handler_check_ksym_size on every symbol.
+		 * If handler_check_ksym_size returns non-zero, kflat_module_kallsyms_on_each_symbol breaks and returns the same status.
+		 * If handler_check_ksym_size always returns 0, kflat_module_kallsyms_on_each_symbol also returns 0 when it finishes iterating over all ksyms.
+		 */
+		return kflat_module_kallsyms_on_each_symbol(mod_name, handler_check_ksym_size, &ksym);
+	}
+
+	// If mod_name is NULL, seach through vmlinux globals
+	return kflat_kallsyms_on_each_symbol(handler_check_ksym_size, &ksym);
+
+}
+EXPORT_SYMBOL_GPL(flatten_validate_inmem_size);
 
 /*******************************************************
  * DYNAMIC OBJECTS RESOLUTION

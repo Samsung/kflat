@@ -717,7 +717,10 @@ static int __init kflat_init(void) {
 		goto fail_debugfs;
 	}
 
-	kflat_lookup_kallsyms_name = probing_get_kallsyms();
+	kflat_lookup_kallsyms_name = (lookup_kallsyms_name_t) probing_get_kallsyms();
+	kflat_module_kallsyms_on_each_symbol = (module_kallsyms_on_each_symbol_t) kflat_lookup_kallsyms_name("module_kallsyms_on_each_symbol");
+	kflat_kallsyms_on_each_symbol = (kallsyms_on_each_symbol_t) kflat_lookup_kallsyms_name("kallsyms_on_each_symbol");
+	
 	kflat_dbgfs_node = node;
 	return 0;
 
