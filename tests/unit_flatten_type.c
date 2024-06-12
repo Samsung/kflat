@@ -6,9 +6,6 @@
 
 #include "common.h"
 
-static unsigned long magic = 0xCAFEBEEF;
-static char garr[20];
-
 struct tpX {
     long* larr;
     short* sarr;
@@ -19,6 +16,9 @@ struct tpX {
 /********************************/
 #ifdef __TESTER__
 /********************************/
+
+static unsigned long magic = 0xCAFEBEEF;
+static char garr[20];
 
 FUNCTION_DEFINE_FLATTEN_STRUCT(tpX,
     AGGREGATE_FLATTEN_TYPE_ARRAY(long,larr,4);

@@ -1,4 +1,13 @@
+/**
+ * @file client_app.cpp
+ * @author Samsung R&D Poland - Mobile Security Group
+ * @brief Simple userspace application for running do_init_module example
+ */
+
+#ifndef _GNU_SOURCE
 #define _GNU_SOURCE
+#endif
+
 #include "ExecFlat.hpp"
 #include "unflatten.hpp"
 #include <fcntl.h>

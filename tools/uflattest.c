@@ -53,7 +53,7 @@ static const char* current_test_name = NULL;
 char _last_assert_tested[MAX_LAST_ASSERT];
 
 static void signal_handler(int signo, siginfo_t* si, void* raw_ucontext) {
-    ucontext_t* ucontext = (ucontext_t*) raw_ucontext;
+    // ucontext_t* ucontext = (ucontext_t*) raw_ucontext;
 
     printf("\n=======================\n");
     log_error("SIGNAL %s", strsignal(signo)); 
@@ -198,8 +198,6 @@ int run_test(struct args* args, const char* name) {
     FILE* file;
     char out_name[128];
     int test_result = KFLAT_TEST_FAIL;
-    const size_t flat_size = 10ULL * 1024 * 1024;   // 10MB
-    ssize_t output_size;
     struct time_elapsed total_time, flatten_time;
 
     if(args->verbose)
@@ -373,7 +371,6 @@ static struct argp_option options[] = {
 };
 
 static error_t parse_opt(int key, char* arg, struct argp_state* state) {
-    int64_t code;
     struct args* options = (struct args*) state->input;
 
     switch(key) {

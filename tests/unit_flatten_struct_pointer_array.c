@@ -13,16 +13,16 @@ struct fb_info {
 	unsigned long fb_id;
 };
 
+/********************************/
+#ifdef __TESTER__
+/********************************/
+
 static struct fb_info fb0 = { "fb0",0};
 static struct fb_info fb1 = { "fb1",1};
 static struct fb_info fb2 = { "fb2",2};
 static struct fb_info fb3 = { "fb3",3};
-
 static struct fb_info *registered_fb[FB_MAX] = {&fb0,&fb1,&fb2,&fb3};
 
-/********************************/
-#ifdef __TESTER__
-/********************************/
 
 FUNCTION_DEFINE_FLATTEN_STRUCT(fb_info,
 	AGGREGATE_FLATTEN_STRING(fb_name);

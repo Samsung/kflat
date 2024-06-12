@@ -23,7 +23,7 @@ FUNCTION_DEFINE_FLATTEN_STRUCT(validate_global_size_results);
 
 static int kflat_global_size_unit_test(struct flat *flat) {
 	struct validate_global_size_results results = { 0 };
-    unsigned long kernel_test_global_addr = flatten_global_address_by_name("modules_disabled");
+    unsigned long kernel_test_global_addr = (unsigned long)flatten_global_address_by_name("modules_disabled");
 
 
 	// Stop copiler from optimizing this global

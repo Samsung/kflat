@@ -55,7 +55,7 @@ static const char* current_test_name = NULL;
 char _last_assert_tested[MAX_LAST_ASSERT];
 
 static void signal_handler(int signo, siginfo_t* si, void* raw_ucontext) {
-    ucontext_t* ucontext = (ucontext_t*) raw_ucontext;
+    // ucontext_t* ucontext = (ucontext_t*) raw_ucontext;
 
     printf("\n=======================\n");
     log_error("SIGNAL %s", strsignal(signo)); 
@@ -203,7 +203,7 @@ int run_test(struct args* args, const char* name) {
         goto close_fd;
     }
 
-    strncpy(tests.test_name, name, sizeof(tests.test_name));
+    strncpy(tests.test_name, name, sizeof(tests.test_name) - 1);
 
     output_size = ioctl(fd, KFLAT_TESTS, &tests);
     if(args->stop_machine && output_size < 0 && errno == EINVAL) {
@@ -416,7 +416,6 @@ static struct argp_option options[] = {
 };
 
 static error_t parse_opt(int key, char* arg, struct argp_state* state) {
-    int64_t code;
     struct args* options = (struct args*) state->input;
 
     switch(key) {

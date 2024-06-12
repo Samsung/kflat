@@ -140,7 +140,7 @@ void print_kallsyms_info(struct kdump_memory_map* mem, const char* symbol) {
         addr = -1;
     } while(ret > 0);
 
-    if(addr == -1) {
+    if(addr == -1ULL) {
         printf("Failed to locate symbol `%s` in kallsyms\n", symbol);
         exit(1);
     }
@@ -197,7 +197,6 @@ size_t calc_size_of_phys_mem(struct kdump_memory_map* mem) {
  * Present human-friendly content to user
  */
 void process_dump() {
-    int ret;
     Unflatten flatten;
 
     FILE* f = fopen("mem_map.bin", "r");

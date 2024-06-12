@@ -86,17 +86,17 @@ static int kflat_variable_struct_example(struct flat *flat) {
     for(int i = 0; i < sizeof(data.data); i++)
         data.data[i] = i * 17;
 
-	FOR_ROOT_POINTER(&ranges,
-		FLATTEN_STRUCT_SELF_CONTAINED(iommu_base, sizeof(uint32_t), &ranges);
-	);
-	FOR_ROOT_POINTER(&result,
-		FLATTEN_STRUCT_SELF_CONTAINED(iommu_base, sizeof(uint32_t), &result);
-	);
+    FOR_ROOT_POINTER(&ranges,
+        FLATTEN_STRUCT_SELF_CONTAINED(iommu_base, sizeof(uint32_t), &ranges);
+    );
+    FOR_ROOT_POINTER(&result,
+        FLATTEN_STRUCT_SELF_CONTAINED(iommu_base, sizeof(uint32_t), &result);
+    );
     FOR_ROOT_POINTER(&data,
-		FLATTEN_STRUCT_SELF_CONTAINED(iommu_base, sizeof(uint32_t), &data);
-	);
+        FLATTEN_STRUCT_SELF_CONTAINED(iommu_base, sizeof(uint32_t), &data);
+    );
 
-	return 0;
+    return 0;
 }
 
 /********************************/
@@ -105,11 +105,11 @@ static int kflat_variable_struct_example(struct flat *flat) {
 /********************************/
 
 static int kflat_variable_struct_validate(void *memory, size_t size, CUnflatten flatten) {
-	struct iommu_ranges* ranges = (struct iommu_ranges*)unflatten_root_pointer_seq(flatten, 0);
-	struct iommu_result* result = (struct iommu_result*)unflatten_root_pointer_seq(flatten, 1);
-	struct iommu_data* data = (struct iommu_data*)unflatten_root_pointer_seq(flatten, 2);
+    struct iommu_ranges* ranges = (struct iommu_ranges*)unflatten_root_pointer_seq(flatten, 0);
+    struct iommu_result* result = (struct iommu_result*)unflatten_root_pointer_seq(flatten, 1);
+    struct iommu_data* data = (struct iommu_data*)unflatten_root_pointer_seq(flatten, 2);
 
-	ASSERT_EQ(ranges->size, sizeof(struct iommu_ranges));
+    ASSERT_EQ(ranges->size, sizeof(struct iommu_ranges));
     ASSERT_EQ(ranges->fd, 2);
     ASSERT_EQ(ranges->num_ranges, 5);
     ASSERT_EQ(ranges->padding, 3);
@@ -126,7 +126,7 @@ static int kflat_variable_struct_validate(void *memory, size_t size, CUnflatten 
     for(int i = 0; i < sizeof(data->data); i++)
         ASSERT_EQ(data->data[i], (uint8_t)(i * 17));
 
-	return KFLAT_TEST_SUCCESS;
+    return KFLAT_TEST_SUCCESS;
 }
 
 /********************************/
