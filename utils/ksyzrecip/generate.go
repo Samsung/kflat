@@ -2,8 +2,9 @@ package main
 
 import (
 	"errors"
-	"github.com/google/syzkaller/prog"
 	"strings"
+
+	"github.com/google/syzkaller/prog"
 )
 
 func syzlangTypeToC(typeName string) string {
@@ -38,7 +39,8 @@ func syzlangTypeToC(typeName string) string {
 }
 
 func shouldQueue(typ prog.Type) (bool, prog.Type, bool) {
-	var isPointer bool = false
+	isPointer := false
+
 again:
 	switch typ.(type) {
 	case *prog.StructType:
@@ -119,31 +121,27 @@ func deduceDependantTypes(targetType prog.Type) map[string]prog.Type {
 func aggregateFromPointer(subType prog.Type, field string, offset uint64) (Aggregate, bool) {
 	switch t := subType.(type) {
 	case *prog.StructType:
-		size := calculateActualSize(t)
-		common := AggregateCommon{
-			TypeName:    t.TemplateName(),
-			TypeSize:    &size,
-			FieldName:   field,
-			FieldOffset: offset,
-		}
-
 		aggregate := &RecordAggregate{
-			AggregateCommon: common,
-			IsUnion:         false,
+			AggregateCommon: AggregateCommon{
+				TypeName:    t.TemplateName(),
+				TypeSize:    calculateActualSize(t),
+				FieldName:   field,
+				FieldOffset: offset,
+			},
+
+			IsUnion: false,
 		}
 		return aggregate, true
 	case *prog.UnionType:
-		size := calculateActualSize(t)
-		common := AggregateCommon{
-			TypeName:    t.TemplateName(),
-			TypeSize:    &size,
-			FieldName:   field,
-			FieldOffset: offset,
-		}
-
 		aggregate := &RecordAggregate{
-			AggregateCommon: common,
-			IsUnion:         true,
+			AggregateCommon: AggregateCommon{
+				TypeName:    t.TemplateName(),
+				TypeSize:    calculateActualSize(t),
+				FieldName:   field,
+				FieldOffset: offset,
+			},
+
+			IsUnion: true,
 		}
 		return aggregate, true
 	}
@@ -187,8 +185,8 @@ func generateRecipe(insideType prog.StructType) ([]*FlatHandler, error) {
 
 		flat := &FlatHandler{
 			Name: iter.TemplateName(),
-			// hiddev_usage_ref_multi  returns size 4124 from syzkaller????
-			Size:       calculateActualSize(iter).Size,
+			// TODO: Investigate later, hiddev_usage_ref_multi returns size 4124 from syzkaller????
+			Size:       calculateActualSize(iter),
 			Aggregates: make(map[string]Aggregate),
 		}
 
@@ -202,29 +200,34 @@ func generateRecipe(insideType prog.StructType) ([]*FlatHandler, error) {
 
 				flat.Aggregates[field.Name] = aggregate
 			case *prog.ArrayType:
-				size := &IntegerSize{
+				arraySize := &IntegerSize{
 					Size: t.RangeBegin,
 				}
-				common := &AggregateCommon{
+				common := AggregateCommon{
 					TypeName:    syzlangTypeToC(t.Elem.TemplateName()),
 					FieldName:   field.Name,
 					FieldOffset: fieldOffset,
-					TypeSize:    size,
+					TypeSize:    calculateActualSize(t.Elem),
 				}
+
+				// TODO: Array of pointers to records should be handled separately
 				switch t.Elem.(type) {
 				case *prog.StructType:
 					flat.Aggregates[field.Name] = &RecordArrayAggregate{
-						AggregateCommon: *common,
+						AggregateCommon: common,
 						IsUnion:         false,
+						ArraySize:       arraySize,
 					}
 				case *prog.UnionType:
 					flat.Aggregates[field.Name] = &RecordArrayAggregate{
-						AggregateCommon: *common,
+						AggregateCommon: common,
 						IsUnion:         true,
+						ArraySize:       arraySize,
 					}
 				default:
 					flat.Aggregates[field.Name] = &BuiltinArrayAggregate{
-						AggregateCommon: *common,
+						AggregateCommon: common,
+						ArraySize:       arraySize,
 					}
 				}
 			case *prog.BufferType:
@@ -243,15 +246,16 @@ func generateRecipe(insideType prog.StructType) ([]*FlatHandler, error) {
 					TypeName:    "char",
 					FieldName:   field.Name,
 					FieldOffset: fieldOffset,
-					TypeSize:    createSizable(uint64(min)),
+					TypeSize:    1,
 				}
 
 				flat.Aggregates[field.Name] = &BuiltinArrayAggregate{
 					AggregateCommon: *common,
+					ArraySize:       createSizable(uint64(min)),
 				}
 			}
 
-			fieldOffset += calculateActualSize(field.Type).Size
+			fieldOffset += calculateActualSize(field.Type)
 		}
 
 		// syzlang specifications says len[] it can point to a
@@ -285,18 +289,20 @@ func generateRecipe(insideType prog.StructType) ([]*FlatHandler, error) {
 				TypeName:    aggregate.Name(),
 				FieldName:   aggregate.Field(),
 				FieldOffset: aggregate.Offset(),
-				TypeSize:    lengthWrapper,
+				TypeSize:    aggregate.Size(),
 			}
 
-			switch aggregate.(type) {
+			switch aggregate := aggregate.(type) {
 			case *RecordArrayAggregate:
 				flat.Aggregates[t.Path[0]] = &RecordArrayAggregate{
 					AggregateCommon: *common,
-					IsUnion:         aggregate.(*RecordArrayAggregate).IsUnion,
+					IsUnion:         aggregate.IsUnion,
+					ArraySize:       lengthWrapper,
 				}
 			case *BuiltinArrayAggregate:
 				flat.Aggregates[t.Path[0]] = &BuiltinArrayAggregate{
 					AggregateCommon: *common,
+					ArraySize:       lengthWrapper,
 				}
 			}
 		}
@@ -307,21 +313,17 @@ func generateRecipe(insideType prog.StructType) ([]*FlatHandler, error) {
 	return recipeTypes, nil
 }
 
-func calculateActualSize(typ prog.Type) IntegerSize {
+func calculateActualSize(typ prog.Type) uint64 {
 	var size uint64 = 0
 
 	if typ.Varlen() {
 		fields, _ := getRecordFields(typ)
 		for _, field := range fields {
-			size += calculateActualSize(field.Type).Size
+			size += calculateActualSize(field.Type)
 		}
 	} else {
 		size = typ.Size()
 	}
 
-	intSize := IntegerSize{
-		Size: size,
-	}
-
-	return intSize
+	return size
 }
