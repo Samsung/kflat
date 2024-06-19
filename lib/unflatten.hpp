@@ -76,6 +76,13 @@ public:
 	void unload();
 
 	/**
+	 * @brief Mark pointer as freed by some external code. This prevents double frees when image is unloaded.
+	 * 
+	 * @param mptr already freed pointer
+	 */
+	void mark_freed(void *mptr);
+
+	/**
 	 * @brief retrieve the pointer to the next flattened object
 	 * 
 	 * @return generic pointer to flattened object
@@ -202,6 +209,14 @@ void* unflatten_root_pointer_seq(CUnflatten flatten, size_t idx);
  * @return void* 	generic pointer to the named flattened object or NULL
  */
 void* unflatten_root_pointer_named(CUnflatten flatten, const char* name, size_t* size);
+
+/**
+ * @brief Mark pointer as freed by some external code. This prevents double frees when image is unloaded.
+ * 
+ * @param flatten library instance
+ * @param mptr already freed pointer
+ */
+void unflatten_mark_freed(CUnflatten flatten, void *mptr);
 
 /**
  * @brief Retrieve the pointer to the flatten image header structure

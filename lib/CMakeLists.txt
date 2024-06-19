@@ -21,10 +21,12 @@ set_target_properties(ExecFlat_obj PROPERTIES POSITION_INDEPENDENT_CODE ON)
 # STATIC
 add_library(ExecFlat_static STATIC $<TARGET_OBJECTS:ExecFlat_obj>)
 set_target_properties(ExecFlat_static PROPERTIES OUTPUT_NAME ExecFlat)
+target_include_directories(ExecFlat_static PUBLIC ${KFLAT_INCLUDES})
 
 # SHARED
 add_library(ExecFlat_shared SHARED $<TARGET_OBJECTS:ExecFlat_obj>)
 set_target_properties(ExecFlat_shared PROPERTIES OUTPUT_NAME ExecFlat)
+target_include_directories(ExecFlat_shared PUBLIC ${KFLAT_INCLUDES})
 
 # Custom ExecFlat target that compiles both dynamic and static version of ExecFlat
 add_custom_target(ExecFlat DEPENDS ExecFlat_static ExecFlat_shared)
@@ -49,12 +51,12 @@ target_include_directories(uflat_obj PUBLIC ${UFLAT_INCLUDES})
 # STATIC
 add_library(uflat_static STATIC $<TARGET_OBJECTS:uflat_obj>)
 set_target_properties(uflat_static PROPERTIES OUTPUT_NAME uflat)
-target_link_libraries(uflat_static PUBLIC)
+target_include_directories(uflat_static PUBLIC ${UFLAT_INCLUDES})
 
 # SHARED
 add_library(uflat_shared SHARED $<TARGET_OBJECTS:uflat_obj>)
 set_target_properties(uflat_shared PROPERTIES OUTPUT_NAME uflat)
-target_link_libraries(uflat_shared PUBLIC)
+target_include_directories(uflat_shared PUBLIC ${UFLAT_INCLUDES})
 
 # Custom uflat target that compiles both dynamic and static version of uflat
 add_custom_target(uflat DEPENDS uflat_static uflat_shared)
@@ -74,10 +76,12 @@ set_target_properties(unflatten_obj PROPERTIES POSITION_INDEPENDENT_CODE ON)
 # STATIC
 add_library(unflatten_static STATIC $<TARGET_OBJECTS:unflatten_obj>)
 set_target_properties(unflatten_static PROPERTIES OUTPUT_NAME unflatten)
+target_include_directories(unflatten_static PUBLIC ${UNFLATTEN_INCLUDES})
 
 # SHARED
 add_library(unflatten_shared SHARED $<TARGET_OBJECTS:unflatten_obj>)
 set_target_properties(unflatten_shared PROPERTIES OUTPUT_NAME unflatten)
+target_include_directories(unflatten_shared PUBLIC ${UNFLATTEN_INCLUDES})
 
 # Custom unflatten target that compiles both dynamic and static version of unflatten
 add_custom_target(unflatten DEPENDS unflatten_static unflatten_shared)

@@ -23,6 +23,7 @@
 #include <string>
 #include <stdexcept>
 #include <set>
+#include <unordered_set>
 
 #include "unflatten.hpp"
 
@@ -103,6 +104,7 @@ private:
 
 	std::map<std::string, std::pair<size_t, size_t>> root_addr_map;
 	std::map<uintptr_t,std::string> fptrmap;
+	std::unordered_set<void *> already_freed;
 	
 	struct timeval timeS;
 
@@ -964,7 +966,10 @@ public:
 			// Don't call `interval_tree_remove` here - it might trigger rebalance and 
 			//  invalidate iterator. The tree is going to be removed completely so it's
 			//  sufficient to just clear imap_root at the end
-			free(node->mptr);
+			if (already_freed.find(node->mptr) == already_freed.end())
+				free(node->mptr);
+
+
 			free(node);
 		}
 		memset(&FLCTRL.imap_root, 0, sizeof(struct rb_root_cached));
@@ -974,6 +979,10 @@ public:
 		FLCTRL.last_accessed_root = -1;
 		need_unload = false;
 		close_file();
+	}
+
+	void mark_freed(void *mptr) {
+		already_freed.insert(mptr);
 	}
 
 	void* get_next_root(void) {
@@ -1079,6 +1088,10 @@ int Unflatten::load(FILE* file, get_function_address_t gfa, bool continuous_mapp
 
 int Unflatten::info(FILE* file, const char* arg) {
 	return engine->imginfo(file,arg);
+}
+
+void Unflatten::mark_freed(void *mptr) {
+	return engine->mark_freed(mptr);
 }
 
 void Unflatten::unload() {
@@ -1204,6 +1217,14 @@ void* unflatten_root_pointer_named(CUnflatten flatten, const char* name, size_t*
 	} catch(...) {
 		fprintf(stderr, "[UnflattenLib] Failed to get named root pointer - exception occurred\n");
 		return NULL;
+	}
+}
+
+void unflatten_mark_freed(CUnflatten flatten, void *mptr) {
+	try {
+		((UnflattenEngine*)flatten)->mark_freed(mptr);
+	} catch (std::exception& ex) {
+		fprintf(stderr, "[UnflattenLib] Failed to mark pointer as freed - `%s`\n", ex.what());
 	}
 }
 
