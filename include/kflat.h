@@ -14,6 +14,7 @@
 #include "kflat_uapi.h"
 #include "kdump.h"
 #include "flatten.h"
+#include <linux/version.h>
 
 
 /*******************************
@@ -134,8 +135,22 @@ void kflat_get(struct kflat *kflat);
 void kflat_put(struct kflat *kflat);
 
 typedef unsigned long (*lookup_kallsyms_name_t)(const char* name);
+
+// Before this patch https://patchwork.kernel.org/project/linux-trace-kernel/patch/20221230112729.351-2-thunder.leizhen@huawei.com/
+#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 3, 0)
+typedef int (*module_kallsyms_on_each_symbol_t)(int (*fn)(void *, const char *, struct module *, unsigned long), void *data);
+typedef int (*kallsyms_on_each_symbol_t)(int (*fn)(void *, const char *, struct module *, unsigned long), void *data);
+// Before this patch https://patchwork.kernel.org/project/linux-trace-kernel/patch/20221230112729.351-4-thunder.leizhen@huawei.com/
+#elif LINUX_VERSION_CODE <= KERNEL_VERSION(6, 4, 0)
+typedef int (*module_kallsyms_on_each_symbol_t)(const char *modname, int (*fn)(void *, const char *,  struct module *, unsigned long), void *data);
+typedef int (*kallsyms_on_each_symbol_t)(int (*fn)(void *, const char *,  struct module *, unsigned long), void *data);
+// Newest kernels
+#else
 typedef int (*module_kallsyms_on_each_symbol_t)(const char *modname, int (*fn)(void *, const char *, unsigned long), void *data);
 typedef int (*kallsyms_on_each_symbol_t)(int (*fn)(void *, const char *, unsigned long), void *data);
+#endif
+
+
 extern lookup_kallsyms_name_t kflat_lookup_kallsyms_name;
 extern module_kallsyms_on_each_symbol_t kflat_module_kallsyms_on_each_symbol;
 extern kallsyms_on_each_symbol_t kflat_kallsyms_on_each_symbol;

@@ -52,7 +52,7 @@ EXPORT_SYMBOL_GPL(flatten_global_address_by_name);
 /***************************************************************
  * Detect compilier optimizations that shrink variables' size
 ***************************************************************/
-
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 4, 0)
 static int handler_check_ksym_size(void *data, const char *symbol_name, unsigned long symbol_value) {
     struct kflat_ksym *ksym = (struct kflat_ksym *) data;
 	if (ksym->address < symbol_value && symbol_value < ksym->address + ksym->expected_size) {
@@ -61,6 +61,16 @@ static int handler_check_ksym_size(void *data, const char *symbol_name, unsigned
 
     return 0;
 }
+#else
+static int handler_check_ksym_size(void *data, const char *symbol_name, struct module *mod, unsigned long symbol_value) {
+    struct kflat_ksym *ksym = (struct kflat_ksym *) data;
+	if (ksym->address < symbol_value && symbol_value < ksym->address + ksym->expected_size) {
+		return 1;
+	}
+
+    return 0;
+}
+#endif
 
 /*
  * 0 == no optimization detected
@@ -76,7 +86,12 @@ int flatten_validate_inmem_size(char *mod_name, unsigned long address, size_t ex
 		 * If handler_check_ksym_size returns non-zero, kflat_module_kallsyms_on_each_symbol breaks and returns the same status.
 		 * If handler_check_ksym_size always returns 0, kflat_module_kallsyms_on_each_symbol also returns 0 when it finishes iterating over all ksyms.
 		 */
+
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 3, 0)
 		return kflat_module_kallsyms_on_each_symbol(mod_name, handler_check_ksym_size, &ksym);
+#else 
+		return kflat_module_kallsyms_on_each_symbol(handler_check_ksym_size, &ksym);
+#endif
 	}
 
 	// If mod_name is NULL, seach through vmlinux globals

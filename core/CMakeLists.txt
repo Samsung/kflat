@@ -3,7 +3,7 @@ configure_file(Kbuild.in ${CMAKE_CURRENT_SOURCE_DIR}/Kbuild @ONLY)
 set(KFLAT_CORE kflat_core.ko)
 
 # Specify source files dependencies to track their modifications
-set(KFLAT_CORE_SOURCES kflat.c kdump.c flatten_impl.c probing_arm64.S probing_x86_64.S probing.c)
+set(KFLAT_CORE_SOURCES kflat.c kdump.c kflat_impl.c flatten_impl.c probing_arm64.S probing_x86_64.S probing.c)
 set(KFLAT_CORE_INCLUDES flatten_impl.h probing.h)
 file(GLOB KFLAT_INCLUDES ${CMAKE_SOURCE_DIR}/include/*.h)
 file(GLOB TEST_SOURCES ${CMAKE_SOURCE_DIR}/tests/*.c)
