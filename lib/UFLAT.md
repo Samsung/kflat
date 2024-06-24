@@ -8,11 +8,7 @@ same flattening engine as KFLAT making them similar in performance and functiona
 You can build only `libuflat.so` library (without building tests or Kflat kernel module) with `uflat` target.
 
 ```sh
-make uflat
-
-# or to cross-compile for other architecture
-
-make ARCH=arm64 uflat
+cmake --build . --target uflat
 ```
 
 ## API

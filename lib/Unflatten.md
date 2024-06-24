@@ -41,6 +41,13 @@ Unflatten::get_seq_root(size_t idx);
  *   (size_t*) size:  optional pointer to where the size of object will be stored
  */
 Unflatten::get_named_root(const char* name, size_t* size);
+
+/*
+* Mark pointer as freed by some external code. This prevents double frees when image is unloaded.
+* 
+*   (void *)   mptr:  already freed pointer
+*/
+Unflatten::mark_freed(void *mptr);
 ```
 
 ### C Interface
@@ -54,6 +61,7 @@ int unflatten_load(CUnflatten flatten, FILE* file, get_function_address_t gfa);
 void* unflatten_root_pointer_next(CUnflatten flatten);
 void* unflatten_root_pointer_seq(CUnflatten flatten, size_t idx);
 void* unflatten_root_pointer_named(CUnflatten flatten, const char* name, size_t* idx);
+void unflatten_mark_freed(CUnflatten flatten, void *mptr);
 ```
 
 Any exception thrown by underlying C++ code is caught and converted to `-1` or `NULL`, depending on the function return value type.
