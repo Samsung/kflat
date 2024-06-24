@@ -52,6 +52,10 @@ EXPORT_SYMBOL_GPL(flatten_global_address_by_name);
 /***************************************************************
  * Detect compilier optimizations that shrink variables' size
 ***************************************************************/
+/*
+ * We need the LINUX_VERSION_CODE ifdefs, because the signature of module_kallsyms_on_each_symbol changed in kernel 6.3 (char *mod_name was added as an argument).
+ * In kernel 6.4 the signature of the callback function changed as well.
+ */
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 4, 0)
 static int handler_check_ksym_size(void *data, const char *symbol_name, unsigned long symbol_value) {
     struct kflat_ksym *ksym = (struct kflat_ksym *) data;
