@@ -168,7 +168,7 @@ func createSizable(arg interface{}) Sizable {
 	return nil
 }
 
-func generateRecipe(insideType prog.StructType) ([]*FlatHandler, error) {
+func generateFlatteningFunctions(insideType prog.StructType) ([]*FlatHandler, error) {
 	types := deduceDependantTypes(&insideType)
 
 	// Add the root type as well
@@ -235,7 +235,7 @@ func generateRecipe(insideType prog.StructType) ([]*FlatHandler, error) {
 					continue
 				}
 
-				var min int = len(t.Values[0])
+				min := len(t.Values[0])
 				for _, value := range t.Values {
 					if min > len(value) {
 						min = len(value)

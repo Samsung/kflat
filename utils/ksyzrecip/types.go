@@ -167,3 +167,23 @@ func (p *FlatHandler) Definition() string {
 
 	return sb.String()
 }
+
+type TriggerFunction struct {
+	Name               string
+	FlattenedType      string
+	FlattenedSize      uint64
+	TargetFunctionName string
+	NodePath           string
+}
+
+func (p *TriggerFunction) Definition() string {
+	return fmt.Sprintf(`static void %s(struct kflat *kflat, struct probe_regs *regs) {
+	FOR_USER_ROOT_POINTER(regs->arg3,
+		FLATTEN_STRUCT_SELF_CONTAINED(%s, %d, (void *) regs->arg3);
+	);
+}`, p.Name, p.FlattenedType, p.FlattenedSize)
+}
+
+func (p *TriggerFunction) Declaration() string {
+	return fmt.Sprintf("KFLAT_RECIPE(\"%s\", %s),\n", p.TargetFunctionName, p.Name)
+}

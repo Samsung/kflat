@@ -50,7 +50,7 @@ func tryCompileFromPaths(descriptionFiles []string, constantFiles []string, arch
 		}
 
 		if len(constants) <= 0 || descriptions == nil {
-			return nil, nil, nil, errors.New("Neither descriptions nor constants got parsed")
+			return nil, nil, nil, errors.New("neither descriptions nor constants got parsed")
 		}
 
 		p = compiler.Compile(descriptions, constants, targets.List[targets.Linux][arch], func(pos ast.Pos, _ string) {

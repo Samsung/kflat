@@ -2,10 +2,12 @@
 package main
 
 import (
+	"encoding/json"
 	"flag"
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/google/syzkaller/prog"
 )
@@ -22,19 +24,11 @@ const (
 )
 
 var (
-	outputDir         string
-	syzArch           string
-	fokaPath          string
-	paths             []string
-	concatenateOutput bool
+	outputPath string
+	syzArch    string
+	fokaPath   string
+	paths      []string
 )
-
-func removeAllFilesInDirectory(path string) {
-	existingRecipes, _ := filepath.Glob(filepath.Join(outputDir, "*.c"))
-	for _, item := range existingRecipes {
-		os.RemoveAll(item)
-	}
-}
 
 func globFilesFromPaths(paths []string, glob string) []string {
 	var files []string = nil
@@ -51,11 +45,112 @@ func globFilesFromPaths(paths []string, glob string) []string {
 	return files
 }
 
+func stripModuleNames(name string) string {
+	if strings.Contains(name, " [") {
+		return strings.Split(name, " [")[0]
+	} else if strings.Contains(name, ".cfi_jt") {
+		return strings.Split(name, ".cfi_jt")[0]
+	}
+
+	return name
+}
+
+func generateRecipes(syscalls []*prog.Syscall, outputPath string, pathMap SyscallPathMap, foka Foka) {
+	var f *os.File = nil
+	usedRecipes := make(map[string]struct{})
+
+	f, err := os.Create(outputPath)
+	if err != nil {
+		panic(err)
+	}
+
+	f.WriteString(header)
+
+	triggers := make(map[string]TriggerFunction)
+	for _, syscall := range syscalls {
+		if syscall.CallName != "ioctl" || len(syscall.Args) < 3 {
+			continue
+		}
+
+		derefed, ok := syscall.Args[2].Type.(*prog.PtrType)
+		if !ok {
+			continue
+		}
+
+		inner, ok := derefed.Elem.(*prog.StructType)
+		if !ok {
+			continue
+		}
+
+		flats, err := generateFlatteningFunctions(*inner)
+		if err != nil {
+			continue
+		}
+
+		for _, flat := range flats {
+			if _, ok := usedRecipes[flat.Name]; ok {
+				continue
+			}
+
+			f.WriteString(flat.Declaration() + "\n")
+		}
+
+		f.WriteString("\n")
+
+		for _, flat := range flats {
+			if _, ok := usedRecipes[flat.Name]; ok {
+				continue
+			}
+
+			f.WriteString(flat.Definition() + "\n")
+
+			usedRecipes[flat.Name] = struct{}{}
+		}
+
+		paths := pathMap[syscall.Name]
+		path := paths[len(paths)-1]
+		if path[len(path)-1] == '\x00' {
+			path = path[:len(path)-1]
+		}
+
+		ioctlsByPath := foka[path].Ioctl
+		if len(ioctlsByPath) <= 0 {
+			panic("no foka paths for " + syscall.Name + " function")
+		}
+
+		originalName := stripModuleNames(ioctlsByPath[len(ioctlsByPath)-1])
+		triggers[originalName] = TriggerFunction{
+			Name:               "syz_trigger_" + originalName,
+			FlattenedType:      inner.TemplateName(),
+			FlattenedSize:      calculateActualSize(inner),
+			TargetFunctionName: originalName,
+			NodePath:           path,
+		}
+	}
+
+	f.WriteString("\n")
+
+	for _, t := range triggers {
+		f.WriteString(t.Definition())
+		f.WriteString("\n")
+	}
+
+	f.WriteString("KFLAT_RECIPE_LIST(\n")
+
+	for _, t := range triggers {
+		f.WriteString("\t")
+		f.WriteString(t.Declaration())
+	}
+
+	f.WriteString(");")
+
+	f.WriteString(`KFLAT_RECIPE_MODULE("Automatically generated kflat module from syzkaller recipes")`)
+}
+
 func init() {
-	flag.StringVar(&outputDir, "output", "recipes_out", "path to directory for generated recipes")
+	flag.StringVar(&outputPath, "output", "gen.c", "path to outputted file")
 	flag.StringVar(&syzArch, "arch", "arm64", "targeted arch of syzkaller descriptions (sizes or constants might differ) from sys/targets package")
 	flag.StringVar(&fokaPath, "foka", "foka_v2.json", "path to FOKA output")
-	flag.BoolVar(&concatenateOutput, "concatenate", true, "put all recipes to one file")
 
 	flag.Usage = func() {
 		out := flag.CommandLine.Output()
@@ -83,9 +178,6 @@ func main() {
 		os.Exit(0)
 	}
 
-	os.Mkdir(outputDir, 0775)
-	removeAllFilesInDirectory(outputDir)
-
 	descriptions := globFilesFromPaths(paths, "*.txt")
 	constants := globFilesFromPaths(paths, "*.const")
 
@@ -94,72 +186,17 @@ func main() {
 		panic(err)
 	}
 
-	var f *os.File = nil
-
-	if concatenateOutput {
-		var err error
-		f, err = os.Create(filepath.Join(outputDir, "recipes.c"))
-		if err != nil {
-			panic(err)
-		}
-
-		f.WriteString(header)
+	fokaFile, err := os.ReadFile(fokaPath)
+	if err != nil {
+		panic(err)
 	}
 
-	usedRecipes := make(map[string]struct{})
-	for _, sc := range syscalls {
-		if sc.CallName != "ioctl" || len(sc.Args) < 3 {
-			continue
-		}
-
-		derefed, ok := sc.Args[2].Type.(*prog.PtrType)
-		if !ok {
-			continue
-		}
-
-		inner, ok := derefed.Elem.(*prog.StructType)
-		if !ok {
-			continue
-		}
-
-		recipes, err := generateRecipe(*inner)
-		if err != nil {
-			continue
-		}
-
-		if !concatenateOutput {
-			f, err = os.Create(filepath.Join(outputDir, fmt.Sprintf("%s.c", inner.Name())))
-			if err != nil {
-				continue
-			}
-
-			f.WriteString(header)
-		}
-
-		for _, recipe := range recipes {
-			if concatenateOutput {
-				if _, ok := usedRecipes[recipe.Name]; ok {
-					continue
-				}
-			}
-
-			f.WriteString(recipe.Declaration() + "\n")
-		}
-
-		f.WriteString("\n")
-
-		for _, recipe := range recipes {
-			if concatenateOutput {
-				if _, ok := usedRecipes[recipe.Name]; ok {
-					continue
-				}
-			}
-
-			f.WriteString(recipe.Definition() + "\n")
-
-			if concatenateOutput {
-				usedRecipes[recipe.Name] = struct{}{}
-			}
-		}
+	var foka Foka = nil
+	err = json.Unmarshal(fokaFile, &foka)
+	if err != nil {
+		panic(err)
 	}
+
+	pathMap := createSyscallToPathMap(syscalls)
+	generateRecipes(syscalls, outputPath, pathMap, foka)
 }
