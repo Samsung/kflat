@@ -30,7 +30,6 @@
  * GLOBAL VARIABLES SUPPORT
  *******************************************************/
 lookup_kallsyms_name_t kflat_lookup_kallsyms_name;
-module_kallsyms_on_each_symbol_t kflat_module_kallsyms_on_each_symbol;
 kallsyms_on_each_symbol_t kflat_kallsyms_on_each_symbol;
 
 __nocfi void* flatten_global_address_by_name(const char* name) {
@@ -76,6 +75,71 @@ static int handler_check_ksym_size(void *data, const char *symbol_name, struct m
 }
 #endif
 
+static inline const char *kallsyms_symbol_name(struct mod_kallsyms *kallsyms, unsigned int symnum) {
+	return kallsyms->strtab + kallsyms->symtab[symnum].st_name;
+}
+
+/* Function was based on Linux kernel implementation found in kernel/module/kallsyms.c file */
+int kflat_module_kallsyms_on_each_symbol(const char *modname, ksym_handler_func_t fn, void *data) {
+	struct module *mod;
+	unsigned int i;
+	int ret = 0;
+
+	static struct mutex *module_mutex;
+	static struct list_head *modules;
+
+	if (module_mutex == NULL) {
+		module_mutex = (struct mutex *) kflat_lookup_kallsyms_name("module_mutex");
+	}
+
+	if (modules == NULL) {
+		modules = (struct list_head *) kflat_lookup_kallsyms_name("modules");
+	}
+
+	mutex_lock(module_mutex);
+	list_for_each_entry(mod, modules, list) {
+		struct mod_kallsyms *kallsyms;
+
+		if (mod->state == MODULE_STATE_UNFORMED)
+			continue;
+
+		if (modname && strcmp(modname, mod->name))
+			continue;
+
+		/* Use rcu_dereference_sched() to remain compliant with the sparse tool */
+		preempt_disable();
+		kallsyms = rcu_dereference_sched(mod->kallsyms);
+		preempt_enable();
+
+		for (i = 0; i < kallsyms->num_symtab; i++) {
+			const Elf_Sym *sym = &kallsyms->symtab[i];
+
+			if (sym->st_shndx == SHN_UNDEF)
+				continue;
+#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 4, 0)
+			ret = fn(data, kallsyms_symbol_name(kallsyms, i), mod,
+				 kallsyms_symbol_value(sym));
+#else
+			ret = fn(data, kallsyms_symbol_name(kallsyms, i),
+				 kallsyms_symbol_value(sym));
+#endif
+			if (ret != 0)
+				goto out;
+		}
+
+		/*
+		 * The given module is found, the subsequent modules do not
+		 * need to be compared.
+		 */
+		if (modname)
+			break;
+	}
+out:
+	mutex_unlock(module_mutex);
+	return ret;
+}
+
+
 /*
  * 0 == no optimization detected
  * 1 == optimization detected
@@ -90,12 +154,7 @@ int flatten_validate_inmem_size(char *mod_name, unsigned long address, size_t ex
 		 * If handler_check_ksym_size returns non-zero, kflat_module_kallsyms_on_each_symbol breaks and returns the same status.
 		 * If handler_check_ksym_size always returns 0, kflat_module_kallsyms_on_each_symbol also returns 0 when it finishes iterating over all ksyms.
 		 */
-
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 3, 0)
 		return kflat_module_kallsyms_on_each_symbol(mod_name, handler_check_ksym_size, &ksym);
-#else 
-		return kflat_module_kallsyms_on_each_symbol(handler_check_ksym_size, &ksym);
-#endif
 	}
 
 	// If mod_name is NULL, seach through vmlinux globals

@@ -41,5 +41,10 @@ and therefore might be distributed under GNU General Public License v.2 or any
 later version.
 Please see include/uflat_bsp.h file for details.
 
+The implementation of C function kflat_module_kallsyms_on_each_symbol was based on the
+Linux kernel function module_kallsyms_on_each_symbol and therefore might be distributed 
+under GNU General Public License v.2 or any later version.
+Please see core/kflat_impl.c file for details.
+
 The implementation of C++ argument parser was taken from p-ranav/argparse <https://github.com/p-ranav/argparse> repository.
 Please see lib/argparse.hpp file for details

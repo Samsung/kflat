@@ -136,23 +136,18 @@ void kflat_put(struct kflat *kflat);
 
 typedef unsigned long (*lookup_kallsyms_name_t)(const char* name);
 
-// Before this patch https://patchwork.kernel.org/project/linux-trace-kernel/patch/20221230112729.351-2-thunder.leizhen@huawei.com/
-#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 3, 0)
-typedef int (*module_kallsyms_on_each_symbol_t)(int (*fn)(void *, const char *, struct module *, unsigned long), void *data);
-typedef int (*kallsyms_on_each_symbol_t)(int (*fn)(void *, const char *, struct module *, unsigned long), void *data);
 // Before this patch https://patchwork.kernel.org/project/linux-trace-kernel/patch/20221230112729.351-4-thunder.leizhen@huawei.com/
-#elif LINUX_VERSION_CODE <= KERNEL_VERSION(6, 4, 0)
-typedef int (*module_kallsyms_on_each_symbol_t)(const char *modname, int (*fn)(void *, const char *,  struct module *, unsigned long), void *data);
-typedef int (*kallsyms_on_each_symbol_t)(int (*fn)(void *, const char *,  struct module *, unsigned long), void *data);
+#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 4, 0)
+typedef int (*ksym_handler_func_t)(void *, const char *,  struct module *, unsigned long);
 // Newest kernels
 #else
-typedef int (*module_kallsyms_on_each_symbol_t)(const char *modname, int (*fn)(void *, const char *, unsigned long), void *data);
-typedef int (*kallsyms_on_each_symbol_t)(int (*fn)(void *, const char *, unsigned long), void *data);
+typedef int (*ksym_handler_func_t)(void *, const char *, unsigned long);
 #endif
 
+typedef int (*kallsyms_on_each_symbol_t)(ksym_handler_func_t fn, void *data);
 
+int kflat_module_kallsyms_on_each_symbol(const char *modname, ksym_handler_func_t fn, void *data);
 extern lookup_kallsyms_name_t kflat_lookup_kallsyms_name;
-extern module_kallsyms_on_each_symbol_t kflat_module_kallsyms_on_each_symbol;
 extern kallsyms_on_each_symbol_t kflat_kallsyms_on_each_symbol;
 
 int flatten_validate_inmem_size(char *mod_name, unsigned long address, size_t expected_size);
