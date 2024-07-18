@@ -24,7 +24,7 @@ extern "C" {
 #include "flatten.h"
 #include "funcsymsutils.h"
 
-#define UFLAT_DEFAULT_OUTPUT_SIZE (50ULL * 1024 * 1024)
+#define UFLAT_DEFAULT_OUTPUT_SIZE (100ULL * 1024 * 1024)
 
 /*********************************
  * Exported types
@@ -55,6 +55,9 @@ enum uflat_options {
        load_continous is supported on such image) */
     UFLAT_OPT_SKIP_MEM_FRAGMENTS,
 
+    /* Do not copy memory during the flattening process (less memory used,
+       but make sure the memory won't change during the process) */
+    UFLAT_OPT_SKIP_MEM_COPY,
 
     UFLAT_OPT_MAX
 };
@@ -95,6 +98,15 @@ void uflat_fini(struct uflat* uflat);
  * @return int 0 on success, error code otherwise
  */
 int uflat_write(struct uflat* uflat);
+
+/**
+ * @brief Commit flattened image to file (assuming 'flatten_write' was called already)
+ *
+ * @param uflat pointer to uflat structure
+ * @return int 0 on success, error code otherwise
+ */
+
+int uflat_commit(struct uflat* uflat);
 
 #ifdef __cplusplus
 }

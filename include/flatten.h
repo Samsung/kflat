@@ -67,6 +67,7 @@ struct FLCONTROL {
 
 	int debug_flag;
 	int mem_fragments_skip;
+	int mem_copy_skip;
 };
 
 /* Fixup set */

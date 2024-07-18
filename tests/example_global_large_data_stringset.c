@@ -14,7 +14,7 @@
 #include "../lib/include_priv/rbtree.h"
 #endif
 
-struct largestring_node_atomic {
+struct largestring_global_node_atomic {
 	struct rb_node node;
 	char *s;
 };
@@ -25,22 +25,22 @@ struct largestring_node_atomic {
 
 static struct rb_root stringset_root = RB_ROOT;
 
-FUNCTION_DECLARE_FLATTEN_STRUCT(largestring_node_atomic);
+FUNCTION_DECLARE_FLATTEN_STRUCT(largestring_global_node_atomic);
 
-FUNCTION_DEFINE_FLATTEN_STRUCT(largestring_node_atomic,
+FUNCTION_DEFINE_FLATTEN_STRUCT(largestring_global_node_atomic,
 	STRUCT_ALIGN(4);
-	AGGREGATE_FLATTEN_STRUCT_EMBEDDED_POINTER(largestring_node_atomic, node.__rb_parent_color, ptr_clear_2lsb_bits, flatten_ptr_restore_2lsb_bits);
-	AGGREGATE_FLATTEN_STRUCT(largestring_node_atomic, node.rb_right);
-	AGGREGATE_FLATTEN_STRUCT(largestring_node_atomic, node.rb_left);
+	AGGREGATE_FLATTEN_STRUCT_EMBEDDED_POINTER(largestring_global_node_atomic, node.__rb_parent_color, ptr_clear_2lsb_bits, flatten_ptr_restore_2lsb_bits);
+	AGGREGATE_FLATTEN_STRUCT(largestring_global_node_atomic, node.rb_right);
+	AGGREGATE_FLATTEN_STRUCT(largestring_global_node_atomic, node.rb_left);
 	AGGREGATE_FLATTEN_STRING(s);
 );
 
-FUNCTION_DEFINE_FLATTEN_STRUCT_SPECIALIZE(atomic_largestringset,rb_root,
-	AGGREGATE_FLATTEN_STRUCT(largestring_node_atomic,rb_node);
+FUNCTION_DEFINE_FLATTEN_STRUCT_SPECIALIZE(atomic_largeglobalstringset,rb_root,
+	AGGREGATE_FLATTEN_STRUCT(largestring_global_node_atomic,rb_node);
 );
 
 static int stringset_insert(struct flat* flat, const char *s) {
-	struct largestring_node_atomic *data = flat_zalloc(flat,sizeof(struct largestring_node_atomic),1);
+	struct largestring_global_node_atomic *data = flat_zalloc(flat,sizeof(struct largestring_global_node_atomic),1);
 	struct rb_node **new, *parent = 0;
 	data->s = flat_zalloc(flat,strlen(s) + 1,1);
 	strcpy(data->s, s);
@@ -48,7 +48,7 @@ static int stringset_insert(struct flat* flat, const char *s) {
 
 	/* Figure out where to put new node */
 	while (*new) {
-		struct largestring_node_atomic *this = container_of(*new, struct largestring_node_atomic, node);
+		struct largestring_global_node_atomic *this = container_of(*new, struct largestring_global_node_atomic, node);
 
 		parent = *new;
 		if (strcmp(data->s, this->s) < 0)
@@ -77,12 +77,14 @@ static void stringset_destroy(struct rb_root *root) {
 	// TODO: flat_free
 }
 
-static int kflat_large_data_stringset_test(struct flat *flat) {
+static int kflat_large_global_data_stringset_test(struct flat *flat) {
 	
 	unsigned i, j, r = 0;
+	int rv = 0;
 	static const char chars[] = "ABCDEFGHIJKLMNOP";
 
 	FLATTEN_SETUP_TEST(flat);
+	flat->FLCTRL.mem_copy_skip = 1;
 	
 	for (j = 0; j < TREE_ELEMENT_COUNT; ++j) {
 		char *s = flat_zalloc(flat,TREE_ELEMENT_DATASIZE+1,1);
@@ -101,12 +103,17 @@ static int kflat_large_data_stringset_test(struct flat *flat) {
 	}
 
 	FOR_ROOT_POINTER(&stringset_root,
-		FLATTEN_STRUCT_SPECIALIZE(atomic_largestringset, rb_root, &stringset_root);
+		FLATTEN_STRUCT_SPECIALIZE(atomic_largeglobalstringset, rb_root, &stringset_root);
 	);
+
+    rv = flatten_write(flat);
+    if(rv != 0) {
+        FLATTEN_LOG_ERROR("Failed to write uflat image - flatten_write returned (%d)", rv);
+    }
 
 	stringset_destroy(&stringset_root);
 	stringset_root.rb_node = 0;
-	return 0;
+	return rv;
 }
 
 /********************************/
@@ -124,7 +131,7 @@ static size_t stringset_count(const struct rb_root *root) {
 	return count;
 }
 
-static int kflat_large_data_stringset_validate(void *memory, size_t size, CUnflatten flatten) {
+static int kflat_large_global_data_stringset_validate(void *memory, size_t size, CUnflatten flatten) {
 	const struct rb_root *root = (struct rb_root *)memory;
 	ASSERT(stringset_count(root) == TREE_ELEMENT_COUNT);
 
@@ -137,4 +144,4 @@ static int kflat_large_data_stringset_validate(void *memory, size_t size, CUnfla
 #endif /* __VALIDATOR__ */
 /********************************/
 
-KFLAT_REGISTER_TEST_FLAGS("LARGEDATA_STRINGSET", kflat_large_data_stringset_test, kflat_large_data_stringset_validate,KFLAT_TEST_ATOMIC);
+KFLAT_REGISTER_TEST_FLAGS("LARGEDATA_STRINGSET_SKIPMEMCPY", kflat_large_global_data_stringset_test, kflat_large_global_data_stringset_validate,KFLAT_TEST_ATOMIC);

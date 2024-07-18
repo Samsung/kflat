@@ -236,7 +236,15 @@ int run_test(struct args* args, const char* name) {
         goto exit;
     }
 
-    ret = uflat_write(uflat);
+    if (uflat->flat.FLCTRL.mem_copy_skip) {
+        /* When UFLAT_OPT_SKIP_MEM_COPY is used in the test
+            the user is responsible to call 'flatten_write'
+        */
+       ret = uflat_commit(uflat);
+    }
+    else {
+        ret = uflat_write(uflat);
+    }
     if(ret != 0) {
         log_error("failed to write UFLAT output");
         uflat_fini(uflat);

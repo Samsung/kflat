@@ -36,6 +36,8 @@ void* flat_zalloc(struct flat* flat, size_t size, size_t n) {
 	flat->mptrindex += alloc_size;
 	return ptr;
 #else
+	/* Let's see how much memory was allocated */
+	flat->mptrindex += size*n;
 	return FLATTEN_BSP_ZALLOC(size * n);
 #endif
 }
@@ -53,16 +55,18 @@ EXPORT_FUNC(flat_free);
  * BINARY STREAM
  *  List based implementation of expandable vector 
  ******************************************************/
-static struct blstream* create_binary_stream_element(struct flat* flat, size_t size) {
+static struct blstream* create_binary_stream_element(struct flat* flat, size_t size, int allocate_data) {
 	struct blstream* n;
-	void* m;
+	void* m = 0;
 	n = (struct blstream*) flat_zalloc(flat, sizeof(struct blstream), 1);
 	if (!n)
 		return 0;
-	m = flat_zalloc(flat, size, 1);
-	if (!m) {
-		flat_free(n);
-		return 0;
+	if (allocate_data) {
+		m = flat_zalloc(flat, size, 1);
+		if (!m) {
+			flat_free(n);
+			return 0;
+		}
 	}
 	n->data = m;
 	n->size = size;
@@ -71,18 +75,32 @@ static struct blstream* create_binary_stream_element(struct flat* flat, size_t s
 }
 
 struct blstream* binary_stream_append(struct flat* flat, const void* data, size_t size) {
-	struct blstream* v = create_binary_stream_element(flat, size);
+	struct blstream* v = create_binary_stream_element(flat, size, !flat->FLCTRL.mem_copy_skip);
 	if (!v)
 		return 0;
 	v->source = data;
-	hwasan_safe_memcpy(v->data,data,size);
+	if (!flat->FLCTRL.mem_copy_skip) {
+		hwasan_safe_memcpy(v->data,data,size);
+	}
 	list_add_tail(&v->head, &flat->FLCTRL.storage_head);
 	return v;
 }
 EXPORT_FUNC(binary_stream_append);
 
 static struct blstream* binary_stream_insert_front(struct flat* flat, const void* data, size_t size, struct blstream* where) {
-	struct blstream* v = create_binary_stream_element(flat, size);
+	struct blstream* v = create_binary_stream_element(flat, size, !flat->FLCTRL.mem_copy_skip);
+	if (!v)
+		return 0;
+	v->source = data;
+	if (!flat->FLCTRL.mem_copy_skip) {
+		hwasan_safe_memcpy(v->data, data, size);
+	}
+	list_add_tail(&v->head, &where->head);
+	return v;
+}
+
+static struct blstream* binary_stream_insert_padding_front(struct flat* flat, const void* data, size_t size, struct blstream* where) {
+	struct blstream* v = create_binary_stream_element(flat, size, 1);
 	if (!v)
 		return 0;
 	v->source = data;
@@ -91,13 +109,14 @@ static struct blstream* binary_stream_insert_front(struct flat* flat, const void
 	return v;
 }
 
-
 static struct blstream* binary_stream_insert_back(struct flat* flat, const void* data, size_t size, struct blstream* where) {
-	struct blstream* v = create_binary_stream_element(flat, size);
+	struct blstream* v = create_binary_stream_element(flat, size, !flat->FLCTRL.mem_copy_skip);
 	if (!v)
 		return 0;
 	v->source = data;
-	hwasan_safe_memcpy(v->data,data,size);
+	if (!flat->FLCTRL.mem_copy_skip) {
+		hwasan_safe_memcpy(v->data,data,size);
+	}
 	list_add(&v->head, &where->head);
 	return v;
 }
@@ -121,7 +140,7 @@ int binary_stream_calculate_index(struct flat* flat) {
 			if((uintptr_t)prev->source + prev->size < (uintptr_t) ptr->source) {
 				align = -index & (ptr->alignment - 1);
 				if (align != 0) {
-					v = binary_stream_insert_front(flat, padding, align, ptr);
+					v = binary_stream_insert_padding_front(flat, padding, align, ptr);
 					if (!v)
 						return ENOMEM;
 					v->index = index;
@@ -153,6 +172,17 @@ static int binary_stream_element_write(struct flat* flat, struct blstream* p, si
 	return 0;
 }
 
+static int binary_stream_element_write_from_source(struct flat* flat, struct blstream* p, size_t* wcounter_p) {
+	if (p->data) {
+		/* We can still have a copy of the padding data */
+		FLATTEN_WRITE_ONCE((unsigned char*)(p->data), p->size, wcounter_p);
+	}
+	else {
+		FLATTEN_WRITE_ONCE((unsigned char*)(p->source), p->size, wcounter_p);
+	}
+	return 0;
+}
+
 static void binary_stream_print(struct flat* flat) {
 	struct blstream* cp = NULL;
 	size_t total_size = 0;
@@ -169,9 +199,18 @@ static void binary_stream_print(struct flat* flat) {
 static size_t binary_stream_write(struct flat* flat, size_t* wcounter_p) {
 	int err;
 	struct blstream* cp = NULL;
-	list_for_each_entry(cp, &flat->FLCTRL.storage_head, head) {
-		if ((err = binary_stream_element_write(flat, cp, wcounter_p))!=0) {
-			return err;
+	if (!flat->FLCTRL.mem_copy_skip) {
+		list_for_each_entry(cp, &flat->FLCTRL.storage_head, head) {
+			if ((err = binary_stream_element_write(flat, cp, wcounter_p))!=0) {
+				return err;
+			}
+		}
+	}
+	else {
+		list_for_each_entry(cp, &flat->FLCTRL.storage_head, head) {
+			if ((err = binary_stream_element_write_from_source(flat, cp, wcounter_p))!=0) {
+				return err;
+			}
 		}
 	}
 	return 0;
@@ -218,6 +257,28 @@ static void binary_stream_update_pointers(struct flat* flat) {
     FLATTEN_LOG_DEBUG("Updated %d pointers\n\n",count);
 }
 
+static void binary_stream_update_pointers_inarea(struct flat* flat, void* memory_area) {
+	int count = 0;
+	size_t __ptr_offset;
+	struct blstream* __storage;
+	struct rb_node * p = rb_first(&flat->FLCTRL.fixup_set_root.rb_root);
+
+	FLATTEN_LOG_DEBUG("# Pointer update (in area)\n");
+	while(p) {
+		struct fixup_set_node* node = (struct fixup_set_node*)p;
+		if (node->ptr && (!IS_FIXUP_FPTR(node))) {
+			void* newptr = (unsigned char*)node->ptr->node->storage->index+node->ptr->offset + flat->FLCTRL.HDR.last_mem_addr;
+			DBGS("@ ptr update at ((%lx)%lx:%zu) : %lx => (A) %lx\n",(unsigned long)node->inode,(unsigned long)node->inode->start,node->offset,
+					(unsigned long)newptr,(unsigned long)(((unsigned char*)node->inode->storage->index)+node->offset));
+			__storage = node->inode->storage;
+			__ptr_offset = node->offset;
+			memcpy((unsigned char*)memory_area+__storage->index+__ptr_offset,(unsigned char*)&newptr,sizeof(void*));
+			count++;
+		}
+		p = rb_next(p);
+	}
+    FLATTEN_LOG_DEBUG("Updated %d pointers\n\n",count);
+}
 
 /*******************************************************
  * B-QUEUE
@@ -1214,6 +1275,7 @@ static uintptr_t get_mem_addr(struct FLCONTROL* FLCTRL) {
 
 static int flatten_write_internal(struct flat* flat, size_t* wcounter_p) {
 	int err = 0;
+	size_t memory_area_start;
 	struct root_addrnode* entry = NULL;
 
 	binary_stream_calculate_index(flat);
@@ -1239,7 +1301,9 @@ static int flatten_write_internal(struct flat* flat, size_t* wcounter_p) {
 	flat->FLCTRL.HDR.last_mem_addr = get_mem_addr(&flat->FLCTRL); 
     FLATTEN_WRITE_ONCE(&flat->FLCTRL.HDR, sizeof(struct flatten_header), wcounter_p);
 
-	binary_stream_update_pointers(flat);
+	if (!flat->FLCTRL.mem_copy_skip) {
+		binary_stream_update_pointers(flat);
+	}
 
 	list_for_each_entry(entry, &flat->FLCTRL.root_addr_head, head) {
 		size_t root_addr_offset;
@@ -1284,12 +1348,19 @@ static int flatten_write_internal(struct flat* flat, size_t* wcounter_p) {
 			return err;
 		}
 	}
+	memory_area_start = *wcounter_p;
 	if ((err = binary_stream_write(flat,wcounter_p))!=0) {
 		return err;
 	}
+
 	if ((err = fixup_set_fptr_info_write(flat, wcounter_p)) != 0) {
 		return err;
 	}
+
+	if (flat->FLCTRL.mem_copy_skip) {
+		binary_stream_update_pointers_inarea(flat,(unsigned char*)flat->area+memory_area_start);
+	}
+
     return 0;
 }
 
