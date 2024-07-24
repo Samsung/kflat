@@ -148,7 +148,7 @@ func generateRecipes(syscalls []*prog.Syscall, outputPath string, pathMap Syscal
 }
 
 func init() {
-	flag.StringVar(&outputPath, "output", "gen.c", "path to outputted file")
+	flag.StringVar(&outputPath, "output", "_gen.c", "path to outputted file")
 	flag.StringVar(&syzArch, "arch", "arm64", "targeted arch of syzkaller descriptions (sizes or constants might differ) from sys/targets package")
 	flag.StringVar(&fokaPath, "foka", "foka_v2.json", "path to FOKA output")
 
