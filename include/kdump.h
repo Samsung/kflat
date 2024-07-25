@@ -41,11 +41,13 @@ int kdump_init(void);
 void kdump_exit(void);
 
 void kdump_dump_vma(struct kdump_memory_map* kdump);
-int kdump_tree_remap(struct kdump_memory_map* kdump, struct vm_area_struct* vma);
 int kdump_tree_flatten(struct kdump_memory_map* kdump, void* __user buf, size_t buf_size);
 int kdump_tree_destroy(struct kdump_memory_map* kdump);
+#ifdef KFLAT_VM_TREE_SUPPORT
+int kdump_tree_remap(struct kdump_memory_map* kdump, struct vm_area_struct* vma);
 bool kdump_tree_contains(struct kdump_memory_map* kdump, uint64_t addr, size_t len);
 size_t kdump_tree_total_size(struct kdump_memory_map* kdump);
+#endif
 
 /**
  * @brief Check whether provided address range is valid

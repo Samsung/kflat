@@ -121,6 +121,7 @@ int kdump_tree_flatten(struct kdump_memory_map* kdump, void* __user buf, size_t 
     return 0;
 }
 
+#ifdef KFLAT_VM_TREE_SUPPORT
 int kdump_tree_remap(struct kdump_memory_map* kdump, struct vm_area_struct* vma) {
     int ret;
     int warned = 0;
@@ -183,6 +184,7 @@ size_t kdump_tree_total_size(struct kdump_memory_map* kdump) {
     }
     return size;
 }
+#endif
 
 /*******************************************************
  * LOW LEVEL STUFF

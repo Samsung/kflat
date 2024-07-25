@@ -623,6 +623,7 @@ exit:
 	return ret;
 }
 
+#ifdef KFLAT_VM_TREE_SUPPORT
 static int kflat_mmap_kdump(struct kflat* kflat, struct vm_area_struct* vma) {
 	int ret = 0;
 
@@ -632,6 +633,7 @@ static int kflat_mmap_kdump(struct kflat* kflat, struct vm_area_struct* vma) {
 
 	return ret;
 }
+#endif
 
 static int kflat_mmap(struct file* filep, struct vm_area_struct* vma) {
 	off_t off;
@@ -641,12 +643,18 @@ static int kflat_mmap(struct file* filep, struct vm_area_struct* vma) {
 
 	off = vma->vm_pgoff;
 	vma->vm_pgoff = 0;
-	if(off == KFLAT_MMAP_FLATTEN)
-		return kflat_mmap_flatten(kflat, vma);
-	else if(off == KFLAT_MMAP_KDUMP)
-		return kflat_mmap_kdump(kflat, vma);
-	else
-		return -EINVAL;
+	switch(off) {
+		case KFLAT_MMAP_FLATTEN:
+			return kflat_mmap_flatten(kflat, vma);
+		
+#ifdef KFLAT_VM_TREE_SUPPORT
+		case KFLAT_MMAP_KDUMP:
+			return kflat_mmap_kdump(kflat, vma);
+#endif
+
+		default:
+			return -EINVAL;
+	}
 }
 
 static __poll_t kflat_poll(struct file *filep, struct poll_table_struct *wait) {
