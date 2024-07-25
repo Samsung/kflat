@@ -72,7 +72,7 @@ SYM_CODE_START(raw_probing_delegate)
 
 1:
     mov $0, %rax;
-    ret
+    RET
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(5, 4, 76)
 END(raw_probing_delegate)
