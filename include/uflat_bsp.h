@@ -40,7 +40,7 @@
 #define LINEAR_MEMORY_ALLOCATOR					0
 
 #undef FLAT_MAX_TIME_NS
-#define FLAT_MAX_TIME_NS						(600 * NSEC_PER_SEC)
+#define FLAT_MAX_TIME_NS						(3600 * NSEC_PER_SEC)
 
 /* Funcs decl */
 void uflat_info_log_print(const char* fmt, ...);
