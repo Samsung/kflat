@@ -8,9 +8,9 @@
 
 struct validate_global_size_results {
 	bool test_global_address;
-    bool test_global_address_shifted;
-    bool test_module_global_address;
-    bool test_module_global_address_shifted;
+	bool test_global_address_shifted;
+	bool test_module_global_address;
+	bool test_module_global_address_shifted;
 };
 
 /********************************/
@@ -23,17 +23,16 @@ FUNCTION_DEFINE_FLATTEN_STRUCT(validate_global_size_results);
 
 static int kflat_global_size_unit_test(struct flat *flat) {
 	struct validate_global_size_results results = { 0 };
-    unsigned long kernel_test_global_addr = (unsigned long)flatten_global_address_by_name("modules_disabled");
-
-
-	// Stop copiler from optimizing this global
-	memset((void*) &kflat_test_size_global, 0, sizeof(kflat_test_size_global));
+	unsigned long kernel_test_global_addr = (unsigned long)flatten_global_address_by_name("modules_disabled");
 
 	FLATTEN_SETUP_TEST(flat);
 
+	// Stop copiler from optimizing this global
+	memset((void*) &kflat_test_size_global, 0, sizeof(kflat_test_size_global));
+	
 	results.test_global_address = (flatten_validate_inmem_size(NULL, kernel_test_global_addr, sizeof(int)) == 0);
 	results.test_global_address_shifted = (flatten_validate_inmem_size(NULL, kernel_test_global_addr - 1, sizeof(int)) == 1);
-    
+	
 	results.test_module_global_address = (flatten_validate_inmem_size("kflat_core", (unsigned long) &kflat_test_size_global, sizeof(kflat_test_size_global)) == 0);
 	results.test_module_global_address_shifted = (flatten_validate_inmem_size("kflat_core", (unsigned long) &kflat_test_size_global - 1, sizeof(kflat_test_size_global)) == 1);
 
