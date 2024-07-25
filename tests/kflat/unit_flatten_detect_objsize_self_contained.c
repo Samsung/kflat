@@ -53,7 +53,7 @@ static int kflat_flatten_detect_objsize_self_contained_unit_test(struct flat *fl
 		FLATTEN_STRUCT_SELF_CONTAINED(mere_pointers_sc, sizeof(struct mere_pointers_sc), &ptrs);
 	);
 
-	return 0;
+	return FLATTEN_FINISH_TEST(flat);
 }
 
 /********************************/

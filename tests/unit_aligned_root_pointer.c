@@ -61,7 +61,7 @@ static int kflat_aligned_root_pointers_test(struct flat *flat) {
 		FLATTEN_STRUCT(test_structure, &test5);
 	);
 
-	return 0;
+	return FLATTEN_FINISH_TEST(flat);
 }
 
 /********************************/

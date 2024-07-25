@@ -47,6 +47,8 @@ static int kflat_list_test(struct flat *flat) {
 		FLATTEN_STRUCT_ARRAY(myLongList, &myhead, 1);
 	);
 
+	err = FLATTEN_FINISH_TEST(flat);
+
 	while (!list_empty(&myhead.v)) {
 		struct myLongList *entry = list_entry(myhead.v.next, struct myLongList, v);
 		list_del(myhead.v.next);

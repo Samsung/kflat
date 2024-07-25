@@ -27,13 +27,20 @@ struct B {
 
 FUNCTION_DEFINE_FLATTEN_STRUCT(B);
 
-static int kflat_test(struct kflat *kflat) {
+static int kflat_test(struct flat *flat) {
+	int rv;
 	struct B b = { 0x123 };
 
+	FLATTEN_SETUP_TEST(flat);
 	FOR_ROOT_POINTER(&b,
 		FLATTEN_STRUCT(B, &b);
 	);
-	return 0;
+	rv = FLATTEN_FINISH_TEST(flat);
+	
+	// Release any allocated memory here:
+	// ...
+
+	return rv;
 }
 
 /**************************/

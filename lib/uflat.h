@@ -99,15 +99,6 @@ void uflat_fini(struct uflat* uflat);
  */
 int uflat_write(struct uflat* uflat);
 
-/**
- * @brief Commit flattened image to file (assuming 'flatten_write' was called already)
- *
- * @param uflat pointer to uflat structure
- * @return int 0 on success, error code otherwise
- */
-
-int uflat_commit(struct uflat* uflat);
-
 #ifdef __cplusplus
 }
 #endif

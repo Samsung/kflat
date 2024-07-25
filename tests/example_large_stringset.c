@@ -78,6 +78,7 @@ static void stringset_destroy(struct rb_root *root) {
 
 static int kflat_large_stringset_test(struct flat *flat) {
 	
+	int err;
 	unsigned i, j;
 	static const char chars[] = "ABCDEFGHIJKLMNOPQRST";
 	unsigned long r = 0;
@@ -97,9 +98,11 @@ static int kflat_large_stringset_test(struct flat *flat) {
 		FLATTEN_STRUCT_SPECIALIZE(atomic_stringset, rb_root, &stringset_root);
 	);
 
+	err = FLATTEN_FINISH_TEST(flat);
+
 	stringset_destroy(&stringset_root);
 	stringset_root.rb_node = 0;
-	return 0;
+	return err;
 }
 
 /********************************/

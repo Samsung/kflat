@@ -108,6 +108,8 @@ static int kflat_flatten_detect_vmalloc_size_unit_test(struct flat *flat) {
 		FLATTEN_STRUCT(flatten_detect_vmalloc_size_test, &test);
 	);
 
+	err = FLATTEN_FINISH_TEST(flat);
+
 out:
 	kfree(test.heap_ptr_1);
 	kfree(test.heap_ptr_2);

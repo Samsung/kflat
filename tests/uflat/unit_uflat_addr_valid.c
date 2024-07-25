@@ -28,6 +28,7 @@ struct unit_addr_valid_test {
 FUNCTION_DEFINE_FLATTEN_STRUCT(unit_addr_valid_test);
 
 static int flatten_unit_addr_valid_test(struct flat *flat) {
+	int rv;
 	struct unit_addr_valid_test results = {0};
 
 	// Test uflat_test_addr_range function
@@ -63,11 +64,13 @@ static int flatten_unit_addr_valid_test(struct flat *flat) {
 		FLATTEN_STRUCT(unit_addr_valid_test, &results);
 	);
 
+	rv = FLATTEN_FINISH_TEST(flat);
+
 	munmap(non_read_mem, 4096);
 	munmap(valid, 4096);
 	munmap(test2, 4096);
 	munmap(test, 4096);
-	return 0;
+	return rv;
 }
 
 /********************************/

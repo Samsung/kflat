@@ -53,7 +53,7 @@ static int kflat_flatten_detect_objsize_unit_test(struct flat *flat) {
 		FLATTEN_STRUCT(mere_pointers, &ptrs);
 	);
 
-	return 0;
+	return FLATTEN_FINISH_TEST(flat);
 }
 
 /********************************/

@@ -83,7 +83,7 @@ static int kflat_fptr_test(struct flat *flat) {
 		FLATTEN_STRUCT_SELF_CONTAINED(fptr_test_struct_2, sizeof(struct fptr_test_struct_2), &fptrs_sc);
 	);
 
-	return 0;
+	return FLATTEN_FINISH_TEST(flat);
 }
 
 /********************************/

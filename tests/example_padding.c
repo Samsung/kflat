@@ -56,7 +56,7 @@ static int kflat_padding_test(struct flat *flat) {
 		FLATTEN_STRUCT(paddingRoot, &r);
 	);
 
-	return 0;
+	return FLATTEN_FINISH_TEST(flat);
 }
 
 /********************************/

@@ -38,7 +38,7 @@ int kflat_record_pointer_test(struct flat *flat) {
 		FLATTEN_STRUCT_ARRAY(iptr, &pv2, 1);
 	);
 
-	return 0;
+	return FLATTEN_FINISH_TEST(flat);
 }
 
 /********************************/

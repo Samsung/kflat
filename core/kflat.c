@@ -400,8 +400,6 @@ int kflat_run_test(struct kflat* kflat, struct kflat_ioctl_tests* test) {
 #endif
 
 			flat_infos("@Flatten done: %d\n",kflat->flat.error);
-			if (!kflat->flat.error && !err)
-				err = flatten_write(&kflat->flat);
 			flatten_fini(&kflat->flat);
 			
 			// On success, return the size of flattened memory

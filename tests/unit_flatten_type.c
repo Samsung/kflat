@@ -50,7 +50,7 @@ static int kflat_flatten_type_unit_test(struct flat *flat) {
         FLATTEN_STRUCT(tpX,&x);
     );
 
-	return 0;
+	return FLATTEN_FINISH_TEST(flat);
 }
 
 /********************************/

@@ -69,7 +69,7 @@ static int kflat_struct_variant_test(struct flat *flat) {
 		FLATTEN_STRUCT(audio_device, &main_device);
 	);
 
-	return 0;
+	return FLATTEN_FINISH_TEST(flat);
 }
 
 /********************************/

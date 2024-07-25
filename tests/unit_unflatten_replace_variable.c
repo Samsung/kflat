@@ -98,7 +98,7 @@ static int kflat_unflatten_replace_unit_test(struct flat *flat) {
 		);
 	);
 
-	return 0;
+	return FLATTEN_FINISH_TEST(flat);
 }
 
 /********************************/

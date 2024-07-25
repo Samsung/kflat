@@ -28,7 +28,7 @@ static int kflat_pointer_test(struct flat *flat) {
 		);
 	);
 
-	return 0;
+	return FLATTEN_FINISH_TEST(flat);
 }
 
 /********************************/

@@ -37,7 +37,7 @@ static int kflat_global_addr_unit_test(struct flat *flat) {
 		FLATTEN_STRUCT(get_global_result, &results);
 	);
 
-	return 0;
+	return FLATTEN_FINISH_TEST(flat);
 }
 
 /********************************/

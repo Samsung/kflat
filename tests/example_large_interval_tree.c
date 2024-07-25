@@ -69,15 +69,15 @@ FUNCTION_DEFINE_FLATTEN_STRUCT(my_interval_tree_map,
 
 static int kflat_large_interval_tree_test(struct flat *flat) {
 	
+	int rv;
 	unsigned j;
-	unsigned long i=0;
 	unsigned char *bytes = flat_zalloc(flat,INTERVAL_COUNT*10,1);
 	FLATTEN_SETUP_TEST(flat);
 	interval_tree_map.imap_root.rb_root = RB_ROOT;
 
 	for (j = 0; j < INTERVAL_COUNT; ++j) {
 		struct my_interval_tree_node* node = flat_zalloc(flat,sizeof(*node),1);
-	    node->start = i+bytes[j*10];
+	    node->start = bytes[j*10];
 	    node->end = node->start+bytes[j*10+1]-1;
 	    node->phys_addr = *((uint64_t*)&bytes[j*10+2]);;
 	    my_interval_tree_insert(node, &interval_tree_map.imap_root);
@@ -89,9 +89,11 @@ static int kflat_large_interval_tree_test(struct flat *flat) {
 		FLATTEN_STRUCT(my_interval_tree_map, &interval_tree_map);
 	);
 
+	rv = FLATTEN_FINISH_TEST(flat);
+
 	interval_tree_map.imap_root.rb_root = RB_ROOT;
 	// TODO: flat_free
-	return 0;
+	return rv;
 }
 
 /********************************/

@@ -99,7 +99,7 @@ static int kflat_structarray_example(struct flat *flat) {
 		FLATTEN_STRUCT(MM, &obM);
 	);
 
-	return 0;
+	return FLATTEN_FINISH_TEST(flat);
 }
 
 /********************************/

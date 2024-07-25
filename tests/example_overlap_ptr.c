@@ -34,7 +34,6 @@ FUNCTION_DEFINE_FLATTEN_STRUCT_TYPE(my_A,
 );
 
 static int kflat_overlapptr_test(struct flat *flat) {
-	int err = 0;
 	my_B arrB[4] = { { 1 }, { 2 }, { 3 }, { 4 } };
 	my_A T[3] = { {}, { 0, &arrB[0], &arrB[1], &arrB[2], &arrB[3], "p in struct A" }, {} };
 	unsigned char *p;
@@ -50,7 +49,7 @@ static int kflat_overlapptr_test(struct flat *flat) {
 		FLATTEN_STRUCT_TYPE(my_A, &T[1]);
 	);
 
-	return err;
+	return FLATTEN_FINISH_TEST(flat);
 }
 
 /********************************/

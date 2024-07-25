@@ -147,6 +147,8 @@ static int kflat_list_complex_test(struct flat *flat) {
 		FLATTEN_STRUCT_SPECIALIZE(self_contained, cvec, &vec2);
 	);
 
+	err = FLATTEN_FINISH_TEST(flat);
+
 	while (!list_empty(&vec.head)) {
 		struct complexnode *entry = list_entry(vec.head.next, struct complexnode, link);
 		list_del(vec.head.next);

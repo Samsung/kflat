@@ -70,7 +70,7 @@ static int kflat_flatten_struct_type_array_unit_test(struct flat *flat) {
 		FLATTEN_STRUCT_TYPE_ARRAY(box_t, box, 100000000);
 	);
 
-	return 0;
+	return FLATTEN_FINISH_TEST(flat);
 }
 
 /********************************/

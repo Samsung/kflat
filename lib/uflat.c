@@ -222,20 +222,6 @@ int uflat_write(struct uflat* uflat) {
     return 0;
 }
 
-int uflat_commit(struct uflat* uflat) {
-    int rv = 0;
-
-    if(uflat == NULL)
-        return -EFAULT;
-
-    size_t to_write = ((struct flatten_header*)uflat->out_mem)->image_size;
-    rv = ftruncate(uflat->out_fd, to_write);
-    if(rv)
-        FLATTEN_LOG_ERROR("Failed to truncute output file to its final size - %s", strerror(errno));
-    FLATTEN_LOG_DEBUG("Saved uflat image of size %zu bytes", to_write);
-
-    return 0;
-}
 
 /*
  * Debug logging

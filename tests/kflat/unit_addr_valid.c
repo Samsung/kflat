@@ -82,7 +82,7 @@ static int kflat_addr_valid_unit_test(struct flat *flat) {
 		FLATTEN_STRUCT(addr_valid_result, &results);
 	);
 
-	return 0;
+	return FLATTEN_FINISH_TEST(flat);
 }
 
 /********************************/

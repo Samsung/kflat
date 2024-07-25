@@ -77,7 +77,7 @@ static int kflat_fragment_test(struct flat *flat) {
 		FLATTEN_STRUCT(P,&stack.obP);
 	);
 
-	return 0;
+	return FLATTEN_FINISH_TEST(flat);
 }
 
 /********************************/

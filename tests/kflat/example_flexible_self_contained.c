@@ -69,7 +69,7 @@ FUNCTION_DEFINE_FLATTEN_STRUCT_FLEXIBLE(flexsc_G,
 );
 
 static int kflat_flexible_self_contained_test(struct flat *flat) {
-	int get_obj_supported;
+	int get_obj_supported, rv;
 	struct flexsc_A *a;
 	struct flexsc_C *c;
 	struct flexsc_E *e;
@@ -126,11 +126,13 @@ static int kflat_flexible_self_contained_test(struct flat *flat) {
 	);
 #endif
 
+	rv = FLATTEN_FINISH_TEST(flat);
+
 	kfree(a);
 	kfree(c);
 	kfree(e);
 	kfree(g);
-	return 0;
+	return rv;
 }
 
 /********************************/

@@ -120,7 +120,7 @@ static void strset_destroy(struct rb_root *root) {
 }
 
 static int kflat_rbtree_example(struct flat *flat) {
-	int i;
+	int i, err;
 	struct rb_root iroot = RB_ROOT;
 	struct rb_root sroot = RB_ROOT;
 	struct myTreeNode tarr[15] = {};
@@ -155,11 +155,13 @@ static int kflat_rbtree_example(struct flat *flat) {
 		FLATTEN_STRUCT_ARRAY_SPECIALIZE(sroot, rb_root, &sroot, 1);
 	);
 
+	err = FLATTEN_FINISH_TEST(flat);
+
 	strset_destroy(&sroot);
 	intset_destroy(&iroot);
 	iroot.rb_node = sroot.rb_node = 0;
 
-	return 0;
+	return err;
 }
 
 /********************************/

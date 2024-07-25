@@ -103,6 +103,7 @@ B_t g_B[4] = { {"ABC"},{"DEF"},{"GHI"},{"JKL"} };
 
 static int kflat_flatten_embedded_pointer_unit_test(struct flat *flat) {
 
+	int rv;
 	B_t Bnfo[5] = { {info[0]},{info[1]},{info[2]},{info[3]},{info[4]}, };
 	struct EC Cnfo[5] = { {info[0]},{info[1]},{info[2]},{info[3]},{info[4]}, };
 	struct FC crr[40] = {};
@@ -154,11 +155,13 @@ static int kflat_flatten_embedded_pointer_unit_test(struct flat *flat) {
 		FLATTEN_STRUCT_TYPE_ARRAY_SELF_CONTAINED(B_t,sizeof(B_t),&g_B,4);
 	);
 
+	rv = FLATTEN_FINISH_TEST(flat);
+
 	for (int i=0; i<40; ++i) {
 		FLATTEN_BSP_FREE(crr[i].s);
 	}
 
-	return 0;
+	return rv;
 }
 
 /********************************/

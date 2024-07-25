@@ -55,7 +55,7 @@ static int kflat_flatten_struct_array_specialize_unit_test(struct flat *flat) {
 		FLATTEN_STRUCT_ARRAY_SPECIALIZE(magic, spec_array, &spec_magic, 1);
 	);
 
-	return 0;
+	return FLATTEN_FINISH_TEST(flat);
 }
 
 /********************************/

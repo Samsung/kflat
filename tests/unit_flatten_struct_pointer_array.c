@@ -41,7 +41,7 @@ static int kflat_flatten_struct_pointer_array_unit_test(struct flat *flat) {
     	)
 	);
 
-	return 0;
+	return FLATTEN_FINISH_TEST(flat);
 }
 
 /********************************/

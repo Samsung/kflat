@@ -6,8 +6,8 @@
 
 #include "common.h"
 
-#define TREE_ELEMENT_COUNT	50
-#define TREE_ELEMENT_DATASIZE	(1024*1024)
+#define TREE_ELEMENT_COUNT		2000
+#define TREE_ELEMENT_DATASIZE	8000
 
 #if defined(__VALIDATOR__) && !defined(__TESTER__)
 #include <stdbool.h>
@@ -79,6 +79,7 @@ static void stringset_destroy(struct rb_root *root) {
 
 static int kflat_large_data_stringset_test(struct flat *flat) {
 	
+	int rv;
 	unsigned i, j, r = 0;
 	static const char chars[] = "ABCDEFGHIJKLMNOP";
 
@@ -104,9 +105,11 @@ static int kflat_large_data_stringset_test(struct flat *flat) {
 		FLATTEN_STRUCT_SPECIALIZE(atomic_largestringset, rb_root, &stringset_root);
 	);
 
+	rv = FLATTEN_FINISH_TEST(flat);
+
 	stringset_destroy(&stringset_root);
 	stringset_root.rb_node = 0;
-	return 0;
+	return rv;
 }
 
 /********************************/

@@ -42,7 +42,7 @@ static int kflat_flatten_union_unit_test(struct flat *flat) {
         FLATTEN_STRUCT(my_unions,&mu);
     );
 
-	return 0;
+	return FLATTEN_FINISH_TEST(flat);
 }
 
 /********************************/

@@ -39,7 +39,7 @@ static int kflat_simple_test(struct flat *flat) {
 		FLATTEN_STRUCT(A, pA);
 	);
 
-	return 0;
+	return FLATTEN_FINISH_TEST(flat);
 }
 
 /********************************/

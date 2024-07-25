@@ -125,6 +125,8 @@ static int kflat_list_for_each_entry_test(struct flat *flat) {
 		FLATTEN_STRUCT_SPECIALIZE(self_contained, ivec, &vec2);
 	);
 
+	err = FLATTEN_FINISH_TEST(flat);
+
 	while (!list_empty(&vec.head)) {
 		struct intnode *entry = list_entry(vec.head.next, struct intnode, link);
 		list_del(vec.head.next);

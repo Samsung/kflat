@@ -76,6 +76,7 @@ static void free_circle(struct figure *circle) {
 }
 
 static int kflat_circle_test(struct flat *flat) {
+	int rv;
 	struct figure circle;
 
 	FLATTEN_SETUP_TEST(flat);
@@ -87,8 +88,10 @@ static int kflat_circle_test(struct flat *flat) {
 		FLATTEN_STRUCT(figure, &circle);
 	);
 
+	rv = FLATTEN_FINISH_TEST(flat);
+
 	free_circle(&circle);
-	return 0;
+	return rv;
 }
 
 /********************************/

@@ -34,6 +34,7 @@ FUNCTION_DEFINE_FLATTEN_STRUCT_TYPE_SELF_CONTAINED(typeA, sizeof(typeA),
 FUNCTION_DEFINE_FLATTEN_STRUCT_TYPE_SELF_CONTAINED(typeL, sizeof(typeL));
 
 static int kflat_flatten_struct_type_self_contained_unit_test(struct flat *flat) {
+	int rv;
 	typeB str = { "CDF" };
 	typeA obj = { 0xCAFECAFE, &str };
 	typeA *pA = &obj;
@@ -53,8 +54,10 @@ static int kflat_flatten_struct_type_self_contained_unit_test(struct flat *flat)
 		FLATTEN_STRUCT_TYPE_SELF_CONTAINED(typeL, sizeof(typeL), large);
 	);
 
+	rv = FLATTEN_FINISH_TEST(flat);
+
 	FLATTEN_BSP_FREE(large);
-	return 0;
+	return rv;
 }
 
 /********************************/

@@ -96,6 +96,8 @@ static int kflat_global_list_for_each_entry_test(struct flat *flat) {
 		}
 	);
 
+	err = FLATTEN_FINISH_TEST(flat);
+
 	while (!list_empty(&gvec)) {
 		struct intnodeg *entry = list_entry(gvec.next, struct intnodeg, link);
 		list_del(gvec.next);

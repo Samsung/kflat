@@ -34,6 +34,7 @@ FUNCTION_DEFINE_FLATTEN_STRUCT_SELF_CONTAINED(unit_sc_A, sizeof(struct unit_sc_A
 FUNCTION_DEFINE_FLATTEN_STRUCT_SELF_CONTAINED(unit_sc_Large, sizeof(struct unit_sc_Large));
 
 static int kflat_flatten_struct_self_contained_unit_test(struct flat *flat) {
+	int err;
 	struct unit_sc_B str = { "CDF" };
 	struct unit_sc_A obj = { 0xCAFECAFE, &str };
 	struct unit_sc_A *pA = &obj;
@@ -53,8 +54,10 @@ static int kflat_flatten_struct_self_contained_unit_test(struct flat *flat) {
 		FLATTEN_STRUCT_SELF_CONTAINED(unit_sc_Large, sizeof(struct unit_sc_Large), large);
 	);
 
+	err = FLATTEN_FINISH_TEST(flat);
+
 	FLATTEN_BSP_VMA_FREE(large, 4096);
-	return 0;
+	return err;
 }
 
 /********************************/

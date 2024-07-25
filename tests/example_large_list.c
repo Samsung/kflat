@@ -34,6 +34,8 @@ static int kflat_large_list_test(struct flat *flat) {
 	int i, err = 0;
 	struct list_head *head;
 	struct myLongLargeList myhead = { -1 };
+	struct myLongLargeList *cur, *tmp;
+
 	FLATTEN_SETUP_TEST(flat);
 
 	INIT_LIST_HEAD(&myhead.v);
@@ -49,11 +51,13 @@ static int kflat_large_list_test(struct flat *flat) {
 		FLATTEN_STRUCT_ARRAY(myLongLargeList, &myhead, 1);
 	);
 
-	while (!list_empty(&myhead.v)) {
-		list_del(myhead.v.next);
+	err = FLATTEN_FINISH_TEST(flat);
+
+	list_for_each_entry_safe(cur, tmp, &myhead.v, v) {
+		list_del(&cur->v);
+		flat_free(cur);
 	}
 
-	// TODO: flat_free
 	return err;
 }
 

@@ -92,7 +92,7 @@ static int kflat_pointer_array_test(struct flat *flat) {
 	
 	#endif
 
-	return 0;
+	return FLATTEN_FINISH_TEST(flat);
 }
 
 /********************************/

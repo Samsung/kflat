@@ -135,7 +135,7 @@ static int kflat_flatten_struct_storage_self_contained_unit_test(struct flat *fl
         FLATTEN_STRUCT(SAS, &sa);
     );
 
-	return 0;
+	return FLATTEN_FINISH_TEST(flat);
 }
 
 /********************************/

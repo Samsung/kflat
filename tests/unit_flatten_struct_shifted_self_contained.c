@@ -55,7 +55,7 @@ static int kflat_flatten_struct_shifted_self_contained_unit_test(struct flat *fl
 		FLATTEN_STRUCT_TYPE_SHIFTED_SELF_CONTAINED(product_sc_t, sizeof(product_sc_t), dev2, -offsetof(product_sc_t,dev));
 	);
 
-	return 0;
+	return FLATTEN_FINISH_TEST(flat);
 }
 
 /********************************/

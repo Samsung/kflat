@@ -32,6 +32,7 @@ FUNCTION_DEFINE_FLATTEN_STRUCT(unit_A);
 FUNCTION_DEFINE_FLATTEN_STRUCT(Large);
 
 static int kflat_flatten_struct_unit_test(struct flat *flat) {
+	int rv;
 	struct unit_B str = { "ABC" };
 	struct unit_A obj = { 0x0000404F, &str };
 	struct unit_A *pA = &obj;
@@ -51,8 +52,10 @@ static int kflat_flatten_struct_unit_test(struct flat *flat) {
 		FLATTEN_STRUCT(Large, large);
 	);
 
+	rv = FLATTEN_FINISH_TEST(flat);
+
 	FLATTEN_BSP_FREE(large);
-	return 0;
+	return rv;
 }
 
 /********************************/

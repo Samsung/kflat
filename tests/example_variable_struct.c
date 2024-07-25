@@ -96,7 +96,7 @@ static int kflat_variable_struct_example(struct flat *flat) {
         FLATTEN_STRUCT_SELF_CONTAINED(iommu_base, sizeof(uint32_t), &data);
     );
 
-    return 0;
+    return FLATTEN_FINISH_TEST(flat);
 }
 
 /********************************/

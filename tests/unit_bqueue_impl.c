@@ -115,7 +115,7 @@ static int kflat_bqueue_impl_unit_test(struct flat *flat) {
 		FLATTEN_STRUCT(bqueue_impl_result, &results);
 	);
 
-	return 0;
+	return FLATTEN_FINISH_TEST(flat);
 }
 
 /********************************/

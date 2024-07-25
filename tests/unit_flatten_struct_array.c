@@ -54,7 +54,7 @@ static int kflat_flatten_struct_array_unit_test(struct flat *flat) {
 		FLATTEN_STRUCT_ARRAY(container, box, 10000);
 	);
 
-	return 0;
+	return FLATTEN_FINISH_TEST(flat);
 }
 
 /********************************/

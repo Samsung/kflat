@@ -72,7 +72,7 @@ static int kflat_get_cma_object_unit_test(struct flat *flat) {
 		FLATTEN_STRUCT(get_cma_obj_result, &results);
 	);
 
-	return 0;
+	return FLATTEN_FINISH_TEST(flat);
 }
 
 /********************************/

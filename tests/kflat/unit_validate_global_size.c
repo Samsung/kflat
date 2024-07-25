@@ -44,7 +44,7 @@ static int kflat_global_size_unit_test(struct flat *flat) {
 		FLATTEN_STRUCT(validate_global_size_results, &results);
 	);
 
-	return 0;
+	return FLATTEN_FINISH_TEST(flat);
 }
 
 /********************************/

@@ -40,6 +40,7 @@ FUNCTION_DEFINE_FLATTEN_STRUCT_SELF_CONTAINED(self_str_ex_container, sizeof(stru
 );
 
 static int kflat_flatten_string_ex_unit_test(struct flat *flat) {
+	int rv;
 	char *long_str = (char *)vmalloc(PAGE_SIZE * 2);
 	char *long_str2 = (char *)vmalloc(PAGE_SIZE * 2);
 	char* unterminated_str = (char *) vmalloc(PAGE_SIZE);
@@ -75,10 +76,12 @@ static int kflat_flatten_string_ex_unit_test(struct flat *flat) {
 		FLATTEN_STRUCT_SELF_CONTAINED(self_str_ex_container, sizeof(struct self_str_ex_container), &str2);
 	);
 
+	rv = FLATTEN_FINISH_TEST(flat);
+
 	vfree(long_str);
 	vfree(long_str2);
 	vfree(unterminated_str);
-	return 0;
+	return rv;
 }
 
 /********************************/

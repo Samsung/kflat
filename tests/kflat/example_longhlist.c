@@ -50,8 +50,8 @@ FUNCTION_DEFINE_FLATTEN_STRUCT_SELF_CONTAINED(myLongHList, sizeof(struct myLongH
 );
 
 static int kflat_longhlist_test(struct flat *flat) {
+	int i, j, rv;
 	struct hlist_head harr[5];
-	int i, j;
 	struct hlist_node *p;
 
 	FLATTEN_SETUP_TEST(flat);
@@ -84,6 +84,8 @@ static int kflat_longhlist_test(struct flat *flat) {
 		}
 	);
 
+	rv = FLATTEN_FINISH_TEST(flat);
+
 	for (i = 0; i < 5; ++i) {
 		while (!hlist_empty(&harr[i])) {
 			struct myLongHList *entry = hlist_entry(harr[i].first, struct myLongHList, r);
@@ -92,8 +94,8 @@ static int kflat_longhlist_test(struct flat *flat) {
 		}
 	}
 
-	return 0;
-	}
+	return rv;
+}
 
 /********************************/
 #endif /* __TESTER__ */

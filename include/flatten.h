@@ -261,7 +261,7 @@ static inline void destroy_flatten_pointer(struct flatten_pointer* fp) {
 	}					\
 	memcpy((char*)flat->area+(*(wcounter_p)),addr,wsize);	\
 	*wcounter_p+=wsize;			\
-} while(0);
+} while(0)
 
 
 #define PTRNODE(PTRV)	(interval_tree_iter_first(&flat->FLCTRL.imap_root, (uintptr_t)(PTRV), (uintptr_t)(PTRV)))

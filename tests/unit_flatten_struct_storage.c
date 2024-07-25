@@ -60,7 +60,7 @@ static int kflat_flatten_struct_storage_unit_test(struct flat *flat) {
         FLATTEN_STRUCT(SA, &sa);
     );
 
-	return 0;
+	return FLATTEN_FINISH_TEST(flat);
 }
 
 /********************************/

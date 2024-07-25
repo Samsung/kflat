@@ -54,7 +54,7 @@ static int kflat_flatten_struct_type_array_self_contained_unit_test(struct flat 
 		FLATTEN_STRUCT_ARRAY_SELF_CONTAINED(iter_box, sizeof(box_t), box, 10000);
 	);
 
-	return 0;
+	return FLATTEN_FINISH_TEST(flat);
 }
 
 /********************************/

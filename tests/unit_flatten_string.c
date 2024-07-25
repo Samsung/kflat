@@ -56,6 +56,7 @@ FUNCTION_DEFINE_FLATTEN_STRUCT_SELF_CONTAINED(self_str_container, sizeof(struct 
 );
 
 static int kflat_flatten_string_unit_test(struct flat *flat) {
+	int rv;
 	char *long_str = (char *)FLATTEN_BSP_ZALLOC(PAGE_SIZE * 2);
 	char *long_str2 = (char *)FLATTEN_BSP_ZALLOC(PAGE_SIZE * 2);
 	char* unterminated_str = (char *) FLATTEN_BSP_ZALLOC(PAGE_SIZE);
@@ -109,10 +110,12 @@ static int kflat_flatten_string_unit_test(struct flat *flat) {
 		FLATTEN_STRUCT_SELF_CONTAINED(self_str_container, sizeof(struct self_str_container), &str2);
 	);
 
+	rv = FLATTEN_FINISH_TEST(flat);
+
 	FLATTEN_BSP_FREE(long_str);
 	FLATTEN_BSP_FREE(long_str2);
 	FLATTEN_BSP_FREE(unterminated_str);
-	return 0;
+	return rv;
 }
 
 /********************************/

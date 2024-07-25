@@ -55,7 +55,7 @@ static int kflat_flatten_struct_shifted_unit_test(struct flat *flat) {
 		FLATTEN_STRUCT_TYPE_SHIFTED(product_t, dev2, -offsetof(product_t,dev));
 	);
 
-	return 0;
+	return FLATTEN_FINISH_TEST(flat);
 }
 
 /********************************/

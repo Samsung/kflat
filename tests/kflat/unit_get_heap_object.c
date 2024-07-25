@@ -93,7 +93,7 @@ static int kflat_get_heap_object_unit_test(struct flat *flat) {
 		FLATTEN_STRUCT(get_heap_obj_result, &results);
 	);
 
-	return 0;
+	return FLATTEN_FINISH_TEST(flat);
 }
 
 /********************************/

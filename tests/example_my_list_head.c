@@ -45,7 +45,6 @@ FUNCTION_DEFINE_FLATTEN_STRUCT(my_task_struct,
 );
 
 static int kflat_overlaplist_test(struct flat *flat) {
-	int err = 0;
 	struct my_task_struct T;
 	struct intermediate IM = { &T.u };
 
@@ -60,7 +59,7 @@ static int kflat_overlaplist_test(struct flat *flat) {
 		FLATTEN_STRUCT(my_task_struct, &T);
 	);
 
-	return err;
+	return FLATTEN_FINISH_TEST(flat);
 }
 
 /********************************/

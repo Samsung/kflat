@@ -58,7 +58,7 @@ static int kflat_aggregate_struct_shifted_unit_test(struct flat *flat) {
         FLATTEN_STRUCT_TYPE(storage_for_shifted_t, &tstorage_for_shifted);
     );
 
-    return 0;
+    return FLATTEN_FINISH_TEST(flat);
 }
 
 /********************************/

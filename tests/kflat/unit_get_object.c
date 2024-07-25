@@ -116,7 +116,7 @@ static int kflat_get_object_unit_test(struct flat *flat) {
 		FLATTEN_STRUCT(get_obj_result, &results);
 	);
 
-	return 0;
+	return FLATTEN_FINISH_TEST(flat);
 }
 
 /********************************/

@@ -17,17 +17,18 @@
 #ifdef __TESTER__
 /********************************/
 
+/* Macro called at the START of each test - extract valid opaque type */
 #ifdef FLATTEN_KERNEL_BSP
 #include <kflat.h>
 
 #define FLATTEN_SETUP_TEST(FLAT)    \
-                        struct kflat* kflat = container_of(flat, struct kflat, flat)
+                        struct kflat* kflat = container_of(FLAT, struct kflat, flat)
 
 #elif defined(FLATTEN_USERSPACE_BSP)
 #include <uflat.h>
 
 #define FLATTEN_SETUP_TEST(FLAT)    \
-                        struct uflat* uflat = container_of(flat, struct uflat, flat)
+                        struct uflat* uflat = container_of(FLAT, struct uflat, flat)
 #define PAGE_SIZE       (4096)
 
 #else
@@ -35,7 +36,33 @@
 
 #endif /* FLATTEN_KERNEL_BSP */
 
-// Stubs for __TESTER__ purpose
+
+/* Macro called at the END of each test - write flattened image to destination buffer */
+#ifdef FLATTEN_KERNEL_BSP
+#define FLATTEN_FINISH_TEST(FLAT)       \
+    ({                                  \
+        int rv = FLAT->error;           \
+        if(FLAT->error == 0) {          \
+            rv = flatten_write(FLAT);   \
+            if(rv != 0)                 \
+                FLATTEN_LOG_ERROR("Failed to write flattened image - flatten_write returned (%d)", rv); \
+        }                               \
+        rv;                             \
+    })
+#elif defined(FLATTEN_USERSPACE_BSP)
+#define FLATTEN_FINISH_TEST(FLAT)       \
+    ({                                  \
+        int rv = FLAT->error;           \
+        if(FLAT->error == 0) {          \
+            rv = uflat_write(uflat);    \
+            if(rv != 0)                 \
+                FLATTEN_LOG_ERROR("Failed to write flattened image - flatten_write returned (%d)", rv); \
+        }                               \
+        rv;                             \
+    })
+#endif
+
+/* Stubs for __TESTER__ purpose */
 #ifndef __VALIDATOR__
 typedef void* CUnflatten;
 typedef uintptr_t (*get_function_address_t)(const char* fsym);

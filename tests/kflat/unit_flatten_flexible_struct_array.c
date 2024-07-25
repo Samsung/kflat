@@ -91,6 +91,7 @@ FUNCTION_DEFINE_FLATTEN_STRUCT_TYPE_FLEXIBLE_SPECIALIZE(newimpl,sound_core_t,
 );
 
 static int kflat_flexible_struct_array_test(struct flat *flat) {
+	int rv;
 	struct sound_core* core;
 	sound_core_t* core2;
 	struct sound_core* core3;
@@ -274,6 +275,8 @@ static int kflat_flexible_struct_array_test(struct flat *flat) {
 	);
 #endif
 
+	rv = FLATTEN_FINISH_TEST(flat);
+
 	for(int i = 0; i < core->amps_count; i++)
 		kfree(core->amps[i].name);
 	kfree(core);
@@ -298,7 +301,7 @@ static int kflat_flexible_struct_array_test(struct flat *flat) {
 		kfree(core6->amps[i].name);
 	kfree(core6);
 
-	return 0;
+	return rv;
 }
 
 /********************************/

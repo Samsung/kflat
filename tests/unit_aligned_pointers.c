@@ -70,6 +70,8 @@ static int unit_aligned_pointers_test(struct flat *flat) {
 		FLATTEN_STRUCT(alignment_structure, &test1);
 	);
 
+	ret = FLATTEN_FINISH_TEST(flat);
+
 exit:
 	FLATTEN_BSP_FREE(test1.data->test_string);
 	FLATTEN_BSP_FREE(test1.data->test_numbers);

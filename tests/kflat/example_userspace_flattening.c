@@ -160,6 +160,8 @@ __nocfi static int userspace_flattening_test(struct flat *flat) {
         FLATTEN_STRUCT(outer_struct, kouter[1]);
     );
 
+    err = FLATTEN_FINISH_TEST(flat);
+
 
     for (int i = 0; i < 2; i++) {
         err = vm_munmap((unsigned long) uouter[i], sizeof(struct outer_struct));
