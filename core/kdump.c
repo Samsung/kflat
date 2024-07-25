@@ -132,7 +132,7 @@ int kdump_tree_remap(struct kdump_memory_map* kdump, struct vm_area_struct* vma)
     if(vma->vm_flags & (VM_WRITE | VM_EXEC))
         return -EPERM;
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 3, 0) && !defined(CONFIG_ANDROID_VENDOR_OEM_DATA)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 3, 0)
     vma->vm_flags |= VM_IO | VM_PFNMAP | VM_DONTEXPAND | VM_DONTDUMP;
     vma->vm_flags &= ~VM_MAYWRITE;
 #else
