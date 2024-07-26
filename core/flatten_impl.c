@@ -55,68 +55,60 @@ EXPORT_FUNC(flat_free);
  * BINARY STREAM
  *  List based implementation of expandable vector 
  ******************************************************/
-static struct blstream* create_binary_stream_element(struct flat* flat, size_t size, int allocate_data) {
-	struct blstream* n;
-	void* m = 0;
-	n = (struct blstream*) flat_zalloc(flat, sizeof(struct blstream), 1);
-	if (!n)
+static struct blstream* create_binary_stream_element(struct flat* flat, size_t size) {
+	void* memory = NULL;
+	struct blstream* node;
+
+	node = (struct blstream*) flat_zalloc(flat, sizeof(struct blstream), 1);
+	if (node == NULL)
 		return 0;
-	if (allocate_data) {
-		m = flat_zalloc(flat, size, 1);
-		if (!m) {
-			flat_free(n);
+	
+	if (!flat->FLCTRL.mem_copy_skip) {
+		memory = flat_zalloc(flat, size, 1);
+		if (memory == NULL) {
+			flat_free(node);
 			return 0;
 		}
 	}
-	n->data = m;
-	n->size = size;
-	INIT_LIST_HEAD(&n->head);
-	return n;
+
+	node->data = memory;
+	node->size = size;
+	INIT_LIST_HEAD(&node->head);
+	return node;
 }
 
-struct blstream* binary_stream_append(struct flat* flat, const void* data, size_t size) {
-	struct blstream* v = create_binary_stream_element(flat, size, !flat->FLCTRL.mem_copy_skip);
-	if (!v)
+static struct blstream* binary_stream_append(struct flat* flat, const void* data, size_t size) {
+	struct blstream* v = create_binary_stream_element(flat, size);
+	if (v == NULL)
 		return 0;
+
 	v->source = data;
-	if (!flat->FLCTRL.mem_copy_skip) {
+	if (!flat->FLCTRL.mem_copy_skip)
 		hwasan_safe_memcpy(v->data,data,size);
-	}
 	list_add_tail(&v->head, &flat->FLCTRL.storage_head);
 	return v;
 }
-EXPORT_FUNC(binary_stream_append);
 
 static struct blstream* binary_stream_insert_front(struct flat* flat, const void* data, size_t size, struct blstream* where) {
-	struct blstream* v = create_binary_stream_element(flat, size, !flat->FLCTRL.mem_copy_skip);
-	if (!v)
+	struct blstream* v = create_binary_stream_element(flat, size);
+	if (v == NULL)
 		return 0;
-	v->source = data;
-	if (!flat->FLCTRL.mem_copy_skip) {
-		hwasan_safe_memcpy(v->data, data, size);
-	}
-	list_add_tail(&v->head, &where->head);
-	return v;
-}
 
-static struct blstream* binary_stream_insert_padding_front(struct flat* flat, const void* data, size_t size, struct blstream* where) {
-	struct blstream* v = create_binary_stream_element(flat, size, 1);
-	if (!v)
-		return 0;
 	v->source = data;
-	hwasan_safe_memcpy(v->data, data, size);
+	if (!flat->FLCTRL.mem_copy_skip)
+		hwasan_safe_memcpy(v->data, data, size);
 	list_add_tail(&v->head, &where->head);
 	return v;
 }
 
 static struct blstream* binary_stream_insert_back(struct flat* flat, const void* data, size_t size, struct blstream* where) {
-	struct blstream* v = create_binary_stream_element(flat, size, !flat->FLCTRL.mem_copy_skip);
-	if (!v)
+	struct blstream* v = create_binary_stream_element(flat, size);
+	if (v == NULL)
 		return 0;
+
 	v->source = data;
-	if (!flat->FLCTRL.mem_copy_skip) {
-		hwasan_safe_memcpy(v->data,data,size);
-	}
+	if (!flat->FLCTRL.mem_copy_skip)
+		hwasan_safe_memcpy(v->data, data, size);
 	list_add(&v->head, &where->head);
 	return v;
 }
@@ -125,7 +117,7 @@ static struct blstream* binary_stream_insert_back(struct flat* flat, const void*
 int binary_stream_calculate_index(struct flat* flat) {
 	struct blstream *ptr = NULL, *v;
 	size_t index = 0;
-	unsigned char padding[128] = {0};
+	static unsigned char padding[128] = {0};
 
 	list_for_each_entry(ptr, &flat->FLCTRL.storage_head, head) {
 		size_t align = 0;
@@ -140,7 +132,7 @@ int binary_stream_calculate_index(struct flat* flat) {
 			if((uintptr_t)prev->source + prev->size < (uintptr_t) ptr->source) {
 				align = -index & (ptr->alignment - 1);
 				if (align != 0) {
-					v = binary_stream_insert_padding_front(flat, padding, align, ptr);
+					v = binary_stream_insert_front(flat, padding, align, ptr);
 					if (!v)
 						return ENOMEM;
 					v->index = index;
@@ -168,18 +160,11 @@ static void binary_stream_destroy(struct flat* flat) {
 }
 
 static int binary_stream_element_write(struct flat* flat, struct blstream* p, size_t* wcounter_p) {
-	FLATTEN_WRITE_ONCE((unsigned char*)(p->data), p->size, wcounter_p);
-	return 0;
-}
-
-static int binary_stream_element_write_from_source(struct flat* flat, struct blstream* p, size_t* wcounter_p) {
-	if (p->data) {
-		/* We can still have a copy of the padding data */
+	if(p->data)
 		FLATTEN_WRITE_ONCE((unsigned char*)(p->data), p->size, wcounter_p);
-	}
-	else {
+	else
+		/* flat->FLCTRL.mem_copy_skip is set - copy memory directly from source*/
 		FLATTEN_WRITE_ONCE((unsigned char*)(p->source), p->size, wcounter_p);
-	}
 	return 0;
 }
 
@@ -199,18 +184,9 @@ static void binary_stream_print(struct flat* flat) {
 static size_t binary_stream_write(struct flat* flat, size_t* wcounter_p) {
 	int err;
 	struct blstream* cp = NULL;
-	if (!flat->FLCTRL.mem_copy_skip) {
-		list_for_each_entry(cp, &flat->FLCTRL.storage_head, head) {
-			if ((err = binary_stream_element_write(flat, cp, wcounter_p))!=0) {
-				return err;
-			}
-		}
-	}
-	else {
-		list_for_each_entry(cp, &flat->FLCTRL.storage_head, head) {
-			if ((err = binary_stream_element_write_from_source(flat, cp, wcounter_p))!=0) {
-				return err;
-			}
+	list_for_each_entry(cp, &flat->FLCTRL.storage_head, head) {
+		if ((err = binary_stream_element_write(flat, cp, wcounter_p))!=0) {
+			return err;
 		}
 	}
 	return 0;
