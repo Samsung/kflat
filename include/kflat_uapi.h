@@ -33,6 +33,7 @@ struct kflat_ioctl_disable {
 struct kflat_ioctl_tests {
 	int debug_flag;
 	int use_stop_machine;
+	int skip_memcpy;
 	char test_name[128];
 };
 

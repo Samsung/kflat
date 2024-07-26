@@ -35,7 +35,7 @@ struct args {
     bool imginfo;
     bool continuous;
     bool verbose;
-    bool stop_machine;
+    bool skip_memcpy;
     const char* output_dir;
 };
 
@@ -221,6 +221,8 @@ int run_test(struct args* args, const char* name) {
         uflat_set_option(uflat, UFLAT_OPT_DEBUG, 1);
     if(args->verbose)
         uflat_set_option(uflat, UFLAT_OPT_VERBOSE, 1);
+    if(args->skip_memcpy)
+        uflat_set_option(uflat, UFLAT_OPT_SKIP_MEM_COPY, 1);
 
     flat_test_case_handler_t handler = get_test_handler(name);
     if(handler == NULL) {
@@ -360,6 +362,7 @@ static struct argp_option options[] = {
     {"image-info", 'i', 0, 0, "Print image information before validation"},
     {"continuous", 'c', 0, 0, "Load memory image in continuous fashion during validation"},
     {"verbose", 'v', 0, 0, "More verbose logs"},
+    {"single-buffer", 'b', 0, 0, "Don't copy memory to temporary buffer during flattening"},
     { 0 }
 };
 
@@ -387,6 +390,9 @@ static error_t parse_opt(int key, char* arg, struct argp_state* state) {
             break;
         case 'v':
             options->verbose = true;
+            break;
+        case 'b':
+            options->skip_memcpy = true;
             break;
         
         case ARGP_KEY_ARG:

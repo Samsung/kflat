@@ -365,6 +365,7 @@ int kflat_run_test(struct kflat* kflat, struct kflat_ioctl_tests* test) {
 
 			flatten_init(&kflat->flat);
 			kflat->flat.FLCTRL.debug_flag = kflat->debug_flag;
+			kflat->flat.FLCTRL.mem_copy_skip = test->skip_memcpy;
 
 #if defined(CONFIG_KASAN)
 			kasan_disable_current();

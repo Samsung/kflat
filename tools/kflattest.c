@@ -39,6 +39,7 @@ struct args {
     bool continuous;
     bool verbose;
     bool stop_machine;
+    bool skip_memcpy;
     const char* output_dir;
     const char* image_file;
 };
@@ -180,7 +181,8 @@ int run_test(struct args* args, const char* name) {
 
     struct kflat_ioctl_tests tests = {
         .debug_flag = args->debug,
-        .use_stop_machine = args->stop_machine
+        .use_stop_machine = args->stop_machine,
+        .skip_memcpy = args->skip_memcpy
     };
 
     if(args->verbose)
@@ -412,6 +414,7 @@ static struct argp_option options[] = {
     {"continuous", 'c', 0, 0, "Load memory image in continuous fashion during validation"},
     {"verbose", 'v', 0, 0, "More verbose logs"},
     {"stop-machine", 'm', 0, 0, "Run tests under stop_machine macro"},
+    {"single-buffer", 'b', 0, 0, "Don't copy memory to temporary buffer during flattening"},
     { 0 }
 };
 
@@ -445,6 +448,9 @@ static error_t parse_opt(int key, char* arg, struct argp_state* state) {
             break;
         case 'm':
             options->stop_machine = true;
+            break;
+        case 'b':
+            options->skip_memcpy = true;
             break;
         
         case ARGP_KEY_ARG:
