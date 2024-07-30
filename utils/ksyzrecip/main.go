@@ -19,7 +19,6 @@ const (
 
 #include "kflat.h"
 #include "kflat_recipe.h"
-
 `
 )
 
@@ -92,17 +91,15 @@ func generateRecipes(syscalls []*prog.Syscall, outputPath string, pathMap Syscal
 				continue
 			}
 
-			f.WriteString(flat.Declaration() + "\n")
+			f.WriteString("\n" + flat.Declaration() + "\n")
 		}
-
-		f.WriteString("\n")
 
 		for _, flat := range flats {
 			if _, ok := usedRecipes[flat.Name]; ok {
 				continue
 			}
 
-			f.WriteString(flat.Definition() + "\n")
+			f.WriteString("\n" + flat.Definition() + "\n")
 
 			usedRecipes[flat.Name] = struct{}{}
 		}
@@ -128,11 +125,9 @@ func generateRecipes(syscalls []*prog.Syscall, outputPath string, pathMap Syscal
 		}
 	}
 
-	f.WriteString("\n")
-
 	for _, t := range triggers {
 		f.WriteString(t.Definition())
-		f.WriteString("\n")
+		f.WriteString("\n\n")
 	}
 
 	f.WriteString("KFLAT_RECIPE_LIST(\n")
@@ -142,9 +137,9 @@ func generateRecipes(syscalls []*prog.Syscall, outputPath string, pathMap Syscal
 		f.WriteString(t.Declaration())
 	}
 
-	f.WriteString(");")
+	f.WriteString(");\n\n")
 
-	f.WriteString(`KFLAT_RECIPE_MODULE("Automatically generated kflat module from syzkaller recipes")`)
+	f.WriteString(`KFLAT_RECIPE_MODULE("Automatically generated kflat module from syzkaller recipes");\n`)
 }
 
 func init() {
