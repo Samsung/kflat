@@ -163,7 +163,7 @@ struct flatten_pointer* FUNC_NAME(struct flat* flat, const void* ptr, uintptr_t 
 		DBGS("%s(%lx): %d\n", __func__, (uintptr_t)_ptr,flat->error);	\
 		return 0;	\
 	}	\
-	__node = interval_tree_iter_first(&flat->FLCTRL.imap_root, (uint64_t)_ptr, (uint64_t)_ptr+sizeof(void*)-1);    \
+	__node = flat_interval_tree_iter_first(&flat->FLCTRL.imap_root, (uint64_t)_ptr, (uint64_t)_ptr+sizeof(void*)-1);    \
 	if (__node==0) {	\
 		flat->error = EFAULT;	\
 		DBGS("%s(%lx): EFAULT (__node==0)\n", __func__, (uintptr_t)_ptr);	\
@@ -772,9 +772,9 @@ do {	\
 #define AGGREGATE_FLATTEN_TYPE_ARRAY(T,f,n)	\
 	do {  \
 		DBGS("AGGREGATE_FLATTEN_TYPE_ARRAY(%s, %s, n:0x%zu)\n", #T, #f, n);	\
-        if ((!FLAT_ACCESSOR->error)&&(ADDR_RANGE_VALID(ATTR(f), (n) * sizeof(T)))) {   \
-        	size_t _off = offsetof(_container_type,f);	\
-        	struct flat_node *__node = interval_tree_iter_first(&FLAT_ACCESSOR->FLCTRL.imap_root, (uint64_t)_ptr+_off,\
+		if ((!FLAT_ACCESSOR->error)&&(ADDR_RANGE_VALID(ATTR(f), (n) * sizeof(T)))) {   \
+			size_t _off = offsetof(_container_type,f);	\
+			struct flat_node *__node = flat_interval_tree_iter_first(&FLAT_ACCESSOR->FLCTRL.imap_root, (uint64_t)_ptr+_off,\
 					(uint64_t)_ptr+_off+sizeof(T*)-1);    \
 			if (__node==0) {	\
 				FLAT_ACCESSOR->error = EFAULT;	\
@@ -797,7 +797,7 @@ do {	\
 		DBGS("AGGREGATE_FLATTEN_COMPOUND_TYPE_ARRAY_SELF_CONTAINED(%s, %s, N:0x%zu, off:0x%zu, n:0x%zu)\n", #T, #f, N, _off, n);	\
 		DBGS("  \\->OFFATTR[%lx]\n",(uintptr_t)OFFATTR(void*,_off));	\
         if ((!FLAT_ACCESSOR->error)&&(ADDR_RANGE_VALID(OFFATTR(void*,_off), (n) * (N)))) {   \
-        	struct flat_node *__node = interval_tree_iter_first(&FLAT_ACCESSOR->FLCTRL.imap_root, (uint64_t)_ptr+_off,\
+			struct flat_node *__node = flat_interval_tree_iter_first(&FLAT_ACCESSOR->FLCTRL.imap_root, (uint64_t)_ptr+_off,\
 					(uint64_t)_ptr+_off+sizeof(T*)-1);    \
 			if (__node==0) {	\
 				FLAT_ACCESSOR->error = EFAULT;	\
@@ -823,7 +823,7 @@ do {	\
 	do {  \
 		DBGOF(AGGREGATE_FLATTEN_STRING_SELF_CONTAINED,f,"%lx:%zu",(unsigned long)OFFATTR(const char*,_off),(size_t)_off);	\
         if ((!FLAT_ACCESSOR->error)&&(ADDR_VALID(OFFATTR(void*,_off)))) {   \
-			struct flat_node *__node = interval_tree_iter_first(&FLAT_ACCESSOR->FLCTRL.imap_root, (uint64_t)_ptr+_off,\
+			struct flat_node *__node = flat_interval_tree_iter_first(&FLAT_ACCESSOR->FLCTRL.imap_root, (uint64_t)_ptr+_off,\
 					(uint64_t)_ptr+_off+sizeof(char*)-1);    \
 			if (__node==0) {	\
 				FLAT_ACCESSOR->error = EFAULT;	\
@@ -845,7 +845,7 @@ do {	\
 	do {	\
 		DBGOF(AGGREGATE_FLATTEN_FUNCTION_POINTER_SELF_CONTAINED,f,"%lx:%zu",(unsigned long)OFFATTR(void*,_off),(size_t)_off);	\
         if ((!FLAT_ACCESSOR->error)&&(TEXT_ADDR_VALID(OFFATTR(void*,_off)))) {   \
-			struct flat_node *__node = interval_tree_iter_first(&FLAT_ACCESSOR->FLCTRL.imap_root, (uint64_t)_ptr+_off,\
+			struct flat_node *__node = flat_interval_tree_iter_first(&FLAT_ACCESSOR->FLCTRL.imap_root, (uint64_t)_ptr+_off,\
 					(uint64_t)_ptr+_off+sizeof(int (*)(void))-1);    \
 			if (__node==0) {	\
 				FLAT_ACCESSOR->error = EFAULT;	\

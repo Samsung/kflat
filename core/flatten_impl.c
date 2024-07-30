@@ -1383,7 +1383,7 @@ int flatten_fini(struct flat* flat) {
 }
 
 struct flat_node* flatten_acquire_node_for_ptr(struct flat* flat, const void* _ptr, size_t size) {
-	struct flat_node *node = interval_tree_iter_first(&flat->FLCTRL.imap_root, (uint64_t)_ptr, (uint64_t)_ptr + size - 1);
+	struct flat_node *node = flat_interval_tree_iter_first(&flat->FLCTRL.imap_root, (uint64_t)_ptr, (uint64_t)_ptr + size - 1);
 	struct flat_node* head_node = 0;
 	if (node) {
 		uintptr_t p = (uintptr_t)_ptr;
@@ -1405,7 +1405,7 @@ struct flat_node* flatten_acquire_node_for_ptr(struct flat* flat, const void* _p
 				nn->start = p;
 				nn->last = node->start-1;
 				nn->storage = binary_stream_insert_front(flat, (void*)p, node->start-p, node->storage);
-				interval_tree_insert(nn, &flat->FLCTRL.imap_root);
+				flat_interval_tree_insert(nn, &flat->FLCTRL.imap_root);
 				if (head_node==0) {
 					head_node = node;
 				}
@@ -1417,7 +1417,7 @@ struct flat_node* flatten_acquire_node_for_ptr(struct flat* flat, const void* _p
 			}
 			p = node->last + 1;
 			prev = node;
-			node = interval_tree_iter_next(node, (uintptr_t)_ptr, (uintptr_t)_ptr+ size-1);
+			node = flat_interval_tree_iter_next(node, (uintptr_t)_ptr, (uintptr_t)_ptr+ size-1);
 		}
 
 		if ((uintptr_t)_ptr+ size > p) {
@@ -1436,7 +1436,7 @@ struct flat_node* flatten_acquire_node_for_ptr(struct flat* flat, const void* _p
 			nn->start = p;
 			nn->last = (uintptr_t)_ptr + size - 1;
 			nn->storage = binary_stream_insert_back(flat, (void*)p, (uintptr_t)_ptr + size - p, prev->storage);
-			interval_tree_insert(nn, &flat->FLCTRL.imap_root);
+			flat_interval_tree_insert(nn, &flat->FLCTRL.imap_root);
 		}
 	} else {
     	struct blstream* storage;
@@ -1450,7 +1450,7 @@ struct flat_node* flatten_acquire_node_for_ptr(struct flat* flat, const void* _p
 		}
 		node->start = (uint64_t)_ptr;
         node->last = (uint64_t)_ptr +  size - 1;
-        interval_tree_insert(node, &flat->FLCTRL.imap_root);
+        flat_interval_tree_insert(node, &flat->FLCTRL.imap_root);
         rb = &node->rb;
         prev = rb_prev(rb);
         if (prev) {
@@ -1499,7 +1499,7 @@ void flatten_generic(struct flat* flat, void* q, struct flatten_pointer* fptr, c
 	}
 
 	if (shift != 0) {
-		__ptr_node = interval_tree_iter_first(
+		__ptr_node = flat_interval_tree_iter_first(
 				&flat->FLCTRL.imap_root, 
 				(uintptr_t)_fp - shift,
 				(uintptr_t)_fp - shift + 1);
@@ -1563,7 +1563,7 @@ void flatten_aggregate_generic(struct flat* flat, void* q, const void* _ptr,
 		DBGS("  \\-> AGGREGATE_FLATTEN_GENERIC: error(%d), ADDR(%lx)\n", flat->error, (uintptr_t)OFFATTR(void**,_off));
 		return;
 	}
-	__node = interval_tree_iter_first(
+	__node = flat_interval_tree_iter_first(
 			&flat->FLCTRL.imap_root, 
 			(uint64_t)_ptr + _off,
 			(uint64_t)_ptr + _off + sizeof(void*) - 1);
@@ -1579,7 +1579,7 @@ void flatten_aggregate_generic(struct flat* flat, void* q, const void* _ptr,
 		return;
 	}
 	if (_shift != 0) {
-		__ptr_node = interval_tree_iter_first(
+		__ptr_node = flat_interval_tree_iter_first(
 				&flat->FLCTRL.imap_root, 
 				(uintptr_t)_fp - _shift,
 				(uintptr_t)_fp - _shift + 1);
@@ -1600,7 +1600,7 @@ void flatten_aggregate_generic(struct flat* flat, void* q, const void* _ptr,
 
 	err = 0;
 	for (_i = 0; _i < count; ++_i) {
-		struct flat_node *__struct_node = interval_tree_iter_first(
+		struct flat_node *__struct_node = flat_interval_tree_iter_first(
 				&flat->FLCTRL.imap_root,
 				(uint64_t)((char*)_fp + _i * el_size),
 				(uint64_t)((char*)_fp + (_i + 1) * el_size - 1));

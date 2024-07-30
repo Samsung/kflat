@@ -43,7 +43,6 @@ struct flex_G {
 /********************************/
 #ifdef __TESTER__
 /********************************/
-
 FUNCTION_DEFINE_FLATTEN_STRUCT(flex_B);
 FUNCTION_DEFINE_FLATTEN_STRUCT_FLEXIBLE(flex_A,
 	AGGREGATE_FLATTEN_STRUCT_FLEXIBLE(flex_B, arr);

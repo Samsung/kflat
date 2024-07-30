@@ -165,7 +165,7 @@ struct flatten_job {
 #define LAST(node)  ((node)->last)
 INTERVAL_TREE_DEFINE(struct flat_node, rb,
 		     uintptr_t, __subtree_last,
-		     START, LAST, static __attribute__((used)),interval_tree);
+		     START, LAST, static __attribute__((used)),flat_interval_tree);
 
 /*************************************
  * EXPORTED FLATTEN FUNCTIONS
@@ -264,7 +264,7 @@ static inline void destroy_flatten_pointer(struct flatten_pointer* fp) {
 } while(0)
 
 
-#define PTRNODE(PTRV)	(interval_tree_iter_first(&flat->FLCTRL.imap_root, (uintptr_t)(PTRV), (uintptr_t)(PTRV)))
+#define PTRNODE(PTRV)	(flat_interval_tree_iter_first(&flat->FLCTRL.imap_root, (uintptr_t)(PTRV), (uintptr_t)(PTRV)))
 #define FLAT_ACCESSOR 	flat
 #define __THIS_STRUCT (_ptr)
 #define __ROOT_PTR (FLAT_ACCESSOR->_root_ptr)

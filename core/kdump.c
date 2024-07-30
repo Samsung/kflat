@@ -35,7 +35,7 @@
 INTERVAL_TREE_DEFINE(struct kdump_memory_node, rb,
 		     uintptr_t, __subtree_last,
 		     START, END,
-             static __attribute__((used)), interval_tree)
+             static __attribute__((used)), kdump_interval_tree)
 
 
 int kdump_tree_destroy(struct kdump_memory_map* kdump) {
@@ -55,27 +55,27 @@ static int kdump_tree_add_range(struct kdump_memory_map* kdump, uint64_t start, 
     int rv = 0;
     struct kdump_memory_node* node;
 
-    if(interval_tree_iter_first(&kdump->imap_root, start, end) != NULL) {
+    if(kdump_interval_tree_iter_first(&kdump->imap_root, start, end) != NULL) {
         WARN_ONCE(1, "Kflat: Attempted to insert the same memory range multiple times");
         return -EFAULT;
     }
 
-    node = interval_tree_iter_first(&kdump->imap_root, start - 1, start - 1);
+    node = kdump_interval_tree_iter_first(&kdump->imap_root, start - 1, start - 1);
     if(node && node->phys_addr + (node->end - node->start + 1) == phys_addr) {
         // Extend the existing node to the right
-        interval_tree_remove(node, &kdump->imap_root);
+        kdump_interval_tree_remove(node, &kdump->imap_root);
         node->end = end;
-        interval_tree_insert(node, &kdump->imap_root);
+        kdump_interval_tree_insert(node, &kdump->imap_root);
         return rv;
     }
 
-    node = interval_tree_iter_first(&kdump->imap_root, end + 1, end + 1);
+    node = kdump_interval_tree_iter_first(&kdump->imap_root, end + 1, end + 1);
     if(node && node->phys_addr == phys_addr + (end - start + 1)) {
         // Extend node to the left
-        interval_tree_remove(node, &kdump->imap_root);
+        kdump_interval_tree_remove(node, &kdump->imap_root);
         node->start = start;
         node->phys_addr = phys_addr;
-        interval_tree_insert(node, &kdump->imap_root);
+        kdump_interval_tree_insert(node, &kdump->imap_root);
         return rv;
     }
 
@@ -86,7 +86,7 @@ static int kdump_tree_add_range(struct kdump_memory_map* kdump, uint64_t start, 
     node->start = start;
     node->end = end;
     node->phys_addr = phys_addr;
-    interval_tree_insert(node, &kdump->imap_root);
+    kdump_interval_tree_insert(node, &kdump->imap_root);
 
     return rv;
 }
@@ -168,7 +168,7 @@ int kdump_tree_remap(struct kdump_memory_map* kdump, struct vm_area_struct* vma)
  * Check whether provided address is in virtual memory layout dump
  */
 bool kdump_tree_contains(struct kdump_memory_map* kdump, uint64_t addr, size_t len) {
-    return interval_tree_iter_first(&kdump->imap_root, addr, addr + len) != NULL;
+    return kdump_interval_tree_iter_first(&kdump->imap_root, addr, addr + len) != NULL;
 }
 EXPORT_SYMBOL_GPL(kdump_tree_contains);
 
