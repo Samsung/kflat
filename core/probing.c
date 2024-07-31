@@ -13,6 +13,9 @@
 #include <linux/slab.h>
 #include <linux/version.h>
 
+#ifndef __nocfi
+#define __nocfi
+#endif
 
 /*******************************************************
  * DEBUG MACROS
@@ -223,7 +226,7 @@ NOKPROBE_SYMBOL(probing_disarm);
  *  We really need an access to kallsyms_lookup_name for
  *  dumping global variables
  *******************************************************/
-void* probing_get_kallsyms(void) {
+__nocfi void* probing_get_kallsyms(void) {
     int ret;
     void* result;
     struct kprobe kprobe;
@@ -239,5 +242,21 @@ void* probing_get_kallsyms(void) {
 
     result = kprobe.addr;
     unregister_kprobe(&kprobe);
+
+    if(result != NULL) {
+        /* 
+         * On some architectures (mainly x86_64) functions can be prefixed with
+         *  control-flow integrity related instructions (like `endbr64`), which
+         *  are being skipped in address returned by register_kprobe. Because of
+         *  that, result could be set to something like kallsyms_lookup_name+0x4.
+         * Normally that's not a problem, but with CFI enabled omitting endbr64
+         *  instruction will trigger kernel fault.
+         * To obtain the true starting address of kallsyms_lookup_name, we call
+         *  the function pointer from kprobe with CFI disabled and store the result
+         *  as real kallsyms_lookup_name address.
+         */
+        result = (void*) ((lookup_kallsyms_name_t)result)("kallsyms_lookup_name");
+    }
+
     return result;
 }
