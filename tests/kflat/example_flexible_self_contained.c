@@ -17,13 +17,13 @@ struct flexsc_B {
 struct flexsc_A {
 	int get_obj_supported;
 	size_t cnt;
-	struct flexsc_B arr[0];
+	struct flexsc_B arr[];
 };
 
 struct flexsc_C {
 	long l;
 	const char* name;
-	unsigned long arr[0];
+	unsigned long arr[];
 };
 
 typedef struct {
@@ -32,7 +32,7 @@ typedef struct {
 
 struct flexsc_E {
 	size_t cnt;
-	flexsc_D arr[0];
+	flexsc_D arr[];
 };
 
 union flexsc_F {
@@ -41,7 +41,7 @@ union flexsc_F {
 
 struct flexsc_G {
 	size_t cnt;
-	union flexsc_F arr[0];
+	union flexsc_F arr[];
 };
 
 /********************************/
