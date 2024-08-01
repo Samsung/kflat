@@ -23,6 +23,9 @@ struct get_cma_obj_result {
 
 #if defined(KFLAT_GET_OBJ_SUPPORT) && defined(CONFIG_CMA)
 #include <linux/cma.h>
+#ifdef CONFIG_X86_64
+#include <asm/io.h>
+#endif
 
 static struct cma* some_cma;
 static int _cma_areas_it(struct cma* cma, void* data) {
