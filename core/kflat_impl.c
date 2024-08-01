@@ -75,9 +75,9 @@ __nocfi int flatten_validate_inmem_size(unsigned long address, size_t expected_s
 		// If a symbol is found and its offset is zero, we hit exactly the beginning of some symbol.
 		if (ret && offset == 0) {
 			if (modname)
-				pr_warn("Found compiler optimization. Symbol %s [%s] was optimized to %u bytes.\n", orig_name, modname, i);
+				pr_warn("Found compiler optimization. Symbol %s [%s] was optimized to %zu bytes.\n", orig_name, modname, i);
 			else 
-				pr_warn("Found compiler optimization. Symbol %s was optimized to %u bytes.\n", orig_name, i);
+				pr_warn("Found compiler optimization. Symbol %s was optimized to %zu bytes.\n", orig_name, i);
 			return i;
 		}
 	}

@@ -608,7 +608,10 @@ static int kflat_mmap_flatten(struct kflat *kflat, struct vm_area_struct *vma) {
 	kflat->flat.size = alloc_size;
 	
 #if LINUX_VERSION_CODE < KERNEL_VERSION(6, 3, 0)
-	vma->vm_flags |= VM_DONTEXPAND;
+	/* We have a lot of older kernels that backported vm_flags_set making the following
+	 *  line fail to compile. Let's leave vm_flags unchanged on older kernels. 
+	 */
+	// vma->vm_flags |= VM_DONTEXPAND;
 #else
 	vm_flags_set(vma, VM_DONTEXPAND);
 #endif
