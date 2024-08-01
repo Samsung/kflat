@@ -89,7 +89,7 @@ EXPORT_SYMBOL_GPL(flatten_validate_inmem_size);
 /*******************************************************
  * DYNAMIC OBJECTS RESOLUTION
  *******************************************************/
-#ifdef KFLAT_GET_OBJ_SUPPORT
+#ifndef KFLAT_GET_OBJ_SUPPORT
 #if LINUX_VERSION_CODE <= KERNEL_VERSION(5, 0, 0)
 static void* kasan_reset_tag(void* addr) { 
 	return addr;
@@ -101,7 +101,20 @@ bool check_kfence_address(void* ptr, void** start, void** end) {
 	// KFENCE support has been added in Linux kernel 5.12.0
 	return false;
 #else
-	if(!is_kfence_address(ptr))
+
+	/* Use __kfence_pool from kallsyms to support devices that does not export
+	 *  this symbol to loadable kernel modules
+	 */
+	static char* _kfence_pool = NULL;
+	if(READ_ONCE(_kfence_pool) == NULL) {
+		WRITE_ONCE(_kfence_pool, flatten_global_address_by_name("__kfence_pool"));
+		if(_kfence_pool == NULL) {
+			WARN_ONCE(1, "__kfence_pool is not available in kallsyms");
+			return false;
+		}
+	}
+
+	if((unsigned long)((char *)ptr - _kfence_pool) >= KFENCE_POOL_SIZE)
 		return false;
 	
 	// KFENCE always allocates full kernel page
