@@ -89,7 +89,7 @@ EXPORT_SYMBOL_GPL(flatten_validate_inmem_size);
 /*******************************************************
  * DYNAMIC OBJECTS RESOLUTION
  *******************************************************/
-#ifndef KFLAT_GET_OBJ_SUPPORT
+#ifdef KFLAT_GET_OBJ_SUPPORT
 #if LINUX_VERSION_CODE <= KERNEL_VERSION(5, 0, 0)
 static void* kasan_reset_tag(void* addr) { 
 	return addr;
