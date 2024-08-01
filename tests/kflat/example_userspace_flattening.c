@@ -37,6 +37,11 @@ struct support_check {
 /********************************/
 #ifdef __TESTER__
 /********************************/
+
+#ifndef __nocfi
+#define __nocfi
+#endif
+
 FUNCTION_DEFINE_FLATTEN_STRUCT(support_check);
 
 FUNCTION_DECLARE_FLATTEN_STRUCT(array_element);
@@ -56,7 +61,7 @@ typedef unsigned long (*ksys_mmap_pgoff_t)(unsigned long addr, unsigned long len
 ksys_mmap_pgoff_t my_ksys_mmap_pgoff;
 
 
-static int userspace_flattening_test(struct flat *flat) {
+__nocfi static int userspace_flattening_test(struct flat *flat) {
     struct array_element *uarray[2], *karray[2];
     struct inner_struct *uinner[2], *kinner[2];
     struct outer_struct *uouter[2], *kouter[2];

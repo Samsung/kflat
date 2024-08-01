@@ -11,6 +11,7 @@ struct validate_global_size_results {
 	bool test_global_address_shifted;
 	bool test_module_global_address;
 	bool test_module_global_address_shifted;
+	bool test_invalid_address;
 };
 
 /********************************/
@@ -30,12 +31,13 @@ static int kflat_global_size_unit_test(struct flat *flat) {
 	// Stop copiler from optimizing this global
 	memset((void*) &kflat_test_size_global, 0, sizeof(kflat_test_size_global));
 	
-	results.test_global_address = (flatten_validate_inmem_size(NULL, kernel_test_global_addr, sizeof(int)) == 0);
-	results.test_global_address_shifted = (flatten_validate_inmem_size(NULL, kernel_test_global_addr - 1, sizeof(int)) == 1);
+	results.test_global_address = (flatten_validate_inmem_size(kernel_test_global_addr, sizeof(int)) == 0);
+	results.test_global_address_shifted = (flatten_validate_inmem_size(kernel_test_global_addr - 1, sizeof(int)) == 1);
 	
-	results.test_module_global_address = (flatten_validate_inmem_size("kflat_core", (unsigned long) &kflat_test_size_global, sizeof(kflat_test_size_global)) == 0);
-	results.test_module_global_address_shifted = (flatten_validate_inmem_size("kflat_core", (unsigned long) &kflat_test_size_global - 1, sizeof(kflat_test_size_global)) == 1);
+	results.test_module_global_address = (flatten_validate_inmem_size((unsigned long) &kflat_test_size_global, sizeof(kflat_test_size_global)) == 0);
+	results.test_module_global_address_shifted = (flatten_validate_inmem_size((unsigned long) &kflat_test_size_global - 2, sizeof(kflat_test_size_global)) == 2);
 
+	results.test_invalid_address = (flatten_validate_inmem_size(0xdeadbeef, sizeof(int)) == -EINVAL);
 
 	// Send results back to user
 	FOR_ROOT_POINTER(&results,
@@ -57,6 +59,7 @@ static int kflat_global_size_unit_validate(void *memory, size_t size, CUnflatten
 	ASSERT(pResults->test_global_address_shifted);
 	ASSERT(pResults->test_module_global_address);
 	ASSERT(pResults->test_module_global_address_shifted);
+	ASSERT(pResults->test_invalid_address);
 
 	return KFLAT_TEST_SUCCESS;
 }

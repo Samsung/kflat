@@ -115,17 +115,11 @@ struct kflat {
 	wait_queue_head_t dump_ready_wq;
 };
 
-struct kflat_ksym {
-	unsigned long address;
-	size_t expected_size;
-};
-
-int kflat_recipe_get_all(char *buff, size_t bufsize);
-
 
 /*******************************
  * EXPORTED FUNCTIONS
  *******************************/
+int kflat_recipe_get_all(char *buff, size_t bufsize);
 int kflat_recipe_register(struct kflat_recipe* recipe);
 int kflat_recipe_unregister(struct kflat_recipe* recipe);
 struct kflat_recipe* kflat_recipe_get(char* name);
@@ -135,22 +129,15 @@ void kflat_get(struct kflat *kflat);
 void kflat_put(struct kflat *kflat);
 
 typedef unsigned long (*lookup_kallsyms_name_t)(const char* name);
+typedef const char *(*kallsyms_lookup_t)(unsigned long addr,
+			    unsigned long *symbolsize,
+			    unsigned long *offset,
+			    char **modname, char *namebuf);
 
-// Before this patch https://patchwork.kernel.org/project/linux-trace-kernel/patch/20221230112729.351-4-thunder.leizhen@huawei.com/
-#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 4, 0)
-typedef int (*ksym_handler_func_t)(void *, const char *,  struct module *, unsigned long);
-// Newest kernels
-#else
-typedef int (*ksym_handler_func_t)(void *, const char *, unsigned long);
-#endif
-
-typedef int (*kallsyms_on_each_symbol_t)(ksym_handler_func_t fn, void *data);
-
-int kflat_module_kallsyms_on_each_symbol(const char *modname, ksym_handler_func_t fn, void *data);
 extern lookup_kallsyms_name_t kflat_lookup_kallsyms_name;
-extern kallsyms_on_each_symbol_t kflat_kallsyms_on_each_symbol;
+extern kallsyms_lookup_t kflat_kallsyms_lookup;
 
-int flatten_validate_inmem_size(char *mod_name, unsigned long address, size_t expected_size);
+int flatten_validate_inmem_size(unsigned long address, size_t expected_size);
 
 bool flatten_get_object(struct flat* flat, void* ptr, void** start, void** end);
 void* flatten_global_address_by_name(const char* name);

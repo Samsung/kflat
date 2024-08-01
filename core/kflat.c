@@ -726,9 +726,8 @@ static int __init kflat_init(void) {
 	}
 
 	kflat_lookup_kallsyms_name = (lookup_kallsyms_name_t) probing_get_kallsyms();
-	kflat_kallsyms_on_each_symbol = (kallsyms_on_each_symbol_t) kflat_lookup_kallsyms_name("kallsyms_on_each_symbol");
-	if(kflat_kallsyms_on_each_symbol == NULL)
-		pr_warn("Failed to locate kallsyms_on_each_symbol function - runtime optimization detection is off");
+	kflat_kallsyms_lookup = (kallsyms_lookup_t) kflat_lookup_kallsyms_name("kallsyms_lookup");
+
 	
 	kflat_dbgfs_node = node;
 	return 0;
