@@ -28,6 +28,7 @@ struct outer_struct {
 
 struct support_check {
     bool smap_enabled;
+    bool skip_memcpy_enabled;
 };
 
 #define TEST_ARRAY_SIZE 10
@@ -135,6 +136,7 @@ __nocfi static int userspace_flattening_test(struct flat *flat) {
 #elif CONFIG_ARM64
     support.smap_enabled = true;
 #endif
+    support.skip_memcpy_enabled = flat->FLCTRL.mem_copy_skip;
 
     FOR_ROOT_POINTER(&support,
         FLATTEN_STRUCT(support_check, &support);
@@ -181,14 +183,16 @@ __nocfi static int userspace_flattening_test(struct flat *flat) {
 #ifdef __VALIDATOR__
 /********************************/
 static int userspace_flattening_test_validate(void *memory, size_t size, CUnflatten flatten) {
+    struct outer_struct *u_valid, *u_invalid, *k_invalid, *k_valid;
     struct support_check *support = (struct support_check *) unflatten_root_pointer_seq(flatten, 0);
-    struct outer_struct *u_valid = (struct outer_struct *) unflatten_root_pointer_seq(flatten, 1);
-    struct outer_struct *u_invalid = (struct outer_struct *) unflatten_root_pointer_seq(flatten, 2);
-    struct outer_struct *k_invalid = (struct outer_struct *) unflatten_root_pointer_seq(flatten, 3);
-    struct outer_struct *k_valid = (struct outer_struct *) unflatten_root_pointer_seq(flatten, 4);
 
-    if (!support->smap_enabled)
+    if (!support->smap_enabled || support->skip_memcpy_enabled)
         return KFLAT_TEST_UNSUPPORTED;
+
+    u_valid = (struct outer_struct *) unflatten_root_pointer_seq(flatten, 1);
+    u_invalid = (struct outer_struct *) unflatten_root_pointer_seq(flatten, 2);
+    k_invalid = (struct outer_struct *) unflatten_root_pointer_seq(flatten, 3);
+    k_valid = (struct outer_struct *) unflatten_root_pointer_seq(flatten, 4);
 
     ASSERT(u_valid != NULL);
     ASSERT(k_valid != NULL);

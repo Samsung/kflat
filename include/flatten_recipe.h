@@ -970,9 +970,15 @@ do {	\
  * Kernel space memory must not be accessed when using FOR_USER_ROOT_POINTER 
  */
 #define FOR_EXTENDED_USER_ROOT_POINTER(p,__name,__size,...) \
-    arch_enable_ua(); \
-    FOR_EXTENDED_ROOT_POINTER(p,__name,__size,##__VA_ARGS__); \
-    arch_disable_ua();
+	do {	\
+		if((FLAT_EXTRACTOR)->FLCTRL.mem_copy_skip) {		\
+			flat_errs("Userspace memory cannot be copied with mem_copy_skip option enabled");	\
+			break;	\
+		}	\
+		arch_enable_ua(); \
+		FOR_EXTENDED_ROOT_POINTER(p,__name,__size,##__VA_ARGS__); \
+		arch_disable_ua();	\
+	} while(0)
 
 #define FOR_USER_ROOT_POINTER(p,...) FOR_EXTENDED_USER_ROOT_POINTER(p, NULL, 0, ##__VA_ARGS__)
 #endif /* defined(FLATTEN_KERNEL_BSP) */
