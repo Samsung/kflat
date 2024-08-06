@@ -70,7 +70,7 @@ set(TARGET_NAME edit_me1)
 list(TRANSFORM RECIPE_SOURCE_NAME APPEND ".o")
 string(REPLACE ";" " " RECIPE_SOURCE_NAME "${RECIPE_SOURCE_NAME}")
 
-configure_file(${CMAKE_SOURCE_DIR}/cmake/Kbuild.recipe_template.in ${CMAKE_CURRENT_SOURCE_DIR}/Kbuild @ONLY)
+configure_file(${PROJECT_SOURCE_DIR}/cmake/Kbuild.recipe_template.in ${CMAKE_CURRENT_SOURCE_DIR}/Kbuild @ONLY)
 
 add_custom_command(
     OUTPUT ${RECIPE_SOURCE_NAME}
@@ -141,7 +141,7 @@ set(TARGET_NAME example1)
 list(TRANSFORM RECIPE_SOURCE_NAME APPEND ".o")
 string(REPLACE ";" " " RECIPE_SOURCE_NAME "${RECIPE_SOURCE_NAME}")
 
-configure_file(${CMAKE_SOURCE_DIR}/cmake/Kbuild.recipe_template.in ${CMAKE_CURRENT_SOURCE_DIR}/Kbuild @ONLY)
+configure_file(${PROJECT_SOURCE_DIR}/cmake/Kbuild.recipe_template.in ${CMAKE_CURRENT_SOURCE_DIR}/Kbuild @ONLY)
 
 add_custom_command(
     OUTPUT ${RECIPE_SOURCE_NAME}
@@ -162,7 +162,7 @@ set(TARGET_NAME example2)
 list(TRANSFORM RECIPE_SOURCE_NAME APPEND ".o")
 string(REPLACE ";" " " RECIPE_SOURCE_NAME "${RECIPE_SOURCE_NAME}")
 
-configure_file(${CMAKE_SOURCE_DIR}/cmake/Kbuild.recipe_template.in ${CMAKE_CURRENT_SOURCE_DIR}/Kbuild @ONLY)
+configure_file(${PROJECT_SOURCE_DIR}/cmake/Kbuild.recipe_template.in ${CMAKE_CURRENT_SOURCE_DIR}/Kbuild @ONLY)
 
 add_custom_command(
     OUTPUT ${RECIPE_SOURCE_NAME}

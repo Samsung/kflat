@@ -658,7 +658,7 @@ string(REPLACE ";" " " RECIPE_SOURCE_NAME "${{RECIPE_SOURCE_NAME}}")
 set(DEPENDENT_SOURCES ${{RECIPE_SOURCE_NAME}})
 string(REPLACE ".o" ".c" DEPENDENT_SOURCES "${{DEPENDENT_SOURCES}}")
 
-configure_file(${{CMAKE_SOURCE_DIR}}/cmake/Kbuild.recipe_template.in ${{CMAKE_CURRENT_SOURCE_DIR}}/Kbuild @ONLY)
+configure_file(${{PROJECT_SOURCE_DIR}}/cmake/Kbuild.recipe_template.in ${{CMAKE_CURRENT_SOURCE_DIR}}/Kbuild @ONLY)
 
 add_custom_command(
     OUTPUT ${{RECIPE_SOURCE_NAME}}

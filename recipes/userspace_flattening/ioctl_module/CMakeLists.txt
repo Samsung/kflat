@@ -4,7 +4,7 @@ set(RECIPE_SOURCE_NAME ioctl_module)
 set(TARGET_NAME ioctl_test_module)
 
 list(TRANSFORM RECIPE_SOURCE_NAME APPEND ".o")
-configure_file(${CMAKE_SOURCE_DIR}/cmake/Kbuild.recipe_template.in ${CMAKE_CURRENT_SOURCE_DIR}/Kbuild @ONLY)
+configure_file(${PROJECT_SOURCE_DIR}/cmake/Kbuild.recipe_template.in ${CMAKE_CURRENT_SOURCE_DIR}/Kbuild @ONLY)
 
 add_custom_command(
     OUTPUT ${RECIPE_SOURCE_NAME}

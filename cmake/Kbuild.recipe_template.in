@@ -1,9 +1,9 @@
-KBUILD_EXTRA_SYMBOLS=@CMAKE_BINARY_DIR@/core/Module.symvers
+KBUILD_EXTRA_SYMBOLS=@PROJECT_BINARY_DIR@/core/Module.symvers
 
 KCOV_INSTRUMENT	:= n
 KASAN_SANITIZE 	:= n
 
-ccflags-y := -Wno-undefined-internal -Wno-visibility -Wno-gcc-compat -Wno-unused-variable -I$PWD/ -I@CMAKE_SOURCE_DIR@/include/
+ccflags-y := -Wno-undefined-internal -Wno-visibility -Wno-gcc-compat -Wno-unused-variable -I$PWD/ -I@PROJECT_SOURCE_DIR@/include/
 
 @TARGET_NAME@-objs := @RECIPE_SOURCE_NAME@
 obj-m += @TARGET_NAME@.o

@@ -5,7 +5,7 @@
 set(RBTREE_SOURCES rbtree.c)
 add_library(rbtree_obj OBJECT ${RBTREE_SOURCES})
 set_source_files_properties(${RBTREE_SOURCES} PROPERTIES LANGUAGE CXX)
-target_include_directories(rbtree_obj PRIVATE ${CMAKE_SOURCE_DIR}/lib/include_priv)
+target_include_directories(rbtree_obj PRIVATE ${PROJECT_SOURCE_DIR}/lib/include_priv)
 
 # ==========================================
 # ================ ExecFlat ================
@@ -35,8 +35,8 @@ add_custom_target(ExecFlat DEPENDS ExecFlat_static ExecFlat_shared)
 # =======================================
 # ================ uflat ================
 # =======================================
-set(UFLAT_SOURCES uflat.c funcsymsutils.c ${CMAKE_SOURCE_DIR}/core/flatten_impl.c)
-set(UFLAT_INCLUDES ${KFLAT_INCLUDES} ${CMAKE_SOURCE_DIR}/lib/include_priv ${CMAKE_SOURCE_DIR}/core)
+set(UFLAT_SOURCES uflat.c funcsymsutils.c ${PROJECT_SOURCE_DIR}/core/flatten_impl.c)
+set(UFLAT_INCLUDES ${KFLAT_INCLUDES} ${PROJECT_SOURCE_DIR}/lib/include_priv ${PROJECT_SOURCE_DIR}/core)
 
 # Force cmake to compile .c files with the C++ compiler
 foreach(source ${UFLAT_SOURCES})
@@ -92,13 +92,13 @@ find_program(clang++-13_FOUND clang++-13 NOCACHE PATH ${KLEE_CLANGXX_PATH})
 if (KLEE_LIBCXX_INSTALL AND clang++-13_FOUND)
     set(KLEE_COMPILER ${clang++-13_FOUND})
     set(KLEE_FLAGS -emit-llvm -D KLEE_SUPPORT -c -std=c++11  -nostdinc++)
-    set(KLEE_INCLUDES -I${CMAKE_SOURCE_DIR}/include -I${CMAKE_SOURCE_DIR}/lib/include_priv -I${KLEE_LIBCXX_INSTALL}/include/c++/v1/)
+    set(KLEE_INCLUDES -I${PROJECT_SOURCE_DIR}/include -I${PROJECT_SOURCE_DIR}/lib/include_priv -I${KLEE_LIBCXX_INSTALL}/include/c++/v1/)
     
     set(KLEE_UNFLATTEN_OUTPUT unflatten.bc)
     set(KLEE_UNFLATTEN_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/unflatten.cpp)
     add_custom_command(
         OUTPUT ${KLEE_UNFLATTEN_OUTPUT}
-        WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/lib/
+        WORKING_DIRECTORY ${PROJECT_BINARY_DIR}/lib/
         COMMAND ${KLEE_COMPILER} -o ${KLEE_UNFLATTEN_OUTPUT} ${KLEE_FLAGS} ${KLEE_INCLUDES} ${KLEE_UNFLATTEN_SOURCES}
     )
 
@@ -106,7 +106,7 @@ if (KLEE_LIBCXX_INSTALL AND clang++-13_FOUND)
     set(KLEE_RBTREE_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/rbtree.c)
     add_custom_command(
         OUTPUT ${KLEE_RBTREE_OUTPUT}
-        WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/lib/
+        WORKING_DIRECTORY ${PROJECT_BINARY_DIR}/lib/
         COMMAND ${KLEE_COMPILER} -o ${KLEE_RBTREE_OUTPUT} ${KLEE_FLAGS} ${KLEE_INCLUDES} ${KLEE_RBTREE_SOURCES}
     )
 
@@ -116,13 +116,13 @@ endif()
 find_program(clang15_FOUND clang-15 NOCACHE PATH ${DFSAN_CLANG_PATH})
 if (clang15_FOUND)
     set(DFSAN_COMPILER ${clang15_FOUND})
-    set(DFSAN_FLAGS -I${CMAKE_SOURCE_DIR}/include -I${CMAKE_SOURCE_DIR}/lib/include_priv -O3 -Wall -fPIC -fsanitize=dataflow -mllvm -dfsan-event-callbacks -c)
+    set(DFSAN_FLAGS -I${PROJECT_SOURCE_DIR}/include -I${PROJECT_SOURCE_DIR}/lib/include_priv -O3 -Wall -fPIC -fsanitize=dataflow -mllvm -dfsan-event-callbacks -c)
 
     set(DFSAN_UNFLATTEN_OUTPUT unflatten_dfsan.o)
     set(DFSAN_UNFLATTEN_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/unflatten.cpp)
     add_custom_command(
         OUTPUT ${DFSAN_UNFLATTEN_OUTPUT}
-        WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/lib/
+        WORKING_DIRECTORY ${PROJECT_BINARY_DIR}/lib/
         COMMAND ${DFSAN_COMPILER} -o ${DFSAN_UNFLATTEN_OUTPUT} ${DFSAN_FLAGS} ${DFSAN_UNFLATTEN_SOURCES}
     )
 
@@ -130,14 +130,14 @@ if (clang15_FOUND)
     set(DFSAN_RBTREE_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/unflatten.cpp)
     add_custom_command(
         OUTPUT ${DFSAN_RBTREE_OUTPUT}
-        WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/lib/
+        WORKING_DIRECTORY ${PROJECT_BINARY_DIR}/lib/
         COMMAND ${DFSAN_COMPILER} -o ${DFSAN_RBTREE_OUTPUT} ${DFSAN_FLAGS} ${DFSAN_RBTREE_SOURCES}
     )
 
     set(DFSAN_OUTPUT libunflatten_dfsan.a)
     add_custom_command(
         OUTPUT ${DFSAN_OUTPUT}
-        WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/lib/
+        WORKING_DIRECTORY ${PROJECT_BINARY_DIR}/lib/
         COMMAND ar rcs ${DFSAN_OUTPUT} ${DFSAN_UNFLATTEN_OUTPUT} ${DFSAN_RBTREE_OUTPUT}
         DEPENDS ${DFSAN_UNFLATTEN_OUTPUT} ${DFSAN_RBTREE_OUTPUT}
     )
