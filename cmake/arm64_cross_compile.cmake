@@ -9,7 +9,7 @@ if (NOT CLANG_DIR)
 endif()
 set(CMAKE_C_COMPILER ${CLANG_DIR}/bin/clang.real)
 set(CMAKE_LINKER ${CLANG_DIR}/bin/ld.lld)
-set(CMAKE_CXX_COMPILER aarch64-linux-gnu-g++)
+set(CMAKE_CXX_COMPILER ${CLANG_DIR}/bin/clang++.real)
 
 set(CMAKE_FIND_ROOT_PATH_MODE_PROGRAM NEVER)
 set(CMAKE_FIND_ROOT_PATH_MODE_LIBRARY ONLY)
