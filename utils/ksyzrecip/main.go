@@ -65,13 +65,19 @@ func generateRecipes(syscalls []*prog.Syscall, outputPath string, pathMap Syscal
 
 	f.WriteString(header)
 
-	triggers := make(map[string]TriggerFunction)
+	triggers := make(map[string]*TriggerFunction)
 	for _, syscall := range syscalls {
 		if syscall.CallName != "ioctl" || len(syscall.Args) < 3 {
 			continue
 		}
 
 		derefed, ok := syscall.Args[2].Type.(*prog.PtrType)
+		if !ok {
+			continue
+		}
+
+		// We want Args[1] to be ConstType, to inspect a definition of a call to an actuall ioctl with a specific command
+		commandConst, ok := syscall.Args[1].Type.(*prog.ConstType)
 		if !ok {
 			continue
 		}
@@ -116,14 +122,25 @@ func generateRecipes(syscalls []*prog.Syscall, outputPath string, pathMap Syscal
 		}
 
 		originalName := stripModuleNames(ioctlsByPath[len(ioctlsByPath)-1])
-		triggers[originalName] = TriggerFunction{
-			Name:               "syz_trigger_" + originalName,
-			FlattenedType:      inner.TemplateName(),
-			FlattenedSize:      calculateActualSize(inner),
-			TargetFunctionName: originalName,
-			NodePath:           path,
+		trigger, ok := triggers[originalName]
+		if !ok {
+			triggers[originalName] = &TriggerFunction{
+				Name:               "syz_trigger_" + originalName,
+				TargetFunctionName: originalName,
+				NodePath:           path,
+				Commands:           make(map[int]IoctlCommand),
+			}
+			trigger = triggers[originalName]
+		}
+
+		trigger.Commands[int(commandConst.Val)] = IoctlCommand{
+			Value:    commandConst.Val,
+			TypeName: inner.TemplateName(),
+			TypeSize: calculateActualSize(inner),
 		}
 	}
+
+	f.WriteString("\n")
 
 	for _, t := range triggers {
 		f.WriteString(t.Definition())
@@ -139,7 +156,7 @@ func generateRecipes(syscalls []*prog.Syscall, outputPath string, pathMap Syscal
 
 	f.WriteString(");\n\n")
 
-	f.WriteString(`KFLAT_RECIPE_MODULE("Automatically generated kflat module from syzkaller recipes");\n`)
+	f.WriteString("KFLAT_RECIPE_MODULE(\"Automatically generated kflat module from syzkaller recipes\");\n")
 }
 
 func init() {

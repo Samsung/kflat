@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 )
 
@@ -168,20 +169,40 @@ func (p *FlatHandler) Definition() string {
 	return sb.String()
 }
 
+type IoctlCommand struct {
+	Value    uint64
+	TypeName string
+	TypeSize uint64
+}
+
 type TriggerFunction struct {
 	Name               string
-	FlattenedType      string
-	FlattenedSize      uint64
+	Commands           map[int]IoctlCommand
 	TargetFunctionName string
 	NodePath           string
 }
 
 func (p *TriggerFunction) Definition() string {
-	return fmt.Sprintf(`static void %s(struct kflat *kflat, struct probe_regs *regs) {
-	FOR_USER_ROOT_POINTER(regs->arg3,
-		FLATTEN_STRUCT_SELF_CONTAINED(%s, %d, (void *) regs->arg3);
+	sb := strings.Builder{}
+
+	sb.WriteString("static void " + p.Name + `(struct kflat *kflat, struct probe_regs *regs) {
+	FOR_ROOT_POINTER(&regs->arg2,
+		FLATTEN_TYPE(unsigned long, &regs->arg2);
 	);
-}`, p.Name, p.FlattenedType, p.FlattenedSize)
+
+	FOR_USER_ROOT_POINTER(regs->arg3,
+`)
+	for _, command := range p.Commands {
+		sb.WriteString(`		if (regs->arg2 == ` + strconv.FormatUint(command.Value, 10) + `) {
+			FLATTEN_STRUCT_SELF_CONTAINED(` + command.TypeName + ", " + strconv.FormatUint(command.TypeSize, 10) + `, (void *) regs->arg3);
+		}
+
+`)
+	}
+
+	sb.WriteString("\t);\n}")
+
+	return sb.String()
 }
 
 func (p *TriggerFunction) Declaration() string {
