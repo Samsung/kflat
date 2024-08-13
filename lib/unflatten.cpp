@@ -76,12 +76,40 @@ struct root_addr_node {
 #define COLOR_STRING COLOR_STRING_RED
 #define COLOR_OFF "\033[0m"
 
+const char *unflatten_status_messages[] = {
+	"No error",
+	"Invalid root pointer",
+	"Invalid argument",
+	"Invalid node offset",
+	"Invalid magic in read flattened image",
+	"Invalid pointer fix location",
+	"Invalid pointer fix destination",
+	"Address points to an invalid location",
+	"No next root pointer available",
+	"Named root pointer not found",
+	"FLCTRL is uninitialized",
+	"Index of range",
+	"Failed to acquire read-lock on input file",
+	"Unexpected open_mode",
+	"Image size differs from header",
+	"Size of memory area with header exceeds size of an image",
+	"Memory fragment does not fit in flatten image",
+	"Truncated file",
+	"Incompatible version of flattened image",
+	"Integer overflow",
+	"Memory allocation failed",
+	"Interval extraction failed",
+	""
+};
+
 /********************************
  * Private class UnflattenEngine
  *******************************/
 class UnflattenEngine {
 private:
 	friend class Unflatten;
+
+	static thread_local UnflattenStatus status;
 
 	bool need_unload;
 	enum {
@@ -184,33 +212,40 @@ private:
 		if (root_addr == (size_t) -1)
 			return 0;
 
-		if (interval_tree_iter_first(&FLCTRL.imap_root, 0, ULONG_MAX)) {	
+		if (interval_tree_iter_first(&FLCTRL.imap_root, 0, ULONG_MAX)) {
 			/* We have allocated each memory fragment individually */
 			struct interval_tree_node *node = interval_tree_iter_first(
 					&FLCTRL.imap_root,
 					root_addr, root_addr + 8);
-			if (node == NULL)
-				throw std::invalid_argument("Invalid root pointer");
+			if (node == NULL) {
+				status = UNFLATTEN_INVALID_ROOT_POINTER;
+				return NULL;
+			}
 
 			size_t node_offset = root_addr - node->start;
 			return (char*)node->mptr + node_offset;
 		}
-		
+
 		return (char*)flatten_memory_start() + root_addr;
 	}
 
 	void* root_pointer_next() {
-		if(FLCTRL.last_accessed_root >= (ssize_t)FLCTRL.root_addr.size() - 1)
-			throw std::invalid_argument("No next root pointer available");
+		if(FLCTRL.last_accessed_root >= (ssize_t)FLCTRL.root_addr.size() - 1) {
+			status = UNFLATTEN_NO_NEXT_ROOT_POINTER;
+			return NULL;
+		}
+
 		FLCTRL.last_accessed_root++;
-		
+
 		struct root_addr_node* last_root = &FLCTRL.root_addr[FLCTRL.last_accessed_root];
 		return (void*)last_root->root_addr;
 	}
 
 	void* root_pointer_seq(size_t index) {
-		if(index >= FLCTRL.root_addr.size())
-			throw std::invalid_argument("Index out-of-range for root pointer arrays");
+		if(index >= FLCTRL.root_addr.size()) {
+			status = UNFLATTEN_INDEX_OUT_OF_RANGE;
+			return NULL;
+		}
 		FLCTRL.last_accessed_root = index;
 
 		struct root_addr_node* last_root = &FLCTRL.root_addr[FLCTRL.last_accessed_root];
@@ -218,19 +253,18 @@ private:
 	}
 
 	void* root_pointer_named(const char* name, size_t* size) {
-		size_t root_addr;
-
-		try {
-			auto& entry = root_addr_map.at(name);
-			
-			if(size)
-				*size = entry.second;
-			root_addr = entry.first;
-		} catch(std::out_of_range& _) {
+		auto it = root_addr_map.find(name);
+		if (it == root_addr_map.end()) {
+			status = UNFLATTEN_NOT_FOUND_NAMED_ROOT_POINTER;
 			return NULL;
 		}
 
-		return (void*)root_addr;
+		auto& entry = it->second;
+
+		if (size)
+			*size = entry.second;
+
+		return (void *) entry.first;
 	}
 
 	void root_addr_append(uintptr_t root_addr, const char* name = nullptr, size_t size = 0) {
@@ -252,10 +286,21 @@ private:
 	}
 
 	void fix_root_pointers(void) {
-		for(auto& root_ptr : FLCTRL.root_addr)
-			root_ptr.root_addr = (uintptr_t) get_root_addr_mem(root_ptr.root_addr);
-		for(auto& [name, entry] : root_addr_map)
-			entry.first = (uintptr_t) get_root_addr_mem(entry.first);
+		for (auto& root_ptr : FLCTRL.root_addr) {
+			uintptr_t addr = (uintptr_t) get_root_addr_mem(root_ptr.root_addr);
+			if (!addr)
+				return;
+
+			root_ptr.root_addr = addr;
+		}
+
+		for (auto& [name, entry] : root_addr_map) {
+			uintptr_t addr = (uintptr_t) get_root_addr_mem(entry.first);
+			if (!addr)
+				return;
+
+			entry.first = addr;
+		}
 	}
 
 	/***************************
@@ -330,6 +375,8 @@ private:
 			if(ret >= 0) {
 				// Acquired exclusive write access
 				read_file(&FLCTRL.HDR,sizeof(struct flatten_header),1);
+				if (status)
+					return;
 				fseek(f, 0, SEEK_SET);
 				if(!FLCTRL.HDR.last_load_addr){
 					// rewrite image, mmap it and release lock
@@ -338,6 +385,7 @@ private:
 					if(opened_mmap_addr != MAP_FAILED) {
 						info("Opened file in write mode\n");
 						open_mode = UNFLATTEN_OPEN_MMAP_WRITE;
+						status = UNFLATTEN_OK;
 						return;
 					}
 				}
@@ -352,21 +400,26 @@ private:
 		ret = fcntl(fd, F_SETLKW, &lock);
 		if(ret < 0) {
 			info("Failed to obtain read-lock - fcntl returned: %s\n", strerror(errno));
-			throw std::runtime_error("Failed to acquire read-lock on input file");
+			status = UNFLATTEN_FILE_LOCKED;
+			return;
 		}
 
 		// At this point we've got read_lock, check header and try to mmap file
+		status = UNFLATTEN_OK;
 		read_file(&FLCTRL.HDR,sizeof(struct flatten_header),1);
+		if (status)
+			return;
 		fseek(f, 0, SEEK_SET);
 		void* mmap_addr = (void*) FLCTRL.HDR.last_load_addr;
-		if(mmap_addr != NULL && support_mmap) {	
-			opened_mmap_addr = mmap(mmap_addr, opened_mmap_size, 
+		if(mmap_addr != NULL && support_mmap) {
+			opened_mmap_addr = mmap(mmap_addr, opened_mmap_size,
 					PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_FIXED_NOREPLACE, fd, 0);
 			if(opened_mmap_addr != MAP_FAILED) {
 				// Succesfully mmaped file, hold lock till close_file
-				info("Opened input file in mmap mode @ %p (size: %p)\n", 
+				info("Opened input file in mmap mode @ %p (size: %p)\n",
 					opened_mmap_addr, opened_mmap_size);
 				open_mode = UNFLATTEN_OPEN_MMAP;
+				status = UNFLATTEN_OK;
 				return;
 			} else
 				debug("Failed to open input file in mmap mode - %s\n", strerror(errno));
@@ -375,6 +428,7 @@ private:
 		// Mmap failed. The only thing left is to load whole image into memory
 		info("Opened file in copy mode\n");
 		open_mode = UNFLATTEN_OPEN_READ_COPY;
+		status = UNFLATTEN_OK;
 		return;
 	}
 
@@ -389,7 +443,7 @@ private:
 		switch(open_mode) {
 			case UNFLATTEN_OPEN_MMAP:
 			case UNFLATTEN_OPEN_MMAP_WRITE:
-				debug("Releasing shared memory @ %p (sz:%zu)\n", 
+				debug("Releasing shared memory @ %p (sz:%zu)\n",
 					opened_mmap_addr, opened_mmap_size);
 				munmap(opened_mmap_addr, opened_mmap_size);
 				fcntl(opened_file_fd, F_SETLK, &lock);
@@ -400,7 +454,8 @@ private:
 			break;
 
 			default:
-				throw std::runtime_error("Unexpected open_mode in close_file() method");
+				status = UNFLATTEN_FILE_LOCKED;
+				return;
 		}
 
 		opened_file_fd = -1;
@@ -414,8 +469,10 @@ private:
 			case UNFLATTEN_OPEN_MMAP:
 			case UNFLATTEN_OPEN_MMAP_WRITE: {
 				total_size = size * n;
-				if(total_size + current_mmap_offset > opened_mmap_size)
-					throw std::invalid_argument("Truncated file");
+				if (total_size + current_mmap_offset > opened_mmap_size) {
+					status = UNFLATTEN_TRUNCATED_FILE;
+					return;
+				}
 
 				memcpy(dst, (char*)opened_mmap_addr + current_mmap_offset, total_size);
 				current_mmap_offset += total_size;
@@ -424,13 +481,16 @@ private:
 
 			case UNFLATTEN_OPEN_READ_COPY: {
 				rd = fread(dst, size, n, opened_file_file);
-				if(rd != n)
-					throw std::invalid_argument("Truncated file");
+				if (rd != n) {
+					status = UNFLATTEN_TRUNCATED_FILE;
+					return;
+				}
 			}
 			break;
 
 			default:
-				throw std::runtime_error("Unexpected open_mode in read_file() method");
+				status = UNFLATTEN_UNEXPECTED_OPEN_MODE;
+				return;
 		}
 
 		readin += size * n;
@@ -441,23 +501,26 @@ private:
 	 * UNFLATTEN MEMORY
 	 **************************/
 	inline void check_header(void) const {
-		if (FLCTRL.HDR.magic != KFLAT_IMG_MAGIC)
-			throw std::invalid_argument("Invalid magic while reading flattened image");
-		if (FLCTRL.HDR.version != KFLAT_IMG_VERSION)
-			throw std::invalid_argument(
-					"Incompatible version of flattened image. Present (" +
-					std::to_string(FLCTRL.HDR.version) + ") vs Supported (" +
-					std::to_string(KFLAT_IMG_VERSION) + ")");
-		if (FLCTRL.HDR.image_size > opened_mmap_size)
-			throw std::invalid_argument("Image size specified in header differs from the actual one");
+		if (FLCTRL.HDR.magic != KFLAT_IMG_MAGIC) {
+			status = UNFLATTEN_INVALID_MAGIC;
+			return;
+		}
+
+		if (FLCTRL.HDR.version != KFLAT_IMG_VERSION) {
+			status = UNFLATTEN_UNSUPPORTED_MAGIC;
+			return;
+		}
+
+		if (FLCTRL.HDR.image_size > opened_mmap_size) {
+			status = UNFLATTEN_DIFFERENT_IMAGE_SIZE;
+			return;
+		}
 
 		bool overflow = false;
 		overflow |= check_mul_overflow(FLCTRL.HDR.ptr_count, sizeof(size_t));
 		overflow |= check_mul_overflow(FLCTRL.HDR.fptr_count, sizeof(size_t));
 		overflow |= check_mul_overflow(FLCTRL.HDR.root_addr_count, sizeof(size_t));
 		overflow |= check_mul_overflow(FLCTRL.HDR.mcount, 16);
-		if (overflow)
-			throw std::invalid_argument("Count fields in header are greater than maximum size");
 
 		size_t total_size = 0;
 		overflow |= add_overflow(total_size, FLCTRL.HDR.ptr_count * sizeof(size_t), &total_size);
@@ -467,37 +530,58 @@ private:
 		overflow |= add_overflow(total_size, FLCTRL.HDR.fptrmapsz, &total_size);
 		overflow |= add_overflow(total_size, FLCTRL.HDR.mcount * 16, &total_size);
 		overflow |= add_overflow(total_size, FLCTRL.HDR.memory_size, &total_size);
-		if (overflow)
-			throw std::invalid_argument("Integer overflow when adding fields count in image header");
-		if (total_size > FLCTRL.HDR.image_size)
-			throw std::invalid_argument("Size of memory area with header exceeds size of an image");
+		if (overflow) {
+			status = UNFLATTEN_OVERFLOW;
+			return;
+		}
+
+		if (total_size > FLCTRL.HDR.image_size) {
+			status = UNFLATTEN_MEMORY_SIZE_BIGGER_THAN_IMAGE;
+			return;
+		}
+
+		return;
 	}
 
 	inline void parse_root_ptrs(void) {
 		std::vector<uintptr_t> root_ptr_vector;
 		for (size_t i = 0; i < FLCTRL.HDR.root_addr_count; ++i) {
 			size_t root_addr_offset;
+			status = UNFLATTEN_OK;
 			read_file(&root_addr_offset, sizeof(size_t), 1);
+			if (status)
+				return;
 			root_ptr_vector.push_back(root_addr_offset);
 		}
 
 		std::map<size_t,std::pair<std::string,size_t>> root_ptr_ext_map;
 		for (size_t i = 0; i < FLCTRL.HDR.root_addr_extended_count; ++i) {
 			size_t name_size, index, size;
+			status = UNFLATTEN_OK;
 			read_file(&name_size,sizeof(size_t),1);
+			if (status)
+				return;
 
-			char* name = new char[name_size + 1];
-			try {
-				read_file((void*)name, name_size, 1);
-				name[name_size] = '\0';
-				read_file(&index, sizeof(size_t), 1);
-				read_file(&size, sizeof(size_t), 1);
-				root_ptr_ext_map.insert({index, {std::string(name), size}});
-			} catch(...) {
-				delete[] name;
-				throw;
-			}
-			delete[] name;
+			std::string name;
+			name.reserve(name_size + 1);
+			name[name_size] = '\0';
+
+			status = UNFLATTEN_OK;
+			read_file((void*) name.data(), name_size, 1);
+			if (status)
+				return;
+
+			status = UNFLATTEN_OK;
+			read_file(&index, sizeof(size_t), 1);
+			if (status)
+				return;
+
+			status = UNFLATTEN_OK;
+			read_file(&size, sizeof(size_t), 1);
+			if (status)
+				return;
+
+			root_ptr_ext_map.insert({index, {std::move(name), size}});
 		}
 
 		for (size_t i = 0; i < root_ptr_vector.size(); ++i) {
@@ -518,15 +602,22 @@ private:
 	inline void parse_mem(void) {
 		size_t memsz = get_memsz();
 
-		switch(open_mode) {
+		switch (open_mode) {
 			case UNFLATTEN_OPEN_READ_COPY:
-				FLCTRL.mem = new char[memsz];
+				FLCTRL.mem = new(std::nothrow) char[memsz];
+				if (!FLCTRL.mem) {
+					status = UNFLATTEN_ALLOCATION_FAILED;
+					return;
+				}
 				read_file(FLCTRL.mem, 1, memsz);
 				break;
 			case UNFLATTEN_OPEN_MMAP:
 			case UNFLATTEN_OPEN_MMAP_WRITE:
-				if(current_mmap_offset + memsz > opened_mmap_size)
-					throw std::invalid_argument("Truncated file (memory_size > image_size)");
+				if (current_mmap_offset + memsz > opened_mmap_size) {
+					status = UNFLATTEN_TRUNCATED_FILE;
+					return;
+				}
+
 				FLCTRL.mem = (char*)opened_mmap_addr + current_mmap_offset;
 				current_mmap_offset += memsz;
 				break;
@@ -542,15 +633,28 @@ private:
 	inline void parse_fptrmap(void) {
 		char* orig_fptrmapmem, * fptrmapmem;
 
-		if (FLCTRL.HDR.fptr_count <= 0 || FLCTRL.HDR.fptrmapsz <= 0)
+		if (FLCTRL.HDR.fptr_count <= 0 || FLCTRL.HDR.fptrmapsz <= 0) {
+			status = UNFLATTEN_INVALID_ARGUMENT;
 			return;
-		
+		}
+
 		if(open_mode == UNFLATTEN_OPEN_READ_COPY) {
-			orig_fptrmapmem = fptrmapmem = new char[FLCTRL.HDR.fptrmapsz];
+			orig_fptrmapmem = fptrmapmem = new(std::nothrow) char[FLCTRL.HDR.fptrmapsz];
+			if (orig_fptrmapmem) {
+				status = UNFLATTEN_ALLOCATION_FAILED;
+				return;
+			}
+
+			status = UNFLATTEN_OK;
 			read_file(fptrmapmem, 1, FLCTRL.HDR.fptrmapsz);
+			if (status)
+				return;
 		} else {
-			if(current_mmap_offset + FLCTRL.HDR.fptrmapsz > opened_mmap_size)
-					throw std::invalid_argument("Truncated file (fptrmapsz_end > image_size)");
+			if (current_mmap_offset + FLCTRL.HDR.fptrmapsz > opened_mmap_size) {
+				status = UNFLATTEN_TRUNCATED_FILE;
+				return;
+			}
+
 			orig_fptrmapmem = fptrmapmem = (char*)opened_mmap_addr + current_mmap_offset;
 			current_mmap_offset += FLCTRL.HDR.fptrmapsz;
 		}
@@ -593,33 +697,42 @@ private:
 			 *  pointer should point to.
 			 */
 			size_t fix_loc = *((size_t*)FLCTRL.mem + i);
-			if(fix_loc + sizeof(size_t) > FLCTRL.HDR.memory_size || add_overflow(fix_loc, sizeof(size_t), &tmp))
-				throw std::invalid_argument("Invalid fix location in ptr_array for ptr no. " + std::to_string(i));
+			if (fix_loc + sizeof(size_t) > FLCTRL.HDR.memory_size || add_overflow(fix_loc, sizeof(size_t), &tmp)) {
+				status = UNFLATTEN_INVALID_FIX_LOCATION;
+				return;
+			}
 			uintptr_t ptr = *(uintptr_t*)((char*)mem + fix_loc);
-			if(ptr < FLCTRL.HDR.last_mem_addr)
-				throw std::invalid_argument("Invalid fix destination (offset is negative) for ptr no. " + std::to_string(i));
-			ptr -= FLCTRL.HDR.last_mem_addr;
-			if(ptr > FLCTRL.HDR.memory_size)
-				throw std::invalid_argument("Invalid fix destination (offset is larger than memory size) for ptr no. " + std::to_string(i));
+			if (ptr < FLCTRL.HDR.last_mem_addr || ptr > FLCTRL.HDR.memory_size) {
+				status = UNFLATTEN_INVALID_FIX_DESTINATION;
+				return;
+			}
 
-			if(continuous_mapping) {
+			ptr -= FLCTRL.HDR.last_mem_addr;
+
+			if (continuous_mapping) {
 				*((void**)((unsigned char*)mem + fix_loc)) = (unsigned char*)mem + ptr;
 			} else {
-
 				struct interval_tree_node *node = interval_tree_iter_first(&FLCTRL.imap_root, fix_loc, fix_loc + 8);
-				if (node == NULL)
-					throw std::invalid_argument("Address points to invalid location.");
+				if (node == NULL) {
+					status = UNFLATTEN_INVALID_ADDRESS_POINTEE;
+					return;
+				}
 
 				size_t node_offset = fix_loc - node->start;
 				struct interval_tree_node *ptr_node = interval_tree_iter_first(&FLCTRL.imap_root, ptr, ptr + 8);
-				if (ptr_node == NULL)
-					throw std::invalid_argument("Address points to invalid location.");
+				if (ptr_node == NULL) {
+					status = UNFLATTEN_INVALID_ADDRESS_POINTEE;
+					return;
+				}
 
 				/* Make the fix */
 				size_t ptr_node_offset = ptr - ptr_node->start;
 				size_t mptr_size = node->last - node->start + 1;
-				if (node_offset > mptr_size - 8)
-					throw std::invalid_argument("Invalid node offset");
+				if (node_offset > mptr_size - 8) {
+					status = UNFLATTEN_INVALID_OFFSET;
+					return;
+				}
+
 				*((void**)((char*)node->mptr + node_offset)) = (char*)ptr_node->mptr + ptr_node_offset;
 
 				debug("%lx <- %lx (%hhx)\n", fix_loc, ptr, *(unsigned char*)((char*)ptr_node->mptr + ptr_node_offset));
@@ -663,12 +776,32 @@ public:
 		loglevel = (decltype(loglevel))_level;
 	}
 
+	UnflattenStatus get_status() {
+		return status;
+	}
+
+	void reset_status() {
+		status = UNFLATTEN_OK;
+	}
+
 	int imginfo(FILE* f, const char* arg) {
 		if (need_unload)
 			unload();
+
+		status = UNFLATTEN_OK;
 		open_file(f, false);
+		if (status)
+			return -1;
+
+		status = UNFLATTEN_OK;
 		read_file(&FLCTRL.HDR, sizeof(struct flatten_header), 1);
+		if (status)
+			return -1;
+
+		status = UNFLATTEN_OK;
 		check_header();
+		if (status)
+			return -1;
 
 		printf("# Image size: %zu\n\n",FLCTRL.HDR.image_size);
 
@@ -679,6 +812,8 @@ public:
 		for (size_t i = 0; i < FLCTRL.HDR.root_addr_count; ++i) {
 			size_t root_addr_offset;
 			read_file(&root_addr_offset, sizeof(size_t), 1);
+			if (status)
+				return -1;
 			if ((!arg) || (!strcmp(arg,"-r"))) {
 				printf("%zu ",root_addr_offset);
 			}
@@ -690,25 +825,29 @@ public:
 		for (size_t i = 0; i < FLCTRL.HDR.root_addr_extended_count; ++i) {
 			size_t name_size, index, size;
 			read_file(&name_size, sizeof(size_t), 1);
+			if (status)
+				return -1;
 
-			char* name = new char[name_size + 1];
-			memset(name, 0, name_size);
-			try {
-				read_file((void*)name, name_size, 1);
-				read_file(&index, sizeof(size_t), 1);
-				read_file(&size, sizeof(size_t), 1);
-				if ((!arg) || (!strcmp(arg,"-r"))) {
-					printf(" %zu [%s:%lu]\n", index, name, size);
-				}
-			} catch(...) {
-				delete[] name;
-				throw;
-			}
-			delete[] name;
+			std::string name;
+			name.reserve(name_size + 1);
+			read_file((void*)name.data(), name_size, 1);
+			if (status)
+				return -1;
+
+			read_file(&index, sizeof(size_t), 1);
+			if (status)
+				return -1;
+
+			read_file(&size, sizeof(size_t), 1);
+			if (status)
+				return -1;
+			name[name_size] = 0;
+			if ((!arg) || (!strcmp(arg,"-r")))
+				printf(" %zu [%s:%lu]\n", index, name.data(), size);
 		}
-		if ((!arg) || (!strcmp(arg,"-r"))) {
+
+		if ((!arg) || (!strcmp(arg,"-r")))
 			printf("\n");
-		}
 
 		parse_mem();
 
@@ -819,13 +958,18 @@ public:
 			printf("# Function pointer map size: %zu\n",FLCTRL.HDR.fptrmapsz);
 			// Compare fptrmapsz with sizeof(size_t) because we later dereference and read size_t fptrnum
 			if (FLCTRL.HDR.fptr_count > 0 && FLCTRL.HDR.fptrmapsz >= sizeof(size_t)) {
-				std::unique_ptr<char[]> fptrmapmem(new char[FLCTRL.HDR.fptrmapsz]);
+				std::unique_ptr<char[]> fptrmapmem(new(std::nothrow) char[FLCTRL.HDR.fptrmapsz]);
 				size_t offset = 0;
-				
-				if (fptrmapmem == nullptr)
-					throw std::runtime_error("Failed to allocate memory for function pointers");
 
+				if (fptrmapmem == nullptr) {
+					status = UNFLATTEN_ALLOCATION_FAILED;
+					return -1;
+				}
+
+				status = UNFLATTEN_OK;
 				read_file(fptrmapmem.get(), 1, FLCTRL.HDR.fptrmapsz);
+				if (status)
+					return -1;
 				size_t fptrnum = *((size_t*)fptrmapmem.get());
 				printf("# Function pointer count: %zu\n",fptrnum);
 				offset += sizeof(size_t);
@@ -862,17 +1006,29 @@ public:
 
 		// When continous_mapping is disabled we have to always operate on
 		//  local copy of flatten imaged, because memory chunks are not portable
+		status = UNFLATTEN_OK;
 		open_file(f, continuous_mapping, continuous_mapping);
+		if (status)
+			return -1;
 		need_unload = true;
 
 		time_mark_start();
 		// Parse header info and load flattened memory
 		read_file(&FLCTRL.HDR, sizeof(struct flatten_header), 1);
+		if (status)
+			return -1;
 		check_header();
+		if (status)
+			return -1;
 		parse_root_ptrs();
 		parse_mem();
-		if(gfa)
+		if (status)
+			return -1;
+		if (gfa) {
 			parse_fptrmap();
+			if (status)
+				return -1;
+		}
 		info(" #Unflattening done\n");
 		info(" #Image read time: %lfs\n", time_elapsed());
 
@@ -890,17 +1046,25 @@ public:
 			for (size_t i = 0; i < FLCTRL.HDR.mcount; ++i) {
 				size_t index = *minfoptr++;
 				size_t size = *minfoptr++;
-				if(index + size < index)
-					throw std::invalid_argument("Size overflow for memory fragment no. " + std::to_string(i));
-				if(index + size > FLCTRL.HDR.memory_size)
-					throw std::invalid_argument("Memory fragment no. " + std::to_string(i) + " doesn't fit in flatten image");
+				if (index + size < index) {
+					status = UNFLATTEN_OVERFLOW;
+					return -1;
+				}
+
+				if (index + size > FLCTRL.HDR.memory_size) {
+					status = UNFLATTEN_MEMORY_FRAGMENT_DOES_NOT_FIT;
+					return -1;
+				}
 
 				struct interval_tree_node *node = (struct interval_tree_node*)calloc(1, sizeof(struct interval_tree_node));
 				node->start = index;
 				node->last = index + size - 1;
 				void* fragment = malloc(size);
-				if (fragment == NULL)
-					throw std::bad_alloc();
+				if (fragment == NULL) {
+					status = UNFLATTEN_ALLOCATION_FAILED;
+					return -1;
+				}
+
 				memcpy(fragment, (char*)memptr + index, size);
 				node->mptr = fragment;
 				interval_tree_insert(node, &FLCTRL.imap_root);
@@ -911,6 +1075,8 @@ public:
 		// Fix pointers
 		time_mark_start();
 		fix_flatten_mem(continuous_mapping);
+		if (status)
+			return -1;
 
 		// Fix function pointers
 		if (FLCTRL.HDR.fptr_count > 0 && gfa) {
@@ -927,8 +1093,10 @@ public:
 					*((void**)((char*)mem + fptri)) = (void*)nfptr;
 				} else {
 					struct interval_tree_node *node = interval_tree_iter_first(&FLCTRL.imap_root, fptri, fptri + 8);
-					if (node == NULL)
-						throw std::invalid_argument("Function address points to invalid location.");
+					if (node == NULL) {
+						status = UNFLATTEN_INVALID_ADDRESS_POINTEE;
+						return -1;
+					}
 
 					size_t node_offset = fptri-node->start;
 					*((void**)((char*)node->mptr + node_offset)) = (void*)nfptr;
@@ -985,7 +1153,7 @@ public:
 		already_freed.insert(mptr);
 	}
 
-	void* get_next_root(void) {
+	void* get_next_root() {
 		return root_pointer_next();
 	}
 
@@ -1009,16 +1177,17 @@ public:
 	ssize_t replace_variable(void* old_mem, void* new_mem, size_t size) {
 		ssize_t fixed = 0;
 		if(old_mem == NULL || new_mem == NULL || size == 0) {
-			info("Invalid arguments provided to .replace_variable (%p; %p; %zu)", 
+			info("Invalid arguments provided to .replace_variable (%p; %p; %zu)",
 				old_mem, new_mem, size);
 			return -1;
 		}
 
-		if(open_mode == UNFLATTEN_OPEN_MMAP_WRITE)
-			throw std::runtime_error("Unflatten is running in invalid open mode");
-		if(FLCTRL.mem == NULL)
-			throw std::runtime_error("FLCTRL.mem is not initialized");
-		
+		if (open_mode == UNFLATTEN_OPEN_MMAP_WRITE)
+			status = UNFLATTEN_UNEXPECTED_OPEN_MODE;
+
+		if (FLCTRL.mem == NULL)
+			status = UNFLATTEN_UNINITIALIZED_FLCTRL;
+
 		for (size_t i = 0; i < FLCTRL.HDR.ptr_count; ++i) {
 			void* mem = flatten_memory_start();
 			size_t fix_loc = *((size_t*)FLCTRL.mem + i);
@@ -1034,12 +1203,12 @@ public:
 
 				struct interval_tree_node *node = interval_tree_iter_first(&FLCTRL.imap_root, fix_loc, fix_loc + 8);
 				if (node == NULL)
-					throw std::invalid_argument("Interval tree node could not be extracted");
+					status = UNFLATTEN_INTERVAL_EXTRACTION_FAILED;
 				size_t node_offset = fix_loc-node->start;
 
 				struct interval_tree_node *ptr_node = interval_tree_iter_first(&FLCTRL.imap_root, ptr, ptr + 8);
 				if (ptr_node == NULL)
-					throw std::invalid_argument("Interval tree node could not be extracted");
+					status = UNFLATTEN_INTERVAL_EXTRACTION_FAILED;
 				size_t ptr_node_offset = ptr-ptr_node->start;
 
 				void* target = (unsigned char*)ptr_node->mptr + ptr_node_offset;
@@ -1053,14 +1222,15 @@ public:
 		// Replace variable in root and named_root pointers
 		for (size_t i = 0; i < FLCTRL.HDR.root_addr_count; i++) {
 			uintptr_t root_mem = FLCTRL.root_addr[i].root_addr;
-			if(root_mem >= (uintptr_t)old_mem && root_mem < (uintptr_t)old_mem + size) {
+			if (root_mem >= (uintptr_t)old_mem && root_mem < (uintptr_t)old_mem + size) {
 				uintptr_t offset = root_mem - (uintptr_t)old_mem;
 				FLCTRL.root_addr[i].root_addr = (uintptr_t)new_mem + offset;
 				fixed++;
 			}
 		}
-		for(auto& [name, entry] : root_addr_map) {
-			if(entry.first >= (uintptr_t)old_mem && entry.first < (uintptr_t)old_mem + size) {
+
+		for (auto& [name, entry] : root_addr_map) {
+			if (entry.first >= (uintptr_t)old_mem && entry.first < (uintptr_t)old_mem + size) {
 				uintptr_t offset = entry.first - (uintptr_t)old_mem;
 				entry.first = (uintptr_t)new_mem + offset;
 				fixed++;
@@ -1070,6 +1240,8 @@ public:
 		return fixed;
 	}
 };
+
+thread_local UnflattenStatus UnflattenEngine::status = UNFLATTEN_OK;
 
 /********************************
  * C++ API
@@ -1114,130 +1286,66 @@ ssize_t Unflatten::replace_variable(void* old_mem, void* new_mem, size_t size) {
 	return engine->replace_variable(old_mem, new_mem, size);
 }
 
+UnflattenStatus Unflatten::get_status() {
+	return engine->get_status();
+}
+
+void Unflatten::reset_status() {
+	engine->reset_status();
+}
+
+const char *Unflatten::explain_status(UnflattenStatus status) {
+	if (status < UNFLATTEN_OK || status >= UNFLATTEN_STATUS_MAX)
+		status = UNFLATTEN_STATUS_MAX;
+
+	return unflatten_status_messages[status];
+}
+
 /********************************
  * C Wrappers
  *******************************/
 CUnflatten unflatten_init(int level) {
-	CUnflatten flatten;
-	try {
-		flatten = new UnflattenEngine(level);
-	} catch(std::exception& ex) { 
-		fprintf(stderr, "[UnflattenLib] Failed to initalize kflat - `%s`\n", ex.what());
-		return NULL;
-	} catch(...) {
-		fprintf(stderr, "[UnflattenLib] Failed to initalize kflat - exception occurred\n");
-		return NULL;
-	}
-	return flatten;
+	return new UnflattenEngine(level);
 }
 
 void unflatten_deinit(CUnflatten flatten) {
-	try {
-		if(flatten != NULL)
-			delete (UnflattenEngine*)flatten;
-	} catch(...) {
-		return;
-	}
+	delete (UnflattenEngine*)flatten;
 }
 
 int unflatten_load(CUnflatten flatten, FILE* file, get_function_address_t gfa) {
-	try {
-		return ((UnflattenEngine*)flatten)->load(file, gfa);
-	} catch(std::exception& ex) { 
-		fprintf(stderr, "[UnflattenLib] Failed to load image - `%s`\n", ex.what());
-		return -1;
-	} catch(...) {
-		fprintf(stderr, "[UnflattenLib] Failed to load image - exception occurred\n");
-		return -1;
-	}
+	return ((UnflattenEngine*)flatten)->load(file, gfa);
 }
 
 int unflatten_imginfo(CUnflatten flatten, FILE* file) {
-	try {
-		return ((UnflattenEngine*)flatten)->imginfo(file,0);
-	} catch(std::exception& ex) { 
-		fprintf(stderr, "[UnflattenLib] Failed to print image information - `%s`\n", ex.what());
-		return -1;
-	} catch(...) {
-		fprintf(stderr, "[UnflattenLib] Failed to print image information - exception occurred\n");
-		return -1;
-	}
+	return ((UnflattenEngine*)flatten)->imginfo(file,0);
 }
 
 int unflatten_load_continuous(CUnflatten flatten, FILE* file, get_function_address_t gfa) {
-	try {
-		return ((UnflattenEngine*)flatten)->load(file, gfa, true);
-	} catch(std::exception& ex) { 
-		fprintf(stderr, "[UnflattenLib] Failed to load continous image - `%s`\n", ex.what());
-		return -1;
-	} catch(...) {
-		fprintf(stderr, "[UnflattenLib] Failed to load continous image - exception occurred\n");
-		return -1;
-	}
+	return ((UnflattenEngine*)flatten)->load(file, gfa, true);
 }
 
 void unflatten_unload(CUnflatten flatten) {
-	try {
-		((UnflattenEngine*)flatten)->unload();
-	} catch(...) {
-		return;
-	}
+	((UnflattenEngine*)flatten)->unload();
 }
 
 void* unflatten_root_pointer_next(CUnflatten flatten) {
-	try {
-		return ((UnflattenEngine*)flatten)->get_next_root();
-	} catch(std::exception& ex) { 
-		fprintf(stderr, "[UnflattenLib] Failed to get next root pointer - `%s`\n", ex.what());
-		return NULL;
-	} catch(...) {
-		fprintf(stderr, "[UnflattenLib] Failed to get next root pointer - exception occurred\n");
-		return NULL;
-	}
+	return ((UnflattenEngine*)flatten)->get_next_root();
 }
 
 void* unflatten_root_pointer_seq(CUnflatten flatten, size_t idx) {
-	try {
-		return ((UnflattenEngine*)flatten)->get_seq_root(idx);
-	} catch(std::exception& ex) { 
-		fprintf(stderr, "[UnflattenLib] Failed to get seq root pointer - `%s`\n", ex.what());
-		return NULL;
-	} catch(...) {
-		fprintf(stderr, "[UnflattenLib] Failed to get seq root pointer - exception occurred\n");
-		return NULL;
-	}
+	return ((UnflattenEngine*)flatten)->get_seq_root(idx);
 }
 
 void* unflatten_root_pointer_named(CUnflatten flatten, const char* name, size_t* idx) {
-	try {
-		return ((UnflattenEngine*)flatten)->get_named_root(name, idx);
-	}  catch(std::exception& ex) { 
-		fprintf(stderr, "[UnflattenLib] Failed to get named root pointer - `%s`\n", ex.what());
-		return NULL;
-	} catch(...) {
-		fprintf(stderr, "[UnflattenLib] Failed to get named root pointer - exception occurred\n");
-		return NULL;
-	}
+	return ((UnflattenEngine*)flatten)->get_named_root(name, idx);
 }
 
 void unflatten_mark_freed(CUnflatten flatten, void *mptr) {
-	try {
-		((UnflattenEngine*)flatten)->mark_freed(mptr);
-	} catch (std::exception& ex) {
-		fprintf(stderr, "[UnflattenLib] Failed to mark pointer as freed - `%s`\n", ex.what());
-	}
+	((UnflattenEngine*)flatten)->mark_freed(mptr);
 }
 
 CUnflattenHeader unflatten_get_image_header(CUnflatten flatten) {
-	try {
-		return ((UnflattenEngine*)flatten)->get_image_header();
-	}  catch(std::exception& ex) { 
-		fprintf(stderr, "[UnflattenLib] Failed to get image header\n");
-		return NULL;
-	} catch(...) {
-		fprintf(stderr, "[UnflattenLib] Failed to get image header - exception occurred\n");
-		return NULL;
-	}
+	return ((UnflattenEngine*)flatten)->get_image_header();
 }
 
 unsigned long unflatten_header_fragment_count(CUnflattenHeader header) {
@@ -1249,13 +1357,17 @@ size_t unflatten_header_memory_size(CUnflattenHeader header) {
 }
 
 ssize_t unflatten_replace_variable(CUnflatten flatten, void* old_mem, void* new_mem, size_t size) {
-	try {
-		return ((UnflattenEngine*)flatten)->replace_variable(old_mem, new_mem, size);
-	} catch(std::exception& ex) {
-		fprintf(stderr, "[UnflattenLib] Failed to replace variable references - `%s`\n", ex.what());
-		return -1;
-	} catch(...) {
-		fprintf(stderr, "[UnflattenLib] Failed to replace variable references\n");
-		return -1;
-	}
+	return ((UnflattenEngine*)flatten)->replace_variable(old_mem, new_mem, size);
+}
+
+UnflattenStatus unflatten_get_status(CUnflatten flatten) {
+	return ((UnflattenEngine*)flatten)->get_status();
+}
+
+void unflatten_reset_status(CUnflatten flatten) {
+	((UnflattenEngine*)flatten)->reset_status();
+}
+
+const char *unflatten_explain_status(UnflattenStatus status) {
+	return Unflatten::explain_status(status);
 }

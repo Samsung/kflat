@@ -72,6 +72,7 @@ set(UNFLATTEN_INCLUDES ${CMAKE_CURRENT_SOURCE_DIR}/include_priv ${KFLAT_INCLUDES
 add_library(unflatten_obj OBJECT ${UNFLATTEN_SOURCE} rbtree.c)
 target_include_directories(unflatten_obj PUBLIC ${UNFLATTEN_INCLUDES})
 set_target_properties(unflatten_obj PROPERTIES POSITION_INDEPENDENT_CODE ON)
+target_compile_options(unflatten_obj PUBLIC -fno-exceptions)
 
 # STATIC
 add_library(unflatten_static STATIC $<TARGET_OBJECTS:unflatten_obj>)

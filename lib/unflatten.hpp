@@ -1,7 +1,10 @@
-/* 
+/*
  * Samsung R&D Poland - Mobile Security Group (srpol.mb.sec@samsung.com)
  *  C/C++ library for interacting with kflat images
  */
+
+#ifndef UNFLATTEN_HPP
+#define UNFLATTEN_HPP
 
 #include <stdio.h>
 #include <stdint.h>
@@ -14,6 +17,33 @@ typedef void* CUnflatten;
 typedef void* CUnflattenHeader;
 typedef uintptr_t (*get_function_address_t)(const char* fsym);
 
+typedef enum {
+	UNFLATTEN_OK = 0,
+	UNFLATTEN_INVALID_ROOT_POINTER,
+	UNFLATTEN_INVALID_ARGUMENT,
+	UNFLATTEN_INVALID_OFFSET,
+	UNFLATTEN_INVALID_MAGIC,
+	UNFLATTEN_INVALID_FIX_LOCATION,
+	UNFLATTEN_INVALID_FIX_DESTINATION,
+	UNFLATTEN_INVALID_ADDRESS_POINTEE,
+	UNFLATTEN_NO_NEXT_ROOT_POINTER,
+	UNFLATTEN_NOT_FOUND_NAMED_ROOT_POINTER,
+	UNFLATTEN_UNINITIALIZED_FLCTRL,
+	UNFLATTEN_INDEX_OUT_OF_RANGE,
+	UNFLATTEN_FILE_LOCKED,
+	UNFLATTEN_UNEXPECTED_OPEN_MODE,
+	UNFLATTEN_DIFFERENT_IMAGE_SIZE,
+	UNFLATTEN_MEMORY_SIZE_BIGGER_THAN_IMAGE,
+	UNFLATTEN_MEMORY_FRAGMENT_DOES_NOT_FIT,
+	UNFLATTEN_TRUNCATED_FILE,
+	UNFLATTEN_UNSUPPORTED_MAGIC,
+	UNFLATTEN_OVERFLOW,
+	UNFLATTEN_ALLOCATION_FAILED,
+	UNFLATTEN_INTERVAL_EXTRACTION_FAILED,
+	UNFLATTEN_STATUS_MAX,
+} UnflattenStatus;
+
+extern const char *unflatten_status_messages[];
 
 /********************************
  * C++ interface
@@ -109,14 +139,17 @@ public:
 	/**
 	 * @brief Replace all pointers to the provided memory range with a new variable. It can be
 	 * 	used to replace global variable from image with local copy
-	 * 
-	 * @param old_mem 	pointer to old memory	
+	 *
+	 * @param old_mem 	pointer to old memory
 	 * @param new_mem 	pointer to new memory
 	 * @param size 		size of memory chunked to be replaced
 	 * @return ssize_t  number of chunkes replaced or negative value in case of an error
 	 */
 	ssize_t replace_variable(void* old_mem, void* new_mem, size_t size);
-	
+
+	UnflattenStatus get_status();
+	void reset_status();
+	static const char *explain_status(UnflattenStatus status);
 };
 
 extern "C" {
@@ -255,3 +288,4 @@ ssize_t unflatten_replace_variable(CUnflatten flatten, void* old_mem, void* new_
 #ifdef __cplusplus
 }
 #endif
+#endif /* UNFLATTEN_HPP */
