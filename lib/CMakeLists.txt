@@ -75,28 +75,21 @@ set_target_properties(unflatten_obj PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
 # STATIC
 add_library(unflatten_static STATIC $<TARGET_OBJECTS:unflatten_obj>)
+add_custom_command(
+    TARGET unflatten_static
+    POST_BUILD
+    WORKING_DIRECTORY ${PROJECT_BINARY_DIR}/lib/
+    COMMAND bash ${PROJECT_SOURCE_DIR}/utils/unflatten_for_aot.sh ${PROJECT_BINARY_DIR}
+)
 set_target_properties(unflatten_static PROPERTIES OUTPUT_NAME unflatten)
-target_include_directories(unflatten_static PUBLIC ${UNFLATTEN_INCLUDES})
 
 # SHARED
 add_library(unflatten_shared SHARED $<TARGET_OBJECTS:unflatten_obj>)
 set_target_properties(unflatten_shared PROPERTIES OUTPUT_NAME unflatten)
-target_include_directories(unflatten_shared PUBLIC ${UNFLATTEN_INCLUDES})
 
 # Custom unflatten target that compiles both dynamic and static version of unflatten
 add_custom_target(unflatten DEPENDS unflatten_static unflatten_shared)
 
-# ===========================================
-# =========== unflatten for AOT =============
-# ===========================================
-
-set(UNFLATTEN_FOR_AOT ${PROJECT_BINARY_DIR}/lib/libunflatten_aot.a)
-add_custom_command(
-    OUTPUT ${UNFLATTEN_FOR_AOT}
-    WORKING_DIRECTORY ${PROJECT_BINARY_DIR}/lib/
-    COMMAND bash ${PROJECT_SOURCE_DIR}/utils/unflatten_for_aot.sh ${PROJECT_BINARY_DIR}
-)
-add_custom_target(unflatten_aot ALL DEPENDS unflatten_obj ${UNFLATTEN_FOR_AOT})
 
 # These targets require a specific compiler, so they have to be built manually by custom commands.
 find_program(clang++-13_FOUND clang++-13 NOCACHE PATH ${KLEE_CLANGXX_PATH})

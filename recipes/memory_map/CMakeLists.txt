@@ -26,7 +26,7 @@ add_custom_target(${TARGET_NAME} ALL DEPENDS kflat_core ${RECIPE_SOURCE_NAME})
 
 add_executable(memory_map_client client_app.cpp)
 target_include_directories(memory_map_client PRIVATE ${KFLAT_INCLUDES} ${PROJECT_SOURCE_DIR}/lib/include_priv)
-target_link_libraries(memory_map_client PRIVATE unflatten_static)
+target_link_libraries(memory_map_client PRIVATE unflatten_obj)
 target_link_options(memory_map_client PRIVATE -static)
 
 add_dependencies(${TARGET_NAME} memory_map_client)

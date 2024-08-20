@@ -29,7 +29,7 @@ add_executable(kflattest kflattest.c ${TEST_SOURCES} ${KFLAT_TEST_SOURCES})
 add_dependencies(kflattest kflat_core tests_list)
 
 target_include_directories(kflattest PRIVATE ${KFLAT_INCLUDES} ${PROJECT_SOURCE_DIR}/tests)
-target_link_libraries(kflattest common unflatten_static)
+target_link_libraries(kflattest common unflatten_obj)
 
 target_compile_definitions(kflattest PRIVATE __VALIDATOR__)
 target_link_options(kflattest PRIVATE "-static")
