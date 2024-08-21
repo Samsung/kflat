@@ -79,7 +79,7 @@ add_custom_command(
     TARGET unflatten_static
     POST_BUILD
     WORKING_DIRECTORY ${PROJECT_BINARY_DIR}/lib/
-    COMMAND bash ${PROJECT_SOURCE_DIR}/utils/unflatten_for_aot.sh ${PROJECT_BINARY_DIR}
+    COMMAND bash ${PROJECT_SOURCE_DIR}/cmake/chop_unflatten.sh ${PROJECT_BINARY_DIR}
 )
 set_target_properties(unflatten_static PROPERTIES OUTPUT_NAME unflatten)
 
