@@ -276,11 +276,11 @@ private:
 		return 0;
 	}
 
-	void fix_root_pointers(void) {
+	UnflattenStatus fix_root_pointers(void) {
 		for (auto& root_ptr : FLCTRL.root_addr) {
 			uintptr_t addr = (uintptr_t) get_root_addr_mem(root_ptr.root_addr);
 			if (!addr)
-				return;
+				return UNFLATTEN_INVALID_ROOT_POINTER;
 
 			root_ptr.root_addr = addr;
 		}
@@ -288,10 +288,12 @@ private:
 		for (auto& [name, entry] : root_addr_map) {
 			uintptr_t addr = (uintptr_t) get_root_addr_mem(entry.first);
 			if (!addr)
-				return;
+				return UNFLATTEN_INVALID_ROOT_POINTER;
 
 			entry.first = addr;
 		}
+
+		return UNFLATTEN_OK;
 	}
 
 	/***************************
@@ -1049,7 +1051,9 @@ public:
 			}
 		}
 
-		fix_root_pointers();
+		status = fix_root_pointers();
+		if (status)
+			return status;
 
 		// At this point mode UNFLATTEN_OPEN_READ_COPY copied all memory to local RAM
 		//  so there's no need to hold lock any longer
