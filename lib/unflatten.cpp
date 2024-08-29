@@ -88,7 +88,7 @@ const char *unflatten_status_messages[] = {
 	"No next root pointer available",
 	"Named root pointer not found",
 	"FLCTRL is uninitialized",
-	"Index of range",
+	"Index out of range",
 	"Failed to acquire read-lock on input file",
 	"Unexpected open_mode",
 	"Image size differs from header",
@@ -99,6 +99,7 @@ const char *unflatten_status_messages[] = {
 	"Integer overflow",
 	"Memory allocation failed",
 	"Interval extraction failed",
+	"Memory was already fixed and is loaded at the same address as previously",
 	""
 };
 
@@ -108,8 +109,6 @@ const char *unflatten_status_messages[] = {
 class UnflattenEngine {
 private:
 	friend class Unflatten;
-
-	static thread_local UnflattenStatus status;
 
 	bool need_unload;
 	enum {
@@ -217,10 +216,8 @@ private:
 			struct interval_tree_node *node = interval_tree_iter_first(
 					&FLCTRL.imap_root,
 					root_addr, root_addr + 8);
-			if (node == NULL) {
-				status = UNFLATTEN_INVALID_ROOT_POINTER;
+			if (node == NULL)
 				return NULL;
-			}
 
 			size_t node_offset = root_addr - node->start;
 			return (char*)node->mptr + node_offset;
@@ -230,10 +227,8 @@ private:
 	}
 
 	void* root_pointer_next() {
-		if(FLCTRL.last_accessed_root >= (ssize_t)FLCTRL.root_addr.size() - 1) {
-			status = UNFLATTEN_NO_NEXT_ROOT_POINTER;
+		if(FLCTRL.last_accessed_root >= (ssize_t)FLCTRL.root_addr.size() - 1)
 			return NULL;
-		}
 
 		FLCTRL.last_accessed_root++;
 
@@ -242,10 +237,8 @@ private:
 	}
 
 	void* root_pointer_seq(size_t index) {
-		if(index >= FLCTRL.root_addr.size()) {
-			status = UNFLATTEN_INDEX_OUT_OF_RANGE;
+		if(index >= FLCTRL.root_addr.size())
 			return NULL;
-		}
 		FLCTRL.last_accessed_root = index;
 
 		struct root_addr_node* last_root = &FLCTRL.root_addr[FLCTRL.last_accessed_root];
@@ -254,10 +247,8 @@ private:
 
 	void* root_pointer_named(const char* name, size_t* size) {
 		auto it = root_addr_map.find(name);
-		if (it == root_addr_map.end()) {
-			status = UNFLATTEN_NOT_FOUND_NAMED_ROOT_POINTER;
+		if (it == root_addr_map.end())
 			return NULL;
-		}
 
 		auto& entry = it->second;
 
@@ -355,11 +346,12 @@ private:
 	 * @param support_write_lock flag indicating whether we want to support OPEN_MMAP_WRITE mode
 	 * @param support_mmap whether we want to support any OPEN_MMAP* mode
 	 */
-	void open_file(FILE* f, bool support_write_lock = true, bool support_mmap = true) {
+	UnflattenStatus open_file(FILE* f, bool support_write_lock = true, bool support_mmap = true) {
 		int fd = fileno(f);
 		opened_file_fd = fd;
 		opened_file_file = f;
 		current_mmap_offset = 0;
+		UnflattenStatus status;
 		open_mode = UNFLATTEN_OPEN_READ_COPY;
 
 		opened_mmap_size = lseek(fd, 0, SEEK_END);
@@ -374,9 +366,9 @@ private:
 			ret = fcntl(fd, F_SETLK, &lock);
 			if(ret >= 0) {
 				// Acquired exclusive write access
-				read_file(&FLCTRL.HDR,sizeof(struct flatten_header),1);
+				status = read_file(&FLCTRL.HDR,sizeof(struct flatten_header),1);
 				if (status)
-					return;
+					return status;
 				fseek(f, 0, SEEK_SET);
 				if(!FLCTRL.HDR.last_load_addr){
 					// rewrite image, mmap it and release lock
@@ -385,8 +377,7 @@ private:
 					if(opened_mmap_addr != MAP_FAILED) {
 						info("Opened file in write mode\n");
 						open_mode = UNFLATTEN_OPEN_MMAP_WRITE;
-						status = UNFLATTEN_OK;
-						return;
+						return UNFLATTEN_OK;
 					}
 				}
 				debug("Failed to open file in write mode - %s\n", strerror(errno));
@@ -400,15 +391,13 @@ private:
 		ret = fcntl(fd, F_SETLKW, &lock);
 		if(ret < 0) {
 			info("Failed to obtain read-lock - fcntl returned: %s\n", strerror(errno));
-			status = UNFLATTEN_FILE_LOCKED;
-			return;
+			return UNFLATTEN_FILE_LOCKED;
 		}
 
 		// At this point we've got read_lock, check header and try to mmap file
-		status = UNFLATTEN_OK;
-		read_file(&FLCTRL.HDR,sizeof(struct flatten_header),1);
+		status = read_file(&FLCTRL.HDR,sizeof(struct flatten_header),1);
 		if (status)
-			return;
+			return status;
 		fseek(f, 0, SEEK_SET);
 		void* mmap_addr = (void*) FLCTRL.HDR.last_load_addr;
 		if(mmap_addr != NULL && support_mmap) {
@@ -419,8 +408,7 @@ private:
 				info("Opened input file in mmap mode @ %p (size: %p)\n",
 					opened_mmap_addr, opened_mmap_size);
 				open_mode = UNFLATTEN_OPEN_MMAP;
-				status = UNFLATTEN_OK;
-				return;
+				return UNFLATTEN_OK;
 			} else
 				debug("Failed to open input file in mmap mode - %s\n", strerror(errno));
 		}
@@ -428,11 +416,10 @@ private:
 		// Mmap failed. The only thing left is to load whole image into memory
 		info("Opened file in copy mode\n");
 		open_mode = UNFLATTEN_OPEN_READ_COPY;
-		status = UNFLATTEN_OK;
-		return;
+		return UNFLATTEN_OK;
 	}
 
-	void close_file() {
+	UnflattenStatus close_file() {
 		struct flock lock = { 0,  };
 		lock.l_type = F_UNLCK;
 		lock.l_start = 0;
@@ -454,25 +441,24 @@ private:
 			break;
 
 			default:
-				status = UNFLATTEN_FILE_LOCKED;
-				return;
+				return UNFLATTEN_FILE_LOCKED;
 		}
 
 		opened_file_fd = -1;
 		opened_file_file = NULL;
+
+		return UNFLATTEN_OK;
 	}
 
-	void read_file(void* dst, size_t size, size_t n) {
+	UnflattenStatus read_file(void* dst, size_t size, size_t n) {
 		size_t rd, total_size;
 
 		switch(open_mode) {
 			case UNFLATTEN_OPEN_MMAP:
 			case UNFLATTEN_OPEN_MMAP_WRITE: {
 				total_size = size * n;
-				if (total_size + current_mmap_offset > opened_mmap_size) {
-					status = UNFLATTEN_TRUNCATED_FILE;
-					return;
-				}
+				if (total_size + current_mmap_offset > opened_mmap_size)
+					return UNFLATTEN_TRUNCATED_FILE;
 
 				memcpy(dst, (char*)opened_mmap_addr + current_mmap_offset, total_size);
 				current_mmap_offset += total_size;
@@ -481,40 +467,32 @@ private:
 
 			case UNFLATTEN_OPEN_READ_COPY: {
 				rd = fread(dst, size, n, opened_file_file);
-				if (rd != n) {
-					status = UNFLATTEN_TRUNCATED_FILE;
-					return;
-				}
+				if (rd != n)
+					return UNFLATTEN_TRUNCATED_FILE;
 			}
 			break;
 
 			default:
-				status = UNFLATTEN_UNEXPECTED_OPEN_MODE;
-				return;
+				return UNFLATTEN_UNEXPECTED_OPEN_MODE;
 		}
 
 		readin += size * n;
+		return UNFLATTEN_OK;
 	}
 
 
 	/***************************
 	 * UNFLATTEN MEMORY
 	 **************************/
-	inline void check_header(void) const {
-		if (FLCTRL.HDR.magic != KFLAT_IMG_MAGIC) {
-			status = UNFLATTEN_INVALID_MAGIC;
-			return;
-		}
+	inline UnflattenStatus check_header(void) const {
+		if (FLCTRL.HDR.magic != KFLAT_IMG_MAGIC)
+			return UNFLATTEN_INVALID_MAGIC;
 
-		if (FLCTRL.HDR.version != KFLAT_IMG_VERSION) {
-			status = UNFLATTEN_UNSUPPORTED_MAGIC;
-			return;
-		}
+		if (FLCTRL.HDR.version != KFLAT_IMG_VERSION)
+			return UNFLATTEN_UNSUPPORTED_MAGIC;
 
-		if (FLCTRL.HDR.image_size > opened_mmap_size) {
-			status = UNFLATTEN_DIFFERENT_IMAGE_SIZE;
-			return;
-		}
+		if (FLCTRL.HDR.image_size > opened_mmap_size)
+			return UNFLATTEN_DIFFERENT_IMAGE_SIZE;
 
 		bool overflow = false;
 		overflow |= check_mul_overflow(FLCTRL.HDR.ptr_count, sizeof(size_t));
@@ -530,58 +508,50 @@ private:
 		overflow |= add_overflow(total_size, FLCTRL.HDR.fptrmapsz, &total_size);
 		overflow |= add_overflow(total_size, FLCTRL.HDR.mcount * 16, &total_size);
 		overflow |= add_overflow(total_size, FLCTRL.HDR.memory_size, &total_size);
-		if (overflow) {
-			status = UNFLATTEN_OVERFLOW;
-			return;
-		}
+		if (overflow)
+			return UNFLATTEN_OVERFLOW;
 
-		if (total_size > FLCTRL.HDR.image_size) {
-			status = UNFLATTEN_MEMORY_SIZE_BIGGER_THAN_IMAGE;
-			return;
-		}
+		if (total_size > FLCTRL.HDR.image_size)
+			return UNFLATTEN_MEMORY_SIZE_BIGGER_THAN_IMAGE;
 
-		return;
+		return UNFLATTEN_OK;
 	}
 
-	inline void parse_root_ptrs(void) {
+	inline UnflattenStatus parse_root_ptrs(void) {
+		UnflattenStatus status;
 		std::vector<uintptr_t> root_ptr_vector;
 		for (size_t i = 0; i < FLCTRL.HDR.root_addr_count; ++i) {
 			size_t root_addr_offset;
-			status = UNFLATTEN_OK;
-			read_file(&root_addr_offset, sizeof(size_t), 1);
+			status = read_file(&root_addr_offset, sizeof(size_t), 1);
 			if (status)
-				return;
+				return status;
 			root_ptr_vector.push_back(root_addr_offset);
 		}
 
 		std::map<size_t,std::pair<std::string,size_t>> root_ptr_ext_map;
 		for (size_t i = 0; i < FLCTRL.HDR.root_addr_extended_count; ++i) {
 			size_t name_size, index, size;
-			status = UNFLATTEN_OK;
-			read_file(&name_size,sizeof(size_t),1);
+			status = read_file(&name_size,sizeof(size_t),1);
 			if (status)
-				return;
+				return status;
 
 			std::string name;
-			name.reserve(name_size + 1);
+			name.resize(name_size + 1);
 			name[name_size] = '\0';
 
-			status = UNFLATTEN_OK;
-			read_file((void*) name.data(), name_size, 1);
+			status = read_file((void*) name.data(), name_size, 1);
 			if (status)
-				return;
+				return status;
 
-			status = UNFLATTEN_OK;
-			read_file(&index, sizeof(size_t), 1);
+			status = read_file(&index, sizeof(size_t), 1);
 			if (status)
-				return;
+				return status;
 
-			status = UNFLATTEN_OK;
-			read_file(&size, sizeof(size_t), 1);
+			status = read_file(&size, sizeof(size_t), 1);
 			if (status)
-				return;
+				return status;
 
-			root_ptr_ext_map.insert({index, {std::move(name), size}});
+			root_ptr_ext_map.insert({index, {name, size}});
 		}
 
 		for (size_t i = 0; i < root_ptr_vector.size(); ++i) {
@@ -590,6 +560,8 @@ private:
 			else
 				root_addr_append(root_ptr_vector[i]);
 		}
+
+		return UNFLATTEN_OK;
 	}
 
 	inline size_t get_memsz() {
@@ -599,29 +571,28 @@ private:
 			FLCTRL.HDR.mcount * 2 * sizeof(size_t);
 	}
 
-	inline void parse_mem(void) {
+	inline UnflattenStatus parse_mem(void) {
 		size_t memsz = get_memsz();
 
 		switch (open_mode) {
 			case UNFLATTEN_OPEN_READ_COPY:
 				FLCTRL.mem = new(std::nothrow) char[memsz];
-				if (!FLCTRL.mem) {
-					status = UNFLATTEN_ALLOCATION_FAILED;
-					return;
-				}
+				if (!FLCTRL.mem)
+					return UNFLATTEN_ALLOCATION_FAILED;
+
 				read_file(FLCTRL.mem, 1, memsz);
 				break;
 			case UNFLATTEN_OPEN_MMAP:
 			case UNFLATTEN_OPEN_MMAP_WRITE:
-				if (current_mmap_offset + memsz > opened_mmap_size) {
-					status = UNFLATTEN_TRUNCATED_FILE;
-					return;
-				}
+				if (current_mmap_offset + memsz > opened_mmap_size)
+					return UNFLATTEN_TRUNCATED_FILE;
 
 				FLCTRL.mem = (char*)opened_mmap_addr + current_mmap_offset;
 				current_mmap_offset += memsz;
 				break;
 		}
+
+		return UNFLATTEN_OK;
 	}
 
 	inline void release_mem(void) {
@@ -630,30 +601,24 @@ private:
 		FLCTRL.mem = NULL;
 	}
 
-	inline void parse_fptrmap(void) {
+	inline UnflattenStatus parse_fptrmap(void) {
 		char* orig_fptrmapmem, * fptrmapmem;
+		UnflattenStatus status;
 
-		if (FLCTRL.HDR.fptr_count <= 0 || FLCTRL.HDR.fptrmapsz <= 0) {
-			status = UNFLATTEN_INVALID_ARGUMENT;
-			return;
-		}
+		if (FLCTRL.HDR.fptr_count <= 0 || FLCTRL.HDR.fptrmapsz <= 0)
+			return UNFLATTEN_INVALID_ARGUMENT;
 
 		if(open_mode == UNFLATTEN_OPEN_READ_COPY) {
 			orig_fptrmapmem = fptrmapmem = new(std::nothrow) char[FLCTRL.HDR.fptrmapsz];
-			if (orig_fptrmapmem) {
-				status = UNFLATTEN_ALLOCATION_FAILED;
-				return;
-			}
+			if (!fptrmapmem)
+				return UNFLATTEN_ALLOCATION_FAILED;
 
-			status = UNFLATTEN_OK;
-			read_file(fptrmapmem, 1, FLCTRL.HDR.fptrmapsz);
+			status = read_file(fptrmapmem, 1, FLCTRL.HDR.fptrmapsz);
 			if (status)
-				return;
+				return status;
 		} else {
-			if (current_mmap_offset + FLCTRL.HDR.fptrmapsz > opened_mmap_size) {
-				status = UNFLATTEN_TRUNCATED_FILE;
-				return;
-			}
+			if (current_mmap_offset + FLCTRL.HDR.fptrmapsz > opened_mmap_size)
+				return UNFLATTEN_TRUNCATED_FILE;
 
 			orig_fptrmapmem = fptrmapmem = (char*)opened_mmap_addr + current_mmap_offset;
 			current_mmap_offset += FLCTRL.HDR.fptrmapsz;
@@ -673,19 +638,21 @@ private:
 			fptrmapmem += sz;
 			fptrmap.insert(std::pair<uintptr_t, std::string>(addr, sym));
 		}
-		
+
 		if(open_mode == UNFLATTEN_OPEN_READ_COPY)
 			delete[] orig_fptrmapmem;
+
+		return UNFLATTEN_OK;
 	}
 
 	/**
 	 * @brief Fix all the pointers in flattened memory area
-	 * 
+	 *
 	 */
-	inline void fix_flatten_mem(bool continuous_mapping) {
+	inline UnflattenStatus fix_flatten_mem(bool continuous_mapping) {
 		if(open_mode == UNFLATTEN_OPEN_MMAP) {
 			// Memory was already fixed and is loaded at the same address as previously
-			return;
+			return UNFLATTEN_ALREADY_FIXED;
 		}
 
 		for (size_t i = 0; i < FLCTRL.HDR.ptr_count; ++i) {
@@ -697,41 +664,34 @@ private:
 			 *  pointer should point to.
 			 */
 			size_t fix_loc = *((size_t*)FLCTRL.mem + i);
-			if (fix_loc + sizeof(size_t) > FLCTRL.HDR.memory_size || add_overflow(fix_loc, sizeof(size_t), &tmp)) {
-				status = UNFLATTEN_INVALID_FIX_LOCATION;
-				return;
-			}
+			if (fix_loc + sizeof(size_t) > FLCTRL.HDR.memory_size || add_overflow(fix_loc, sizeof(size_t), &tmp))
+				return UNFLATTEN_INVALID_FIX_LOCATION;
 			uintptr_t ptr = *(uintptr_t*)((char*)mem + fix_loc);
-			if (ptr < FLCTRL.HDR.last_mem_addr || ptr > FLCTRL.HDR.memory_size) {
-				status = UNFLATTEN_INVALID_FIX_DESTINATION;
-				return;
-			}
+
+			if (ptr < FLCTRL.HDR.last_mem_addr)
+				return UNFLATTEN_INVALID_FIX_DESTINATION;
 
 			ptr -= FLCTRL.HDR.last_mem_addr;
+            if (ptr > FLCTRL.HDR.memory_size)
+				return UNFLATTEN_INVALID_FIX_DESTINATION;
 
 			if (continuous_mapping) {
 				*((void**)((unsigned char*)mem + fix_loc)) = (unsigned char*)mem + ptr;
 			} else {
 				struct interval_tree_node *node = interval_tree_iter_first(&FLCTRL.imap_root, fix_loc, fix_loc + 8);
-				if (node == NULL) {
-					status = UNFLATTEN_INVALID_ADDRESS_POINTEE;
-					return;
-				}
+				if (node == NULL)
+					return UNFLATTEN_INVALID_ADDRESS_POINTEE;
 
 				size_t node_offset = fix_loc - node->start;
 				struct interval_tree_node *ptr_node = interval_tree_iter_first(&FLCTRL.imap_root, ptr, ptr + 8);
-				if (ptr_node == NULL) {
-					status = UNFLATTEN_INVALID_ADDRESS_POINTEE;
-					return;
-				}
+				if (ptr_node == NULL)
+					return UNFLATTEN_INVALID_ADDRESS_POINTEE;
 
 				/* Make the fix */
 				size_t ptr_node_offset = ptr - ptr_node->start;
 				size_t mptr_size = node->last - node->start + 1;
-				if (node_offset > mptr_size - 8) {
-					status = UNFLATTEN_INVALID_OFFSET;
-					return;
-				}
+				if (node_offset > mptr_size - 8)
+					return UNFLATTEN_INVALID_OFFSET;
 
 				*((void**)((char*)node->mptr + node_offset)) = (char*)ptr_node->mptr + ptr_node_offset;
 
@@ -747,7 +707,7 @@ private:
 
 			// Remap image as COW
 			munmap(opened_mmap_addr, opened_mmap_size);
-			opened_mmap_addr = mmap(opened_mmap_addr, opened_mmap_size, 
+			opened_mmap_addr = mmap(opened_mmap_addr, opened_mmap_size,
 				PROT_READ | PROT_WRITE, MAP_PRIVATE, opened_file_fd, 0);
 
 			struct flock lock = { 0,  };
@@ -763,6 +723,8 @@ private:
 		// Update header to reflect modified memory base address
 		if(continuous_mapping)
 			FLCTRL.HDR.last_mem_addr = (uintptr_t) flatten_memory_start();
+
+		return UNFLATTEN_OK;
 	}
 
 
@@ -776,32 +738,22 @@ public:
 		loglevel = (decltype(loglevel))_level;
 	}
 
-	UnflattenStatus get_status() {
-		return status;
-	}
-
-	void reset_status() {
-		status = UNFLATTEN_OK;
-	}
-
-	int imginfo(FILE* f, const char* arg) {
+	UnflattenStatus imginfo(FILE* f, const char* arg) {
+		UnflattenStatus status;
 		if (need_unload)
 			unload();
 
-		status = UNFLATTEN_OK;
-		open_file(f, false);
+		status = open_file(f, false);
 		if (status)
-			return -1;
+			return status;
 
-		status = UNFLATTEN_OK;
-		read_file(&FLCTRL.HDR, sizeof(struct flatten_header), 1);
+		status = read_file(&FLCTRL.HDR, sizeof(struct flatten_header), 1);
 		if (status)
-			return -1;
+			return status;
 
-		status = UNFLATTEN_OK;
-		check_header();
+		status = check_header();
 		if (status)
-			return -1;
+			return status;
 
 		printf("# Image size: %zu\n\n",FLCTRL.HDR.image_size);
 
@@ -811,9 +763,9 @@ public:
 		}
 		for (size_t i = 0; i < FLCTRL.HDR.root_addr_count; ++i) {
 			size_t root_addr_offset;
-			read_file(&root_addr_offset, sizeof(size_t), 1);
+			status = read_file(&root_addr_offset, sizeof(size_t), 1);
 			if (status)
-				return -1;
+				return status;
 			if ((!arg) || (!strcmp(arg,"-r"))) {
 				printf("%zu ",root_addr_offset);
 			}
@@ -824,23 +776,23 @@ public:
 		}
 		for (size_t i = 0; i < FLCTRL.HDR.root_addr_extended_count; ++i) {
 			size_t name_size, index, size;
-			read_file(&name_size, sizeof(size_t), 1);
+			status = read_file(&name_size, sizeof(size_t), 1);
 			if (status)
-				return -1;
+				return status;
 
 			std::string name;
 			name.reserve(name_size + 1);
-			read_file((void*)name.data(), name_size, 1);
+			status = read_file((void*)name.data(), name_size, 1);
 			if (status)
-				return -1;
+				return status;
 
-			read_file(&index, sizeof(size_t), 1);
+			status = read_file(&index, sizeof(size_t), 1);
 			if (status)
-				return -1;
+				return status;
 
-			read_file(&size, sizeof(size_t), 1);
+			status = read_file(&size, sizeof(size_t), 1);
 			if (status)
-				return -1;
+				return status;
 			name[name_size] = 0;
 			if ((!arg) || (!strcmp(arg,"-r")))
 				printf(" %zu [%s:%lu]\n", index, name.data(), size);
@@ -961,15 +913,12 @@ public:
 				std::unique_ptr<char[]> fptrmapmem(new(std::nothrow) char[FLCTRL.HDR.fptrmapsz]);
 				size_t offset = 0;
 
-				if (fptrmapmem == nullptr) {
-					status = UNFLATTEN_ALLOCATION_FAILED;
-					return -1;
-				}
+				if (fptrmapmem == nullptr)
+					return UNFLATTEN_ALLOCATION_FAILED;
 
-				status = UNFLATTEN_OK;
-				read_file(fptrmapmem.get(), 1, FLCTRL.HDR.fptrmapsz);
+				status = read_file(fptrmapmem.get(), 1, FLCTRL.HDR.fptrmapsz);
 				if (status)
-					return -1;
+					return status;
 				size_t fptrnum = *((size_t*)fptrmapmem.get());
 				printf("# Function pointer count: %zu\n",fptrnum);
 				offset += sizeof(size_t);
@@ -996,38 +945,41 @@ public:
 		}
 
 		release_mem();
-		return 0;
+		return UNFLATTEN_OK;
 	}
 
-	int load(FILE* f, get_function_address_t gfa = NULL, bool continuous_mapping = false) {
+	UnflattenStatus load(FILE* f, get_function_address_t gfa = NULL, bool continuous_mapping = false) {
+		UnflattenStatus status;
+
 		if(need_unload)
 			unload();
 		readin = 0;
 
 		// When continous_mapping is disabled we have to always operate on
 		//  local copy of flatten imaged, because memory chunks are not portable
-		status = UNFLATTEN_OK;
-		open_file(f, continuous_mapping, continuous_mapping);
+		status = open_file(f, continuous_mapping, continuous_mapping);
 		if (status)
-			return -1;
+			return status;
 		need_unload = true;
 
 		time_mark_start();
 		// Parse header info and load flattened memory
-		read_file(&FLCTRL.HDR, sizeof(struct flatten_header), 1);
+		status = read_file(&FLCTRL.HDR, sizeof(struct flatten_header), 1);
 		if (status)
-			return -1;
-		check_header();
+			return status;
+		status = check_header();
 		if (status)
-			return -1;
-		parse_root_ptrs();
-		parse_mem();
+			return status;
+		status = parse_root_ptrs();
 		if (status)
-			return -1;
+			return status;
+		status = parse_mem();
+		if (status)
+			return status;
 		if (gfa) {
-			parse_fptrmap();
+			status = parse_fptrmap();
 			if (status)
-				return -1;
+				return status;
 		}
 		info(" #Unflattening done\n");
 		info(" #Image read time: %lfs\n", time_elapsed());
@@ -1046,24 +998,19 @@ public:
 			for (size_t i = 0; i < FLCTRL.HDR.mcount; ++i) {
 				size_t index = *minfoptr++;
 				size_t size = *minfoptr++;
-				if (index + size < index) {
-					status = UNFLATTEN_OVERFLOW;
-					return -1;
-				}
+				if (index + size < index)
+					return UNFLATTEN_OVERFLOW;
 
-				if (index + size > FLCTRL.HDR.memory_size) {
-					status = UNFLATTEN_MEMORY_FRAGMENT_DOES_NOT_FIT;
-					return -1;
-				}
+				if (index + size > FLCTRL.HDR.memory_size)
+					return UNFLATTEN_MEMORY_FRAGMENT_DOES_NOT_FIT;
 
-				struct interval_tree_node *node = (struct interval_tree_node*)calloc(1, sizeof(struct interval_tree_node));
+				struct interval_tree_node *node = new(std::nothrow) struct interval_tree_node;
+				// struct interval_tree_node *node = (struct interval_tree_node*)calloc(1, sizeof(struct interval_tree_node));
 				node->start = index;
 				node->last = index + size - 1;
-				void* fragment = malloc(size);
-				if (fragment == NULL) {
-					status = UNFLATTEN_ALLOCATION_FAILED;
-					return -1;
-				}
+				void* fragment = (void *) new(std::nothrow) char[size];
+				if (fragment == NULL)
+					return UNFLATTEN_ALLOCATION_FAILED;
 
 				memcpy(fragment, (char*)memptr + index, size);
 				node->mptr = fragment;
@@ -1074,9 +1021,9 @@ public:
 
 		// Fix pointers
 		time_mark_start();
-		fix_flatten_mem(continuous_mapping);
-		if (status)
-			return -1;
+		status = fix_flatten_mem(continuous_mapping);
+		if (status && status != UNFLATTEN_ALREADY_FIXED)
+			return status;
 
 		// Fix function pointers
 		if (FLCTRL.HDR.fptr_count > 0 && gfa) {
@@ -1093,10 +1040,8 @@ public:
 					*((void**)((char*)mem + fptri)) = (void*)nfptr;
 				} else {
 					struct interval_tree_node *node = interval_tree_iter_first(&FLCTRL.imap_root, fptri, fptri + 8);
-					if (node == NULL) {
-						status = UNFLATTEN_INVALID_ADDRESS_POINTEE;
-						return -1;
-					}
+					if (node == NULL)
+						return UNFLATTEN_INVALID_ADDRESS_POINTEE;
 
 					size_t node_offset = fptri-node->start;
 					*((void**)((char*)node->mptr + node_offset)) = (void*)nfptr;
@@ -1122,7 +1067,7 @@ public:
 		if(!continuous_mapping)
 			info("  Number of allocated fragments: %zu\n", FLCTRL.HDR.mcount);
 		info("  Number of fixed pointers: %lu\n", FLCTRL.HDR.ptr_count);
-		return 0;
+		return UNFLATTEN_OK;
 	}
 
 	void unload(void) {
@@ -1131,14 +1076,13 @@ public:
 		fptrmap.clear();
 
 		rbtree_postorder_for_each_entry_safe(node, tmp, &FLCTRL.imap_root.rb_root, rb) {
-			// Don't call `interval_tree_remove` here - it might trigger rebalance and 
+			// Don't call `interval_tree_remove` here - it might trigger rebalance and
 			//  invalidate iterator. The tree is going to be removed completely so it's
 			//  sufficient to just clear imap_root at the end
 			if (already_freed.find(node->mptr) == already_freed.end())
-				free(node->mptr);
+				delete (char *) node->mptr;
 
-
-			free(node);
+			delete node;
 		}
 		memset(&FLCTRL.imap_root, 0, sizeof(struct rb_root_cached));
 
@@ -1183,10 +1127,10 @@ public:
 		}
 
 		if (open_mode == UNFLATTEN_OPEN_MMAP_WRITE)
-			status = UNFLATTEN_UNEXPECTED_OPEN_MODE;
+			return -UNFLATTEN_UNEXPECTED_OPEN_MODE;
 
 		if (FLCTRL.mem == NULL)
-			status = UNFLATTEN_UNINITIALIZED_FLCTRL;
+			return -UNFLATTEN_UNINITIALIZED_FLCTRL;
 
 		for (size_t i = 0; i < FLCTRL.HDR.ptr_count; ++i) {
 			void* mem = flatten_memory_start();
@@ -1203,12 +1147,12 @@ public:
 
 				struct interval_tree_node *node = interval_tree_iter_first(&FLCTRL.imap_root, fix_loc, fix_loc + 8);
 				if (node == NULL)
-					status = UNFLATTEN_INTERVAL_EXTRACTION_FAILED;
+					return -UNFLATTEN_INTERVAL_EXTRACTION_FAILED;
 				size_t node_offset = fix_loc-node->start;
 
 				struct interval_tree_node *ptr_node = interval_tree_iter_first(&FLCTRL.imap_root, ptr, ptr + 8);
 				if (ptr_node == NULL)
-					status = UNFLATTEN_INTERVAL_EXTRACTION_FAILED;
+					return -UNFLATTEN_INTERVAL_EXTRACTION_FAILED;
 				size_t ptr_node_offset = ptr-ptr_node->start;
 
 				void* target = (unsigned char*)ptr_node->mptr + ptr_node_offset;
@@ -1241,8 +1185,6 @@ public:
 	}
 };
 
-thread_local UnflattenStatus UnflattenEngine::status = UNFLATTEN_OK;
-
 /********************************
  * C++ API
  *******************************/
@@ -1254,11 +1196,11 @@ Unflatten::~Unflatten() {
 	delete engine;
 }
 
-int Unflatten::load(FILE* file, get_function_address_t gfa, bool continuous_mapping) {
+UnflattenStatus Unflatten::load(FILE* file, get_function_address_t gfa, bool continuous_mapping) {
 	return engine->load(file, gfa, continuous_mapping);
 }
 
-int Unflatten::info(FILE* file, const char* arg) {
+UnflattenStatus Unflatten::info(FILE* file, const char* arg) {
 	return engine->imginfo(file,arg);
 }
 
@@ -1286,14 +1228,6 @@ ssize_t Unflatten::replace_variable(void* old_mem, void* new_mem, size_t size) {
 	return engine->replace_variable(old_mem, new_mem, size);
 }
 
-UnflattenStatus Unflatten::get_status() {
-	return engine->get_status();
-}
-
-void Unflatten::reset_status() {
-	engine->reset_status();
-}
-
 const char *Unflatten::explain_status(UnflattenStatus status) {
 	if (status < UNFLATTEN_OK || status >= UNFLATTEN_STATUS_MAX)
 		status = UNFLATTEN_STATUS_MAX;
@@ -1312,15 +1246,15 @@ void unflatten_deinit(CUnflatten flatten) {
 	delete (UnflattenEngine*)flatten;
 }
 
-int unflatten_load(CUnflatten flatten, FILE* file, get_function_address_t gfa) {
+UnflattenStatus unflatten_load(CUnflatten flatten, FILE* file, get_function_address_t gfa) {
 	return ((UnflattenEngine*)flatten)->load(file, gfa);
 }
 
-int unflatten_imginfo(CUnflatten flatten, FILE* file) {
+UnflattenStatus unflatten_imginfo(CUnflatten flatten, FILE* file) {
 	return ((UnflattenEngine*)flatten)->imginfo(file,0);
 }
 
-int unflatten_load_continuous(CUnflatten flatten, FILE* file, get_function_address_t gfa) {
+UnflattenStatus unflatten_load_continuous(CUnflatten flatten, FILE* file, get_function_address_t gfa) {
 	return ((UnflattenEngine*)flatten)->load(file, gfa, true);
 }
 
@@ -1358,14 +1292,6 @@ size_t unflatten_header_memory_size(CUnflattenHeader header) {
 
 ssize_t unflatten_replace_variable(CUnflatten flatten, void* old_mem, void* new_mem, size_t size) {
 	return ((UnflattenEngine*)flatten)->replace_variable(old_mem, new_mem, size);
-}
-
-UnflattenStatus unflatten_get_status(CUnflatten flatten) {
-	return ((UnflattenEngine*)flatten)->get_status();
-}
-
-void unflatten_reset_status(CUnflatten flatten) {
-	((UnflattenEngine*)flatten)->reset_status();
 }
 
 const char *unflatten_explain_status(UnflattenStatus status) {
