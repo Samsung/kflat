@@ -43,8 +43,9 @@
 #define FLAT_MAX_TIME_NS						(3600 * NSEC_PER_SEC)
 
 /* Funcs decl */
+void uflat_err_log_print(const char* fmt, ...);
 void uflat_info_log_print(const char* fmt, ...);
-void uflat_dbg_log_printf(const char* fmt, ...);
+void uflat_dbg_log_print(const char* fmt, ...);
 void uflat_dbg_log_clear();
 bool uflat_test_address_range(struct flat*, void* ptr, size_t size);
 bool uflat_test_exec_range(struct flat*, void* ptr) ;
@@ -55,9 +56,9 @@ uintptr_t uflat_image_base_addr(void);
 /* Logging */
 #define uflat_fmt(fmt) 		            "uflat: " fmt "\n"
 
-#define FLATTEN_LOG_ERROR(fmt, ...)		fprintf(stderr, uflat_fmt(fmt), ##__VA_ARGS__)
+#define FLATTEN_LOG_ERROR(fmt, ...)     uflat_err_log_print(uflat_fmt(fmt), ##__VA_ARGS__)
 #define FLATTEN_LOG_INFO(fmt, ...)		uflat_info_log_print(uflat_fmt(fmt), ##__VA_ARGS__)
-#define FLATTEN_LOG_DEBUG(fmt, ...)		uflat_dbg_log_printf(fmt "\n", ##__VA_ARGS__)
+#define FLATTEN_LOG_DEBUG(fmt, ...)		uflat_dbg_log_print(fmt "\n", ##__VA_ARGS__)
 #define FLATTEN_LOG_CLEAR()             uflat_dbg_log_clear()
 
 /* Memory allocation */

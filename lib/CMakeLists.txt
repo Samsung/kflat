@@ -38,11 +38,6 @@ add_custom_target(ExecFlat DEPENDS ExecFlat_static ExecFlat_shared)
 set(UFLAT_SOURCES uflat.c funcsymsutils.c ${PROJECT_SOURCE_DIR}/core/flatten_impl.c)
 set(UFLAT_INCLUDES ${KFLAT_INCLUDES} ${PROJECT_SOURCE_DIR}/lib/include_priv ${PROJECT_SOURCE_DIR}/core)
 
-# Force cmake to compile .c files with the C++ compiler
-foreach(source ${UFLAT_SOURCES})
-    set_source_files_properties(SOURCE ${source} PROPERTIES LANGUAGE CXX)
-endforeach()
-
 # Create a common OBJECT library so that the sources are compiled only once and then linked both statically and dynamically
 add_library(uflat_obj OBJECT ${UFLAT_SOURCES} rbtree.c)
 target_compile_definitions(uflat_obj PUBLIC FLATTEN_USERSPACE_BSP)

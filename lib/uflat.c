@@ -52,34 +52,35 @@ int verbose_flag = false;
 func_symbol_info *func_sym_table = NULL;
 size_t func_sym_table_n_entries = 0;
 
-
 struct uflat* uflat_init(const char* path) {
     int rv;
-    struct uflat* uflat;
+    struct uflat* uflat = NULL, *err;
 
     uflat = (struct uflat*) calloc(1, sizeof(*uflat));
     if(uflat == NULL) {
         FLATTEN_LOG_ERROR("Failed to initialize uflat - out-of-memory");
-        return NULL;
+        return UFLAT_ERR_PTR(ENOMEM);
     }
 
     uflat->udump_memory = (struct udump_memory_map*) calloc(1, sizeof(struct udump_memory_map));
     if(uflat->udump_memory == NULL) {
         FLATTEN_LOG_ERROR("Failed to initialize kflat - out-of-memory on udump_memory");
         free(uflat);
-        return NULL;
+        return UFLAT_ERR_PTR(ENOMEM);
     }
 
     rv = udump_dump_vma(uflat->udump_memory);
-    if(rv) {
+    if (rv) {
         FLATTEN_LOG_ERROR("Failed to initialize uflat - udump_dump_vma returned (%d)", rv);
+        err = UFLAT_ERR_PTR(ENOMEM);
         goto err_flat_allocated;
     }
 
     flatten_init(&uflat->flat);
     rv = uflat->flat.error;
-    if(rv) {
+    if (rv) {
         FLATTEN_LOG_ERROR("Failed to initialize uflat - flatten_init returned (%d)", rv);
+        err = UFLAT_ERR_PTR(rv);
         goto err_udump_created;
     }
 
@@ -87,20 +88,24 @@ struct uflat* uflat_init(const char* path) {
     uflat->out_size = UFLAT_DEFAULT_OUTPUT_SIZE;
     uflat->out_name = strdup(path);
     uflat->out_fd = open(path, O_RDWR | O_CREAT, 0664);
-    if(uflat->out_fd < 0) {
+    if (uflat->out_fd < 0) {
         FLATTEN_LOG_ERROR("Failed to create output file - %s", strerror(errno));
+        err = UFLAT_ERR_PTR(EIO);
         goto err_open;
     }
-    
+
     rv = ftruncate(uflat->out_fd, uflat->out_size);
-    if(rv) {
+    if (rv) {
         FLATTEN_LOG_ERROR("Failed to truncate output file - %s", strerror(errno));
+        err = UFLAT_ERR_PTR(EIO);
         goto err_mmap;
     }
-    uflat->out_mem = mmap(0, uflat->out_size, PROT_READ | PROT_WRITE, 
+    uflat->out_mem = mmap(0, uflat->out_size, PROT_READ | PROT_WRITE,
         MAP_SHARED, uflat->out_fd, 0);
-    if(uflat->out_mem == MAP_FAILED) {
+
+    if (uflat->out_mem == MAP_FAILED) {
         FLATTEN_LOG_ERROR("Failed to mmap output file - %s", strerror(errno));
+        err = UFLAT_ERR_PTR(EFAULT);
         goto err_mmap;
     }
 
@@ -121,11 +126,11 @@ err_udump_created:
 err_flat_allocated:
     free(uflat->udump_memory);
     free(uflat);
-    return NULL;
+    return err;
 }
 
 void uflat_fini(struct uflat* uflat) {
-    if(uflat == NULL)
+    if (uflat == NULL)
         return;
 
     munmap(uflat->out_mem, uflat->out_size);
@@ -208,15 +213,17 @@ int uflat_write(struct uflat* uflat) {
 
     FLATTEN_LOG_DEBUG("Starting uflat_write to file `%s`", uflat->out_name);
     rv = flatten_write(&uflat->flat);
-    if(rv != 0) {
+    if (rv != 0) {
         FLATTEN_LOG_ERROR("Failed to write uflat image - flatten_write returned (%d)", rv);
         return rv;
     }
 
     size_t to_write = ((struct flatten_header*)uflat->out_mem)->image_size;
     rv = ftruncate(uflat->out_fd, to_write);
-    if(rv)
+    if (rv) {
         FLATTEN_LOG_ERROR("Failed to truncute output file to its final size - %s", strerror(errno));
+        return -EBADF;
+    }
     FLATTEN_LOG_DEBUG("Saved uflat image of size %zu bytes", to_write);
 
     return 0;
@@ -228,7 +235,19 @@ int uflat_write(struct uflat* uflat) {
  */
 void uflat_dbg_log_clear(void) {}
 
-void uflat_dbg_log_printf(const char* fmt, ...) {
+#ifdef UFLAT_LOGGING
+void uflat_err_log_print(const char* fmt, ...) {
+    va_list args;
+
+    if(!debug_flag)
+        return;
+
+    va_start(args, fmt);
+    vfprintf(stderr, fmt, args);
+	va_end(args);
+}
+
+void uflat_dbg_log_print(const char* fmt, ...) {
     va_list args;
 
     if(!debug_flag)
@@ -241,7 +260,7 @@ void uflat_dbg_log_printf(const char* fmt, ...) {
 
 void uflat_info_log_print(const char* fmt, ...) {
     va_list args;
-    
+
     if(!verbose_flag)
         return;
 
@@ -249,6 +268,11 @@ void uflat_info_log_print(const char* fmt, ...) {
     vprintf(fmt, args);
     va_end(args);
 }
+#else
+void uflat_err_log_print(const char* fmt, ...) {}
+void uflat_dbg_log_print(const char* fmt, ...) {}
+void uflat_info_log_print(const char* fmt, ...) {}
+#endif
 
 /*
  * Memory regions collection

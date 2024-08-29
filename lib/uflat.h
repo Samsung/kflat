@@ -26,6 +26,10 @@ extern "C" {
 
 #define UFLAT_DEFAULT_OUTPUT_SIZE (100ULL * 1024 * 1024)
 
+#define UFLAT_ERR_PTR(err) (void *) ((uintptr_t) err << 56)
+#define UFLAT_PTR_ERR(ptr) (int) -((uintptr_t) ptr & ((uintptr_t) 0xff << 56))
+#define UFLAT_IS_ERR(ptr)  UFLAT_PTR_ERR(ptr)
+
 /*********************************
  * Exported types
  *********************************/
@@ -68,15 +72,15 @@ enum uflat_options {
 
 /**
  * @brief Initialize Userspace FLAT (UFLAT) engine
- * 
+ *
  * @param path path to the output file
- * @return pointer to struct uflat or NULL in case of an error
+ * @return pointer to struct uflat or ERR_PTR in case of an error
  */
 struct uflat* uflat_init(const char* path) __attribute__ ((warn_unused_result));
 
 /**
  * @brief Set internal UFLAT option bit (for instance, enable debug mode)
- * 
+ *
  * @param uflat pointer to uflat structure
  * @param option one of available uflat options
  * @param value the value to be set for selected option

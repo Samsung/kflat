@@ -204,15 +204,15 @@ int run_test(struct args* args, const char* name) {
         log_info("=> Testing %s...", name);
     current_test_name = name;
     memset(_last_assert_tested, 0, sizeof(_last_assert_tested));
-    
+
     mark_time_start(&total_time);
     mark_time_start(&flatten_time);
 
     snprintf(out_name, sizeof(out_name), "%s/flat_%s.img", args->output_dir, name);
-    
+
     // Setup UFLAT and run test
     struct uflat* uflat = uflat_init(out_name);
-    if(uflat == NULL) {
+    if (UFLAT_PTR_ERR(uflat)) {
         log_error("failed to initialize UFLAT");
         goto exit;
     }
