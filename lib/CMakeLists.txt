@@ -75,12 +75,14 @@ set_target_properties(unflatten_obj PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
 # STATIC
 add_library(unflatten_static STATIC $<TARGET_OBJECTS:unflatten_obj>)
-add_custom_command(
-    TARGET unflatten_static
-    POST_BUILD
-    WORKING_DIRECTORY ${PROJECT_BINARY_DIR}/lib/
-    COMMAND bash ${PROJECT_SOURCE_DIR}/cmake/chop_unflatten.sh ${PROJECT_BINARY_DIR}
-)
+if(CMAKE_SYSTEM_PROCESSOR MATCHES x86_64)
+    add_custom_command(
+        TARGET unflatten_static
+        POST_BUILD
+        WORKING_DIRECTORY ${PROJECT_BINARY_DIR}/lib/
+        COMMAND bash ${PROJECT_SOURCE_DIR}/cmake/chop_unflatten.sh ${PROJECT_BINARY_DIR}
+    )
+endif()
 set_target_properties(unflatten_static PROPERTIES OUTPUT_NAME unflatten)
 
 # SHARED
