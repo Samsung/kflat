@@ -41,6 +41,7 @@ set(UFLAT_INCLUDES ${KFLAT_INCLUDES} ${PROJECT_SOURCE_DIR}/lib/include_priv ${PR
 # Create a common OBJECT library so that the sources are compiled only once and then linked both statically and dynamically
 add_library(uflat_obj OBJECT ${UFLAT_SOURCES} rbtree.c)
 target_compile_definitions(uflat_obj PUBLIC FLATTEN_USERSPACE_BSP)
+target_compile_definitions(uflat_obj PRIVATE $<$<CONFIG:Debug>:UFLAT_LOGGING>)
 target_include_directories(uflat_obj PUBLIC ${UFLAT_INCLUDES})
 
 # STATIC
