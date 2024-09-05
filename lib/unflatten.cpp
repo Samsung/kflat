@@ -209,7 +209,7 @@ private:
 	 **************************/
 	inline void* get_root_addr_mem(uintptr_t root_addr) {
 		if (root_addr == (size_t) -1)
-			return 0;
+			return NULL;
 
 		if (interval_tree_iter_first(&FLCTRL.imap_root, 0, ULONG_MAX)) {
 			/* We have allocated each memory fragment individually */
@@ -217,7 +217,7 @@ private:
 					&FLCTRL.imap_root,
 					root_addr, root_addr + 8);
 			if (node == NULL)
-				return NULL;
+				return (void *) UNFLATTEN_INVALID_ROOT_POINTER;
 
 			size_t node_offset = root_addr - node->start;
 			return (char*)node->mptr + node_offset;
@@ -279,7 +279,7 @@ private:
 	UnflattenStatus fix_root_pointers(void) {
 		for (auto& root_ptr : FLCTRL.root_addr) {
 			uintptr_t addr = (uintptr_t) get_root_addr_mem(root_ptr.root_addr);
-			if (!addr)
+			if (addr == UNFLATTEN_INVALID_ROOT_POINTER)
 				return UNFLATTEN_INVALID_ROOT_POINTER;
 
 			root_ptr.root_addr = addr;
@@ -287,7 +287,7 @@ private:
 
 		for (auto& [name, entry] : root_addr_map) {
 			uintptr_t addr = (uintptr_t) get_root_addr_mem(entry.first);
-			if (!addr)
+			if (addr == UNFLATTEN_INVALID_ROOT_POINTER)
 				return UNFLATTEN_INVALID_ROOT_POINTER;
 
 			entry.first = addr;
