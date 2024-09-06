@@ -76,7 +76,7 @@ struct root_addr_node {
 #define COLOR_STRING COLOR_STRING_RED
 #define COLOR_OFF "\033[0m"
 
-const char *unflatten_status_messages[] = {
+static const char *unflatten_status_messages[UNFLATTEN_STATUS_MAX] = {
 	"No error",
 	"Invalid root pointer",
 	"Invalid argument",
@@ -100,7 +100,6 @@ const char *unflatten_status_messages[] = {
 	"Memory allocation failed",
 	"Interval extraction failed",
 	"Memory was already fixed and is loaded at the same address as previously",
-	""
 };
 
 /********************************

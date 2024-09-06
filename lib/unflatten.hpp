@@ -89,8 +89,6 @@ typedef enum {
 	UNFLATTEN_STATUS_MAX,
 } UnflattenStatus;
 
-extern const char *unflatten_status_messages[];
-
 /********************************
  * C++ interface
  *******************************/
