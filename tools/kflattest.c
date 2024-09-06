@@ -307,7 +307,7 @@ save_image:
         if (args->imginfo) {
             ret = unflatten_imginfo(flatten, file);
             if(ret != 0) {
-                log_error("failed to parse flattened image - %d", ret);
+                log_error("failed to parse flattened image - %s", unflatten_explain_status(ret));
                 goto unflatten_cleanup;
             }
             rewind(file);
@@ -320,7 +320,7 @@ save_image:
             ret = unflatten_load(flatten, file, get_test_gfa(name));
         }
         if(ret != 0) {
-            log_error("failed to parse flattened image - %d", ret);
+            log_error("failed to parse flattened image - %s", unflatten_explain_status(ret));
             goto unflatten_cleanup;
         }
 

@@ -213,7 +213,7 @@ int run_test(struct args* args, const char* name) {
     // Setup UFLAT and run test
     struct uflat* uflat = uflat_init(out_name);
     if (UFLAT_PTR_ERR(uflat)) {
-        log_error("failed to initialize UFLAT");
+        log_error("failed to initialize UFLAT: %s", strerror(UFLAT_PTR_ERR(uflat)));
         goto exit;
     }
 
@@ -261,7 +261,7 @@ int run_test(struct args* args, const char* name) {
         if (args->imginfo) {
             ret = unflatten_imginfo(flatten, file);
             if(ret != 0) {
-                log_error("failed to parse flattened image - %d", ret);
+                log_error("failed to parse flattened image - %s", unflatten_explain_status(ret));
                 goto exit;
             }
             rewind(file);
@@ -274,7 +274,7 @@ int run_test(struct args* args, const char* name) {
             ret = unflatten_load(flatten, file, get_test_gfa(name));
         }
         if(ret != 0) {
-            log_error("failed to parse flattened image - %d", ret);
+            log_error("failed to parse flattened image - %s", unflatten_explain_status(ret));
             goto unflatten_cleanup;
         }
 
