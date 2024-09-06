@@ -1192,7 +1192,7 @@ public:
  * C++ API
  *******************************/
 Unflatten::Unflatten(int level) {
-	engine = new UnflattenEngine(level);
+	engine = new(std::nothrow) UnflattenEngine(level);
 }
 
 Unflatten::~Unflatten() {
@@ -1200,34 +1200,58 @@ Unflatten::~Unflatten() {
 }
 
 UnflattenStatus Unflatten::load(FILE* file, get_function_address_t gfa, bool continuous_mapping) {
+	if (!engine)
+		return UNFLATTEN_ALLOCATION_FAILED;
+
 	return engine->load(file, gfa, continuous_mapping);
 }
 
 UnflattenStatus Unflatten::info(FILE* file, const char* arg) {
+	if (!engine)
+		return UNFLATTEN_ALLOCATION_FAILED;
+
 	return engine->imginfo(file,arg);
 }
 
 void Unflatten::mark_freed(void *mptr) {
+	if (!engine)
+		return;
+
 	return engine->mark_freed(mptr);
 }
 
 void Unflatten::unload() {
+	if (!engine)
+		return;
+
 	engine->unload();
 }
 
 void* Unflatten::get_next_root() {
+	if (!engine)
+		return NULL;
+
 	return engine->root_pointer_next();
 }
 
 void* Unflatten::get_seq_root(size_t idx) {
+	if (!engine)
+		return NULL;
+
 	return engine->root_pointer_seq(idx);
 }
 
 void* Unflatten::get_named_root(const char* name, size_t* size) {
+	if (!engine)
+		return NULL;
+
 	return engine->root_pointer_named(name, size);
 }
 
 ssize_t Unflatten::replace_variable(void* old_mem, void* new_mem, size_t size) {
+	if (!engine)
+		return -UNFLATTEN_ALLOCATION_FAILED;
+
 	return engine->replace_variable(old_mem, new_mem, size);
 }
 
@@ -1242,7 +1266,7 @@ const char *Unflatten::explain_status(UnflattenStatus status) {
  * C Wrappers
  *******************************/
 CUnflatten unflatten_init(int level) {
-	return new UnflattenEngine(level);
+	return new(std::nothrow) UnflattenEngine(level);
 }
 
 void unflatten_deinit(CUnflatten flatten) {
