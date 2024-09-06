@@ -1,11 +1,18 @@
-# ksyzrecip - syzkaller descriptions <-> KFLAT recipes translator
+# ksyzrecip - syzkaller descriptions -> KFLAT recipes translator
 
-`ksyzrecip` automatically coverts syzkaller descriptions to KFLAT recipe by plugging into Syzkaller recipe compiler.  
+`ksyzrecip` automatically converts syzkaller descriptions to KFLAT recipe by plugging into Syzkaller recipe compiler.  
 
 `ksyzrecip` generates a flattening functions for each possible (described in passed descriptions) type passed to a viable syscall, as well as trigger functions for each supported syscall.
 
 This tool utilizes [FOKA](https://github.com/Samsung/seal), a kernel syscall2fspath mapper, for generating trigger functions.
 For more informations, check the FOKA repo
+
+## Building
+```sh
+$ # From the kflat tree root
+$ cd utils/ksyzrecip
+$ go build
+```
 
 ## Usage
 ```sh
