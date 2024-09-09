@@ -277,16 +277,18 @@ func (g *Generator) fokaName(path string) (string, error) {
 
 func (g *Generator) generateFlattener(t prog.Type) *Flattener {
 	shouldAggregate := func (t prog.Type) bool {
-		if ptr, ok := t.(*prog.PtrType); ok {
-			if _, ok := ptr.Elem.(*prog.StructType); ok {
+		switch v := t.(type) {
+		case *prog.PtrType:
+			switch v.Elem.(type) {
+			case *prog.StructType:
 				return true
-			} else if _, ok := ptr.Elem.(*prog.UnionType); ok {
+			case *prog.UnionType:
 				return true
 			}
-		} else if _, ok := t.(*prog.ArrayType); ok {
+		case *prog.ArrayType:
 			return true
-		} else if buf, ok := t.(*prog.BufferType); ok {
-			if buf.Kind == prog.BufferString && buf.TypeName == "string" {
+		case *prog.BufferType:
+			if v.Kind == prog.BufferString && v.TypeName == "string" {
 				return true
 			}
 		}
@@ -479,22 +481,24 @@ func (g *Generator) bufferAggregate (b *prog.BufferType, field string, offset ui
 }
 
 func (g *Generator) generateAggregate(t prog.Type, field string, offset uint64) Aggregate {
-	if p, ok := t.(*prog.PtrType); ok {
-		return g.pointerAggregate(p, field, offset)
-	} else if a, ok := t.(*prog.ArrayType); ok {
-		return g.arrayAggregate(a, field, offset)
-	} else if b, ok := t.(*prog.BufferType); ok {
-		return g.bufferAggregate(b, field, offset)
+	switch v := t.(type) {
+	case *prog.PtrType:
+		return g.pointerAggregate(v, field, offset)
+	case *prog.ArrayType:
+		return g.arrayAggregate(v, field, offset)
+	case *prog.BufferType:
+		return g.bufferAggregate(v, field, offset)
 	}
 
 	return nil
 }
 
 func getRecordFields(t prog.Type) []prog.Field {
-	if s, ok := t.(*prog.StructType); ok {
-		return s.Fields
-	} else if u, ok := t.(*prog.UnionType); ok {
-		return u.Fields
+	switch v := t.(type) {
+	case *prog.StructType:
+		return v.Fields
+	case *prog.UnionType:
+		return v.Fields
 	}
 
 	return nil
@@ -507,24 +511,25 @@ func (g *Generator) findDependencies(t prog.Type) map[string]prog.Type {
 	queue := []prog.Type{t} // Queue for recursive type traversal
 
 	shouldQueue := func (typ prog.Type) (prog.Type, bool, bool) {
-		isPointer := false
-again:
-		switch typ.(type) {
-		case *prog.StructType:
-			return typ, true, isPointer
-		case *prog.UnionType:
-			return typ, true, isPointer
-		case *prog.ArrayType:
-			typ = typ.(*prog.ArrayType).Elem
-			isPointer = true
-			goto again
-		case *prog.PtrType:
-			typ = typ.(*prog.PtrType).Elem
-			isPointer = true
-			goto again
+		ptr := false
+		for {
+			switch typ.(type) {
+			case *prog.StructType:
+				return typ, true, ptr
+			case *prog.UnionType:
+				return typ, true, ptr
+			case *prog.ArrayType:
+				typ = typ.(*prog.ArrayType).Elem
+				ptr = true
+			case *prog.PtrType:
+				typ = typ.(*prog.PtrType).Elem
+				ptr = true
+			default:
+				return nil, false, ptr
+			}
 		}
 
-		return nil, false, isPointer
+		return nil, false, ptr
 	}
 
 	for len(queue) > 0 {
