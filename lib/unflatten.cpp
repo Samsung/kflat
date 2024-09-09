@@ -1255,8 +1255,11 @@ ssize_t Unflatten::replace_variable(void* old_mem, void* new_mem, size_t size) {
 	return engine->replace_variable(old_mem, new_mem, size);
 }
 
-const char *Unflatten::explain_status(UnflattenStatus status) {
-	if (status < UNFLATTEN_OK || status >= UNFLATTEN_STATUS_MAX)
+const char *Unflatten::explain_status(int8_t status) {
+	if (status < UNFLATTEN_OK)
+		status = -status;
+
+	if (status > UNFLATTEN_STATUS_MAX)
 		status = UNFLATTEN_STATUS_MAX;
 
 	return unflatten_status_messages[status];
@@ -1321,6 +1324,6 @@ ssize_t unflatten_replace_variable(CUnflatten flatten, void* old_mem, void* new_
 	return ((UnflattenEngine*)flatten)->replace_variable(old_mem, new_mem, size);
 }
 
-const char *unflatten_explain_status(UnflattenStatus status) {
+const char *unflatten_explain_status(int8_t status) {
 	return Unflatten::explain_status(status);
 }

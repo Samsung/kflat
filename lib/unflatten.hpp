@@ -197,7 +197,7 @@ public:
 	 * @param  status status code
 	 * @return status string description
 	 */
-	static const char *explain_status(UnflattenStatus status);
+	static const char *explain_status(int8_t status);
 };
 
 extern "C" {
@@ -340,7 +340,7 @@ ssize_t unflatten_replace_variable(CUnflatten flatten, void* old_mem, void* new_
  * @param  status status code
  * @return status string description
  */
-const char *unflatten_explain_status(UnflattenStatus status);
+const char *unflatten_explain_status(int8_t status);
 
 #ifdef __cplusplus
 }
