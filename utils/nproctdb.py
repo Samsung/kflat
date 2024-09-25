@@ -795,6 +795,77 @@ add_custom_target(${{TARGET_NAME}} ALL DEPENDS kflat_core ${{RECIPE_SOURCE_NAME}
 		self.additional_custom_recipe_deps = {}
 		self.members_with_custom_recipes = list()
 
+	def get_func_module_name(self, func):
+		"""
+			For a given function `func` (FTDB func object) returns the module name
+			where it resides
+		"""
+		mids_without_vmlinux = [mid for mid in func.mids if not self.gftdb.modules[mid].endswith('/vmlinux')]
+		mids_with_bazel_sandboxes_merged = list({''.join(self.gftdb.modules[mid].split('__main__/out/')[1:]): mid for mid in mids_without_vmlinux}.values())
+		if len(func.mids) == 1:
+			target_mid = func.mids[0]
+		elif len(mids_without_vmlinux) == 1:
+			target_mid = mids_without_vmlinux[0]
+		elif len(mids_with_bazel_sandboxes_merged) == 1:
+			target_mid = mids_with_bazel_sandboxes_merged[0]
+		else:
+			raise RuntimeError("Failed to uniquely match kernel module for input function")
+		return os.path.basename(self.gftdb.modules[target_mid]).replace('.ko', '').replace('-', '_')
+	
+	def get_off_target_entry(self):
+		with open('ids.json', 'r') as f:
+			funcs = json.load(f)['entry_funcs']
+		if len(funcs) != 1:
+			raise RuntimeError("Unexpected number of entrypoint function IDs found in ids.json")
+		
+		name, loc = funcs[0].split('@')
+		funcs = [f for f in self.gftdb.funcs.entry_by_name(name) if f.location.split(':')[0] == loc]
+		return funcs[0]
+
+	def gen_recipe_id(self):
+		if self.gftdb is None:
+			raise ValueError("Cannot generate recipe_id without global FTDB database")
+		
+		target = self.get_off_target_entry()
+		module = self.get_func_module_name(target)
+		return (module + ':' if module != 'vmlinux' else '') + target.name
+	
+	def gen_args_list(self, func):
+		if self.gftdb is None:
+			raise ValueError("Cannot generate list of input arguments without global FTDB database")
+		if 'init_data' not in self.gftdb:
+			raise ValueError("Arguments list can only be generated for FTDB imported to aot.py (no 'init_data')")
+
+		func_inits = [init for init in self.gftdb.init_data if init['name'] == func]
+		if len(func_inits) > 1:
+			raise RuntimeError("Unexpected number of entries in init_data for input function")
+		elif len(func_inits) == 0:
+			raise RuntimeError("Cannot find target function in init_file - provide list of arguments manually")
+		func_init = func_inits[0]
+		
+		func_entry = self.get_off_target_entry()
+		func_args = [d for d in sorted(func_entry.locals, key=lambda x: x.id) if d.parm]
+
+		args_list = []
+		for i, arg in enumerate(func_args):
+			skip = False
+			for item in func_init['items']:
+				if arg.name in item['name']:
+					skip = True
+					break
+			
+			if skip or i >= 4:
+				continue
+			if func_init['interface'] == 'ioctl' and i >= 1:
+				continue
+
+			target = self.gftdb.types[arg.type].refs
+			if len(target) == 0:
+				continue
+			args_list.append(f'{self.gftdb.types[target[0]].str}@{i+1}')
+		print(f"Detected following input arguments: {args_list}")
+		return args_list
+
 	def _find_member_offset(self,RT,member_to_find,ftdb):
 
 		real_refs = list()
@@ -4077,7 +4148,7 @@ def main():
 	parser.add_argument("-g", dest="global_database", action="store", help="global function/type JSON database file", type=str, required=False)
 	parser.add_argument("-o", dest="output", action="store", help="output directory", type=str, default='recipe_gen')
 	parser.add_argument("-c", dest="config", action="store", help="script layout config", type=str)
-	parser.add_argument("-f", dest="func", action="store", help="", type=str)
+	parser.add_argument("-f", dest="func", action="store", help="", type=str, required=True)
 	parser.add_argument("-m", dest="common", action="store", help="path to the file that provides additional common code to be included in generated recipes", type=str)
 
 	parser.add_argument("--recipe-id", action="store", type=str, help="Recipe target")
@@ -4092,6 +4163,12 @@ def main():
 	RG = RecipeGenerator(args)
 	if args.config:
 		RG.parse_structures_config(args.config, args.func)
+
+	if not args.recipe_id:
+		args.recipe_id = RG.gen_recipe_id()
+
+	if len(args.struct) == 1 and args.struct[0] == 'AUTO':
+		args.struct = RG.gen_args_list(args.func)
 
 	deps_done = set([])
 	anon_typedefs = list()
