@@ -818,8 +818,13 @@ add_custom_target(${{TARGET_NAME}} ALL DEPENDS kflat_core ${{RECIPE_SOURCE_NAME}
 		if len(funcs) != 1:
 			raise RuntimeError("Unexpected number of entrypoint function IDs found in ids.json")
 		
-		name, loc = funcs[0].split('@')
-		funcs = [f for f in self.gftdb.funcs.entry_by_name(name) if f.location.split(':')[0] == loc]
+		if '@' in funcs[0]:
+			name, loc = funcs[0].split('@')
+			funcs = [f for f in self.gftdb.funcs.entry_by_name(name) if f.location.split(':')[0] == loc]
+		else:
+			funcs = [f for f in self.gftdb.funcs.entry_by_name(funcs[0])]
+			if len(funcs) > 1:
+				raise RuntimeError("Failed to uniquely identify function - use format <name@location>")
 		return funcs[0]
 
 	def gen_recipe_id(self):
@@ -1326,14 +1331,7 @@ add_custom_target(${{TARGET_NAME}} ALL DEPENDS kflat_core ${{RECIPE_SOURCE_NAME}
 				return None
 			result = results[0]
 			type = self.ftdb.types[result.type]
-			module = ''
-			if len(result.mids) == 0:
-				print(f"WW- Global '{name}' belongs to the unknown module (.mids is empty)")
-			elif len(result.mids) > 1:
-				print(f'WW- Global \'{name}\' has multiple entries in .mids section. '
-					'Let the God decide which one will be used')
-			else:
-				module = self.ftdb.modules[result.mids[0]].split('/')[-1]
+			module = ''	# TODO: use gftdb to properly detect global variable module - for now default to vmlinux
 
 			nonConstType = type.toNonConst()
 			RT,TPD = self.resolve_record_type(nonConstType.id)
