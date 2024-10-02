@@ -4498,6 +4498,9 @@ def main():
 				))
 		for tp in record_typedefs_list:
 			if narg[0]==tp and narg[3]=='typedef':
+				off = narg[4]
+				if isinstance(off,int):
+					off = "%d"%(-int(off))
 				func_args_stream.write(RecipeGenerator.template_output_struct_type_arg_handler.format(
 					narg[7],
 					narg[1],
