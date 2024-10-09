@@ -2,7 +2,7 @@
  * @file common.h
  * @author Samsung R&D Poland - Mobile Security Group (srpol.mb.sec@samsung.com)
  * @brief Logging library
- * 
+ *
  */
 
 #ifndef _HEADER_COMMON_H

@@ -59,7 +59,7 @@ static void signal_handler(int signo, siginfo_t* si, void* raw_ucontext) {
     // ucontext_t* ucontext = (ucontext_t*) raw_ucontext;
 
     printf("\n=======================\n");
-    log_error("SIGNAL %s", strsignal(signo)); 
+    log_error("SIGNAL %s", strsignal(signo));
     log_error(" * Failed test: %s", current_test_name ? : "unknown");
     // log_error(" * PC = %lx", ucontext->uc_mcontext.gregs[REG_RIP]);
 
@@ -189,7 +189,7 @@ int run_test(struct args* args, const char* name) {
         log_info("=> Testing %s...", name);
     current_test_name = name;
     memset(_last_assert_tested, 0, sizeof(_last_assert_tested));
-    
+
     mark_time_start(&total_time);
     mark_time_start(&kernel_time);
 
@@ -391,7 +391,7 @@ exit:
                 total_time.seconds, total_time.mseconds,
                 OUTPUT_COLOR(LOG_WARN_COLOR), OUTPUT_COLOR(LOG_DEFAULT_COLOR));
     else
-        log_error("Test %-50s [%d.%03ds] - %sFAILED%s", name, 
+        log_error("Test %-50s [%d.%03ds] - %sFAILED%s", name,
                  total_time.seconds, total_time.mseconds,
                 OUTPUT_COLOR(LOG_ERR_COLOR), OUTPUT_COLOR(LOG_DEFAULT_COLOR));
     return test_result == KFLAT_TEST_SUCCESS || test_result == KFLAT_TEST_UNSUPPORTED;
@@ -452,14 +452,14 @@ static error_t parse_opt(int key, char* arg, struct argp_state* state) {
         case 'b':
             options->skip_memcpy = true;
             break;
-        
+
         case ARGP_KEY_ARG:
             if(!strcmp(arg, "ALL"))
                 add_all_tests();
             else
                 add_test_to_list(arg);
             break;
-        
+
         case ARGP_KEY_END:
             if(is_tests_list_empty() && !options->list)
                 argp_usage(state);
@@ -526,7 +526,7 @@ int main(int argc, char** argv) {
         .sa_sigaction = signal_handler,
         .sa_flags = SA_SIGINFO
     };
-    
+
     sigaction(SIGSEGV, &sig_intercept, NULL);
     sigaction(SIGBUS, &sig_intercept, NULL);
     sigaction(SIGFPE, &sig_intercept, NULL);
@@ -544,10 +544,10 @@ int main(int argc, char** argv) {
     if(count > 1) {
         log_info("Summary: %d/%d tests succeeded", success, count);
         if(success < count)
-            log_error("%d tests %sFAILED%s", count - success, 
-                    OUTPUT_COLOR(LOG_ERR_COLOR), OUTPUT_COLOR(LOG_DEFAULT_COLOR)); 
+            log_error("%d tests %sFAILED%s", count - success,
+                    OUTPUT_COLOR(LOG_ERR_COLOR), OUTPUT_COLOR(LOG_DEFAULT_COLOR));
         else
-            log_info("All tests %spassed%s", 
+            log_info("All tests %spassed%s",
                     OUTPUT_COLOR(LOG_INFO_COLOR), OUTPUT_COLOR(LOG_DEFAULT_COLOR));
     }
 

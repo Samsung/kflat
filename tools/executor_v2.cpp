@@ -2,7 +2,7 @@
  * @file executor_v2.cpp
  * @author Samsung R&D Poland - Mobile Security Group (srpol.mb.sec@samsung.com)
  * @brief User application that uses ExecFlat to easily execute KFLAT recipes.
- * 
+ *
  */
 
 #include <fcntl.h>
@@ -23,7 +23,7 @@ namespace fs = std::filesystem;
 static std::string format_info(const std::string &str) {
     std::stringstream s;
     s   << TermColor::set(TermColor::FG_BLUE)
-        << "[Executor_v2] " 
+        << "[Executor_v2] "
         << TermColor::clear()
         << str << std::endl;
     return s.str();
@@ -33,7 +33,7 @@ static std::string format_info(const std::string &str) {
 static std::string format_err(const std::runtime_error &e) {
     std::stringstream s;
     s   << TermColor::set(TermColor::FG_BLUE)
-        << "[Executor_v2] " 
+        << "[Executor_v2] "
         << TermColor::set(TermColor::FG_RED)
         << "[ERROR] " << TermColor::clear()
         << e.what() << std::endl;
@@ -79,7 +79,7 @@ static ExecFlatOpts::ExecFlatInterface get_interface(const std::string &s) {
         return ExecFlatOpts::IOCTL;
     if (iequals(s, "COMPAT_IOCTL"))
         return ExecFlatOpts::COMPAT_IOCTL;
-    
+
     throw std::runtime_error("INTERFACE should be one of READ, SHOW, WRITE, STORE, IOCTL, COMPAT_IOCTL");
 }
 
@@ -87,9 +87,9 @@ static ExecFlatOpts::ExecFlatInterface get_interface(const std::string &s) {
 static int run_executor_v2_32(char **argv, char **envp) {
     int ret = execve("executor_v2_32", argv, envp);
 
-    if (ret != 0 && errno == ENOENT) 
+    if (ret != 0 && errno == ENOENT)
         throw std::system_error(errno, std::generic_category(), "Failed to locate 'executor_32' binary needed to execute compat_ioctl.");
-    else 
+    else
         throw std::system_error(errno, std::generic_category(), "Failed to spawn 32-bit executor app");
 
     return ret;
@@ -111,7 +111,7 @@ int main(int argc, char **argv, char **envp) {
     program.add_argument("-d", "--debug")
         .help("Enable KFLAT debug logging to dmesg.")
         .flag();
-    
+
     program.add_argument("-f", "--run_recipe_now")
         .help("Execute KFLAT recipe directly from the IOCTL without attachking to any kernel function.")
         .flag();
@@ -149,7 +149,7 @@ int main(int argc, char **argv, char **envp) {
 
     // Run with a predefined interface and target
     argparse::ArgumentParser auto_trigger("AUTO");
-    
+
     auto_trigger.add_description("Enable flattening and automatically trigger a recipe via one of available interfaces.");
     auto_trigger.add_argument("recipe")
         .help("Recipe to be run");
@@ -178,7 +178,7 @@ int main(int argc, char **argv, char **envp) {
     program.add_subparser(auto_trigger);
     program.add_subparser(manual_trigger);
     program.add_subparser(lister);
-    
+
 
     try {
         program.parse_args(argc, argv);
@@ -195,7 +195,7 @@ int main(int argc, char **argv, char **envp) {
     auto skip_body =    program.get<bool>("--skip_function_body");
     auto stop_machine = program.get<bool>("--stop_machine");
     auto poll_timeout = program.get<int>("--poll_timeout");
-    if (poll_timeout <= 0) 
+    if (poll_timeout <= 0)
         poll_timeout = -1;
     auto dump_size =    program.get<unsigned int>("--dump_size");
     auto verbosity =    get_v_level(program.get<std::string>("--verbosity"));
@@ -222,10 +222,10 @@ int main(int argc, char **argv, char **envp) {
         else if (program.is_subcommand_used(manual_trigger)) {
             std::cout << format_info("Starting executor_v2 in MANUAL mode...");
             auto recipe = program.at<argparse::ArgumentParser>("MANUAL").get<std::string>("recipe");
-            
+
             ExecFlat kflat(dump_size, verbosity);
             kflat.run_recipe_no_target(recipe, output, stop_machine, debug, skip_body, run_now, poll_timeout);
-        } 
+        }
         /* ===================== LIST MODE ======================== */
         else if (program.is_subcommand_used(lister)) {
             std::cout << format_info("Starting executor_v2 in LIST mode...");
@@ -241,11 +241,11 @@ int main(int argc, char **argv, char **envp) {
             std::cerr << program;
             return 1;
         }
-    } 
+    }
     catch (const std::runtime_error& err) {
         std::cerr << format_err(err);
         return 1;
-    }        
+    }
     std::cout << format_info("Executor exiting...");
     return 0;
 }

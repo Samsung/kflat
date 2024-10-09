@@ -28,10 +28,10 @@ static double log_time(void) {
     return (double)time.tv_sec + time.tv_usec / 1000000.0 - start_time;
 }
 
-static void _log_generic(FILE* stream, const char* color, const char* prefix, 
+static void _log_generic(FILE* stream, const char* color, const char* prefix,
                         const char* func, bool new_line, const char* fmt, va_list args) {
     if(supports_colors)
-        fprintf(stdout, "[%s%s" LOG_DEFAULT_COLOR "][" 
+        fprintf(stdout, "[%s%s" LOG_DEFAULT_COLOR "]["
                         LOG_TIME_COLOR "%7.3lf" LOG_DEFAULT_COLOR "] "
                         LOG_FUNC_COLOR "%-*s|" LOG_DEFAULT_COLOR " ",
                         color, prefix, log_time(), 15 - (int) strlen(prefix), func);
@@ -100,7 +100,7 @@ void mark_time_end(struct time_elapsed* time) {
         return;
     }
 
-    time_t ms_elapsed = time->_end.tv_sec * 1000 + time->_end.tv_usec / 1000 - 
+    time_t ms_elapsed = time->_end.tv_sec * 1000 + time->_end.tv_usec / 1000 -
             time->_start.tv_sec * 1000 - time->_start.tv_usec / 1000;
 
     time->seconds = ms_elapsed / 1000;
