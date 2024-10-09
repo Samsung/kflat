@@ -607,7 +607,7 @@ private:
 		UnflattenStatus status;
 
 		if (FLCTRL.HDR.fptr_count <= 0 || FLCTRL.HDR.fptrmapsz <= 0)
-			return UNFLATTEN_INVALID_ARGUMENT;
+			return UNFLATTEN_OK;
 
 		if(open_mode == UNFLATTEN_OPEN_READ_COPY) {
 			orig_fptrmapmem = fptrmapmem = new(std::nothrow) char[FLCTRL.HDR.fptrmapsz];
