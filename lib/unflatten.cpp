@@ -1,4 +1,4 @@
-/* 
+/*
  * Samsung R&D Poland - Mobile Security Group (srpol.mb.sec@samsung.com)
  *  C/C++ library for interacting with kflat images
  */
@@ -116,7 +116,7 @@ private:
 		LOG_DEBUG,
 	} loglevel;
 	size_t readin;
-	
+
 	struct FLCONTROL {
 		struct flatten_header HDR;
 
@@ -131,7 +131,7 @@ private:
 	std::map<std::string, std::pair<size_t, size_t>> root_addr_map;
 	std::map<uintptr_t,std::string> fptrmap;
 	std::unordered_set<void *> already_freed;
-	
+
 	struct timeval timeS;
 
 	/***************************
@@ -325,7 +325,7 @@ private:
 	 *     - O_UNLCK -> no one is using flatten image - we can do whatever we want with it
 	 *     - O_RDLCK -> flatten image is locked for READ - we cannot edit it
 	 *     - O_WRLCK -> flatten image is locked for WRITE - we cannot use it at all
-	 * 
+	 *
 	 *   The idea behind this modes is as follow:
 	 *     1) After dumping memory, all pointers in flatten image are offsets in blob
 	 *     2) The first running instance of Unflatten library obtains O_WRLCK lock and opens
@@ -334,15 +334,15 @@ private:
 	 *     3) The next running instance of Unflatten lib obtains O_RDLCK and maps flatten image
 	 *        at the same address as the first instance did - if it succeed, memory can be used
 	 *        without any further modifications (pointers are still valid), if not:
-	 *     4) Lock O_RDLCK, open file in OPEN_READ_COPY, copy it into local memory, fix locally 
+	 *     4) Lock O_RDLCK, open file in OPEN_READ_COPY, copy it into local memory, fix locally
 	 *         and release O_RDLCK.
-	 * 
+	 *
 	 *   The OPEN_MMAP mode is fastest, while the OPEN_READ_COPY is slowest, but OPEN_MMAP requires some
 	 *   extra preresequites (like write access, RD_LOCK, mmap at the same address as previously), while
 	 *   OPEN_READ_COPY works always.
-	 * 
+	 *
 	 *   TL;DR: This function attempts to open input file in the fastest possible mode.
-	 * 
+	 *
 	 * @param f handler to file opened with fopen
 	 * @param support_write_lock flag indicating whether we want to support OPEN_MMAP_WRITE mode
 	 * @param support_mmap whether we want to support any OPEN_MMAP* mode
@@ -1033,7 +1033,7 @@ public:
 				size_t fptri = ((uintptr_t*)((char*)FLCTRL.mem + FLCTRL.HDR.ptr_count * sizeof(size_t)))[fi];
 				if (fptrmap.find(fptri) == fptrmap.end())
 					continue;
-				
+
 				// Fix function pointer
 				uintptr_t nfptr = (*gfa)(fptrmap[fptri].c_str());
 
