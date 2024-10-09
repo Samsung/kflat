@@ -28,8 +28,7 @@
 
 #include "kflat_tests_list.h"
 
-
-#define KFLAT_NODE      "/sys/kernel/debug/kflat"
+#define KFLAT_NODE "/sys/kernel/debug/kflat"
 
 struct args {
     bool list;
@@ -47,7 +46,6 @@ struct args {
 int enable_verbose = 0;
 static const char* current_test_name = NULL;
 
-
 /*******************************************************
  * SIGNAL HANDLER
  *  Print neat and readable information for user when
@@ -60,16 +58,16 @@ static void signal_handler(int signo, siginfo_t* si, void* raw_ucontext) {
 
     printf("\n=======================\n");
     log_error("SIGNAL %s", strsignal(signo));
-    log_error(" * Failed test: %s", current_test_name ? : "unknown");
+    log_error(" * Failed test: %s", current_test_name ?: "unknown");
     // log_error(" * PC = %lx", ucontext->uc_mcontext.gregs[REG_RIP]);
 
     switch(signo) {
-        case SIGSEGV:
-        case SIGILL:
-        case SIGBUS:
-        case SIGFPE:
-            log_error(" * Problematic address = 0x%llx", si->si_addr);
-            break;
+    case SIGSEGV:
+    case SIGILL:
+    case SIGBUS:
+    case SIGFPE:
+        log_error(" * Problematic address = 0x%llx", si->si_addr);
+        break;
     }
 
     log_error(" * Last assertion tested: `%s`", _last_assert_tested);
@@ -86,17 +84,17 @@ static void signal_handler(int signo, siginfo_t* si, void* raw_ucontext) {
 struct tests_list {
     struct tests_list* next;
     const char* name;
-} *tests_list_tail;
+} * tests_list_tail;
 
 void add_test_to_list(const char* name) {
     if(tests_list_tail == NULL) {
-        tests_list_tail = (struct tests_list*) malloc(sizeof(struct tests_list));
+        tests_list_tail = (struct tests_list*)malloc(sizeof(struct tests_list));
         tests_list_tail->next = NULL;
         tests_list_tail->name = strdup(name);
         return;
     }
 
-    struct tests_list* test = (struct tests_list*) malloc(sizeof(*test));
+    struct tests_list* test = (struct tests_list*)malloc(sizeof(*test));
     test->name = strdup(name);
     test->next = tests_list_tail;
     tests_list_tail = test;
@@ -117,7 +115,7 @@ static ssize_t get_tests_section(struct kflat_test_case*** tests) {
         return 0;
     }
 
-    *tests = (struct kflat_test_case **) test_cases;
+    *tests = (struct kflat_test_case**)test_cases;
     return tests_count;
 }
 
@@ -131,7 +129,7 @@ void list_tests(void) {
 
     log_info("Available tests [%d]:", tests_count);
     for(size_t i = 0; i < tests_count; i++)
-		log_info("\t=> '%s'", tests[i]->name);
+        log_info("\t=> '%s'", tests[i]->name);
 }
 
 void add_all_tests(void) {
@@ -140,7 +138,7 @@ void add_all_tests(void) {
     tests_count = get_tests_section(&tests);
 
     for(size_t i = 0; i < tests_count; i++)
-		add_test_to_list(tests[i]->name);
+        add_test_to_list(tests[i]->name);
 }
 
 flat_test_case_validator_t get_test_validator(const char* name) {
@@ -148,13 +146,13 @@ flat_test_case_validator_t get_test_validator(const char* name) {
     struct kflat_test_case** tests;
     tests_count = get_tests_section(&tests);
 
-	for(size_t i = 0; i < tests_count; i++) {
-		if(!strcmp(name, tests[i]->name))
-			return tests[i]->validator;
-	}
+    for(size_t i = 0; i < tests_count; i++) {
+        if(!strcmp(name, tests[i]->name))
+            return tests[i]->validator;
+    }
 
     log_error("No available validator for test named '%s'", name);
-	return NULL;
+    return NULL;
 }
 
 get_function_address_t get_test_gfa(const char* name) {
@@ -162,11 +160,11 @@ get_function_address_t get_test_gfa(const char* name) {
     struct kflat_test_case** tests;
     tests_count = get_tests_section(&tests);
 
-	for(size_t i = 0; i < tests_count; i++) {
-		if(!strcmp(name, tests[i]->name))
-			return tests[i]->gfa;
-	}
-	return NULL;
+    for(size_t i = 0; i < tests_count; i++) {
+        if(!strcmp(name, tests[i]->name))
+            return tests[i]->gfa;
+    }
+    return NULL;
 }
 
 int run_test(struct args* args, const char* name) {
@@ -175,15 +173,14 @@ int run_test(struct args* args, const char* name) {
     FILE* file;
     char out_name[128];
     int test_result = KFLAT_TEST_FAIL;
-    const size_t flat_size = 100 * 1024 * 1024;   // 10MB
+    const size_t flat_size = 100 * 1024 * 1024; // 10MB
     ssize_t output_size;
     struct time_elapsed kernel_time, total_time;
 
     struct kflat_ioctl_tests tests = {
         .debug_flag = args->debug,
         .use_stop_machine = args->stop_machine,
-        .skip_memcpy = args->skip_memcpy
-    };
+        .skip_memcpy = args->skip_memcpy};
 
     if(args->verbose)
         log_info("=> Testing %s...", name);
@@ -219,8 +216,8 @@ int run_test(struct args* args, const char* name) {
     mark_time_end(&kernel_time);
 
     /* Save debug log early */
-    if (args->debug) {
-        if (args->output_dir) {
+    if(args->debug) {
+        if(args->output_dir) {
             snprintf(out_name, sizeof(out_name), "%s/flat_%s.log", args->output_dir, name);
             int save_fd = open(out_name, O_WRONLY | O_CREAT | O_TRUNC, 0700);
             if(save_fd < 0) {
@@ -231,8 +228,8 @@ int run_test(struct args* args, const char* name) {
             static unsigned char logbuff[4096];
             do {
                 ret = read(fd, logbuff, 4096);
-                if (ret>0) {
-                    read_count+=ret;
+                if(ret > 0) {
+                    read_count += ret;
                     int wret;
                     int write_count = ret;
                     char* offset = (char*)logbuff;
@@ -259,7 +256,8 @@ int run_test(struct args* args, const char* name) {
 save_image:
     if(output_size > flat_size)
         log_abort("test somehow produced image larger than mmaped buffer (kernel bug?)"
-                    " - size: %zu; mmap size: %zu", output_size, flat_size);
+                  " - size: %zu; mmap size: %zu",
+                  output_size, flat_size);
     if(args->verbose)
         log_info("\t test produced %zu bytes of flattened memory", output_size);
 
@@ -304,7 +302,7 @@ save_image:
 
         CUnflatten flatten = unflatten_init(0);
 
-        if (args->imginfo) {
+        if(args->imginfo) {
             ret = unflatten_imginfo(flatten, file);
             if(ret != 0) {
                 log_error("failed to parse flattened image - %s", unflatten_explain_status(ret));
@@ -313,10 +311,9 @@ save_image:
             rewind(file);
         }
 
-        if (args->continuous) {
+        if(args->continuous) {
             ret = unflatten_load_continuous(flatten, file, get_test_gfa(name));
-        }
-        else {
+        } else {
             ret = unflatten_load(flatten, file, get_test_gfa(name));
         }
         if(ret != 0) {
@@ -348,24 +345,24 @@ save_image:
         }
 
         switch(test_result) {
-            case KFLAT_TEST_SUCCESS:
-                if(args->verbose)
-                    log_info("\t\t=>validator accepted test result");
-                break;
+        case KFLAT_TEST_SUCCESS:
+            if(args->verbose)
+                log_info("\t\t=>validator accepted test result");
+            break;
 
-            case KFLAT_TEST_UNSUPPORTED:
-                if(args->verbose)
-                    log_info("\t\t=>this test case is unsupported on current platform/build");
-                break;
+        case KFLAT_TEST_UNSUPPORTED:
+            if(args->verbose)
+                log_info("\t\t=>this test case is unsupported on current platform/build");
+            break;
 
-            case KFLAT_TEST_FAIL:
-            default:
-                if(args->verbose)
-                    log_error("\t\t=>validator rejected test result - %d", ret);
-                break;
+        case KFLAT_TEST_FAIL:
+        default:
+            if(args->verbose)
+                log_error("\t\t=>validator rejected test result - %d", ret);
+            break;
         }
 
-unflatten_cleanup:
+    unflatten_cleanup:
         unflatten_deinit(flatten);
         goto munmap_area;
     }
@@ -382,21 +379,20 @@ exit:
     mark_time_end(&total_time);
     if(args->verbose)
         log_info("\t=> Time spent: kernel [%d.%03ds]; total[%d.%03ds]",
-            kernel_time.seconds, kernel_time.mseconds, total_time.seconds, total_time.mseconds);
+                 kernel_time.seconds, kernel_time.mseconds, total_time.seconds, total_time.mseconds);
 
     if(test_result == KFLAT_TEST_SUCCESS)
         log_info("Test %-50s [%d.%03ds] - SUCCESS", name, total_time.seconds, total_time.mseconds);
     else if(test_result == KFLAT_TEST_UNSUPPORTED)
         log_info("Test %-50s [%d.%03ds] - %sUNSUPPORTED%s", name,
-                total_time.seconds, total_time.mseconds,
-                OUTPUT_COLOR(LOG_WARN_COLOR), OUTPUT_COLOR(LOG_DEFAULT_COLOR));
+                 total_time.seconds, total_time.mseconds,
+                 OUTPUT_COLOR(LOG_WARN_COLOR), OUTPUT_COLOR(LOG_DEFAULT_COLOR));
     else
         log_error("Test %-50s [%d.%03ds] - %sFAILED%s", name,
-                 total_time.seconds, total_time.mseconds,
-                OUTPUT_COLOR(LOG_ERR_COLOR), OUTPUT_COLOR(LOG_DEFAULT_COLOR));
+                  total_time.seconds, total_time.mseconds,
+                  OUTPUT_COLOR(LOG_ERR_COLOR), OUTPUT_COLOR(LOG_DEFAULT_COLOR));
     return test_result == KFLAT_TEST_SUCCESS || test_result == KFLAT_TEST_UNSUPPORTED;
 }
-
 
 /*******************************************************
  * OPTIONS PARSING
@@ -415,63 +411,62 @@ static struct argp_option options[] = {
     {"verbose", 'v', 0, 0, "More verbose logs"},
     {"stop-machine", 'm', 0, 0, "Run tests under stop_machine macro"},
     {"single-buffer", 'b', 0, 0, "Don't copy memory to temporary buffer during flattening"},
-    { 0 }
+    {0},
 };
 
 static error_t parse_opt(int key, char* arg, struct argp_state* state) {
-    struct args* options = (struct args*) state->input;
+    struct args* options = (struct args*)state->input;
 
     switch(key) {
-        case 'o':
-            options->output_dir = arg;
-            break;
-        case 'I':
-            options->image_file = arg;
-            break;
-        case 'l':
-            options->list = true;
-            break;
-        case 'i':
-            options->imginfo = true;
-            break;
-        case 'c':
-            options->continuous = true;
-            break;
-        case 'd':
-            options->debug = true;
-            break;
-        case 's':
-            options->validate = false;
-            break;
-        case 'v':
-            options->verbose = true;
-            break;
-        case 'm':
-            options->stop_machine = true;
-            break;
-        case 'b':
-            options->skip_memcpy = true;
-            break;
+    case 'o':
+        options->output_dir = arg;
+        break;
+    case 'I':
+        options->image_file = arg;
+        break;
+    case 'l':
+        options->list = true;
+        break;
+    case 'i':
+        options->imginfo = true;
+        break;
+    case 'c':
+        options->continuous = true;
+        break;
+    case 'd':
+        options->debug = true;
+        break;
+    case 's':
+        options->validate = false;
+        break;
+    case 'v':
+        options->verbose = true;
+        break;
+    case 'm':
+        options->stop_machine = true;
+        break;
+    case 'b':
+        options->skip_memcpy = true;
+        break;
 
-        case ARGP_KEY_ARG:
-            if(!strcmp(arg, "ALL"))
-                add_all_tests();
-            else
-                add_test_to_list(arg);
-            break;
+    case ARGP_KEY_ARG:
+        if(!strcmp(arg, "ALL"))
+            add_all_tests();
+        else
+            add_test_to_list(arg);
+        break;
 
-        case ARGP_KEY_END:
-            if(is_tests_list_empty() && !options->list)
-                argp_usage(state);
-            break;
+    case ARGP_KEY_END:
+        if(is_tests_list_empty() && !options->list)
+            argp_usage(state);
+        break;
 
-        default:
-            return ARGP_ERR_UNKNOWN;
+    default:
+        return ARGP_ERR_UNKNOWN;
     }
     return 0;
 }
 static struct argp argp = {options, parse_opt, argp_args_doc, argp_doc};
-
 
 /*******************************************************
  * ENTRY POINT
@@ -512,11 +507,11 @@ int main(int argc, char** argv) {
     }
 
     if(opts.output_dir) {
-        if (mkdir(opts.output_dir, 0770) < 0) {
-        	if (errno != EEXIST) {
-        		log_error("Could not create directory: %s [error: %s]", opts.output_dir, strerror(errno));
-        		return 1;
-        	}
+        if(mkdir(opts.output_dir, 0770) < 0) {
+            if(errno != EEXIST) {
+                log_error("Could not create directory: %s [error: %s]", opts.output_dir, strerror(errno));
+                return 1;
+            }
         }
         log_info("Will use `%s` as output directory", opts.output_dir);
     }
@@ -524,7 +519,7 @@ int main(int argc, char** argv) {
     // Setup signal handler
     struct sigaction sig_intercept = {
         .sa_sigaction = signal_handler,
-        .sa_flags = SA_SIGINFO
+        .sa_flags = SA_SIGINFO,
     };
 
     sigaction(SIGSEGV, &sig_intercept, NULL);
@@ -545,10 +540,10 @@ int main(int argc, char** argv) {
         log_info("Summary: %d/%d tests succeeded", success, count);
         if(success < count)
             log_error("%d tests %sFAILED%s", count - success,
-                    OUTPUT_COLOR(LOG_ERR_COLOR), OUTPUT_COLOR(LOG_DEFAULT_COLOR));
+                      OUTPUT_COLOR(LOG_ERR_COLOR), OUTPUT_COLOR(LOG_DEFAULT_COLOR));
         else
             log_info("All tests %spassed%s",
-                    OUTPUT_COLOR(LOG_INFO_COLOR), OUTPUT_COLOR(LOG_DEFAULT_COLOR));
+                     OUTPUT_COLOR(LOG_INFO_COLOR), OUTPUT_COLOR(LOG_DEFAULT_COLOR));
     }
 
     return count - success;

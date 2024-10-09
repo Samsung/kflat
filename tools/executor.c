@@ -3,7 +3,7 @@
  * @author Samsung R&D Poland - Mobile Security Group (srpol.mb.sec@samsung.com)
  * @brief Tool for dumping kernel structures with kflat from
  *     common kernel interfaces
- * 
+ *
  */
 
 #include "kflat_uapi.h"
@@ -22,10 +22,9 @@
 #include <unistd.h>
 #include <poll.h>
 
+#define KFLAT_NODE "/sys/kernel/debug/kflat"
 
-#define KFLAT_NODE      "/sys/kernel/debug/kflat"
-
-#define ARRAY_SIZE(X)       (sizeof(X) / sizeof(X[0]))
+#define ARRAY_SIZE(X) (sizeof(X) / sizeof(X[0]))
 
 /*******************************************************
  * INTERFACES
@@ -63,12 +62,12 @@ struct interface {
 };
 const struct interface avail_interfaces[] = {
 #ifdef ENV_64
-    {"READ", interface_read}, 
+    {"READ", interface_read},
     {"SHOW", interface_read},
-    {"WRITE", interface_write}, 
+    {"WRITE", interface_write},
     {"STORE", interface_write},
     {"IOCTL", interface_ioctl},
-    {"COMPAT_IOCTL", (interface_handler) interface_compat_ioctl},
+    {"COMPAT_IOCTL", (interface_handler)interface_compat_ioctl},
 #else
     {"COMPAT_IOCTL", interface_ioctl},
 #endif
@@ -110,68 +109,66 @@ static struct argp_option options[] = {
     {"run_recipe_now", 'f', 0, 0, "Execute KFLAT recipe directly from IOCTL without attaching to any kernel function"},
     {"poll_timeout", 't', "TIMEOUT", 0, "In miliseconds. Timeout for recipe execution."},
     {"broadcast", 'b', 0, 0, "Capture memory dump from any process running on the machine"},
-    { 0 }
-};
+    {0}};
 
 static error_t parse_opt(int key, char* arg, struct argp_state* state) {
     struct args* options = state->input;
 
     switch(key) {
-        case 'i':
-            options->interface = arg;
-            options->handler = get_interface_by_name(arg);
-            if(options->handler == NULL)
-                argp_usage(state);
-            break;
+    case 'i':
+        options->interface = arg;
+        options->handler = get_interface_by_name(arg);
+        if(options->handler == NULL)
+            argp_usage(state);
+        break;
 
-        case 'o':
-            options->output = arg;
-            break;
-        
-        case 'd':
-            options->debug = 1;
-            break;
-        
-        case 's':
-            options->stop_machine = 1;
-            break;
+    case 'o':
+        options->output = arg;
+        break;
 
-        case 'n':
-            options->skip_function_body = 1;
-            break;
+    case 'd':
+        options->debug = 1;
+        break;
 
-        case 'f':
-            options->run_recipe_now = 1;
-            break;
-        
-        case 'b':
-            options->broadcast = 1;
-            break;
+    case 's':
+        options->stop_machine = 1;
+        break;
 
-        case 't':
-            if (sscanf(arg, "%d", &options->poll_timeout) != 1)
-                return ARGP_KEY_ERROR;
-            break;
-        
-        case ARGP_KEY_ARG:
-            if(options->recipe == NULL)
-                options->recipe = arg;
-            else if(options->node == NULL)
-                options->node = arg;
-            else
-                argp_usage(state);
-            break;
+    case 'n':
+        options->skip_function_body = 1;
+        break;
 
-        case ARGP_KEY_END:
-            break;
-        
-        default:
-            return ARGP_ERR_UNKNOWN;
+    case 'f':
+        options->run_recipe_now = 1;
+        break;
+
+    case 'b':
+        options->broadcast = 1;
+        break;
+
+    case 't':
+        if(sscanf(arg, "%d", &options->poll_timeout) != 1)
+            return ARGP_KEY_ERROR;
+        break;
+
+    case ARGP_KEY_ARG:
+        if(options->recipe == NULL)
+            options->recipe = arg;
+        else if(options->node == NULL)
+            options->node = arg;
+        else
+            argp_usage(state);
+        break;
+
+    case ARGP_KEY_END:
+        break;
+
+    default:
+        return ARGP_ERR_UNKNOWN;
     }
     return 0;
 }
 static struct argp argp = {options, parse_opt, argp_args_doc, argp_doc};
-
 
 /*******************************************************
  * SIGNALS HANDLERS
@@ -180,9 +177,11 @@ void sigalrm_handler(int signum) {}
 
 void setup_sigalarm(void) {
     int ret;
-    struct sigaction act = {0, };
+    struct sigaction act = {
+        0,
+    };
     act.sa_handler = sigalrm_handler;
-    
+
     ret = sigaction(SIGALRM, &act, NULL);
     if(ret)
         log_abort("Failed to set SIGALRM handler with sigaction - %s", strerror(errno));
@@ -199,7 +198,7 @@ int governor_save_current(void) {
         goto error;
 
     int ret = read(fd, active_governor, sizeof(active_governor) - 1);
-    if(ret < 0) 
+    if(ret < 0)
         goto error;
     return 0;
 
@@ -214,7 +213,7 @@ void governor_restore(void) {
         goto error;
 
     int ret = write(fd, active_governor, sizeof(active_governor) - 1);
-    if(ret < 0) 
+    if(ret < 0)
         goto error;
     return;
 
@@ -228,7 +227,7 @@ int governor_set(const char* name) {
         goto error;
 
     int ret = write(fd, name, strlen(name));
-    if(ret < 0) 
+    if(ret < 0)
         goto error;
     return 0;
 
@@ -246,7 +245,7 @@ int kflat_open(void) {
     fd = open(KFLAT_NODE, O_RDONLY);
     if(fd >= 0)
         return fd;
-    
+
     if(errno == ENOENT) {
         log_error("");
         log_error("[KFLAT device not found]");
@@ -261,7 +260,9 @@ int kflat_open(void) {
 
 void kflat_enable(int fd, struct args* opts) {
     int ret;
-    struct kflat_ioctl_enable enable = {0, };
+    struct kflat_ioctl_enable enable = {
+        0,
+    };
 
     enable.pid = opts->broadcast ? -1 : getpid();
     enable.debug_flag = opts->debug;
@@ -281,7 +282,7 @@ void kflat_enable(int fd, struct args* opts) {
         log_abort("Failed to enable KFLAT capture mode - %d:%s", errno, strerror(errno));
     } else if(ret != 0)
         log_abort("Failed to enable KFLAT capture mode - %d:%s", errno, strerror(errno));
-    
+
     log_info("Enabled kflat capture mode (IOCTL KFLAT_PROC_ENABLE)");
 }
 
@@ -353,7 +354,6 @@ size_t kflat_disable(int fd, size_t dump_size) {
     return disable.size;
 }
 
-
 int main(int argc, char** argv, char** envp) {
     int fd, ret, rd_fd, trigger_func;
     size_t output_size;
@@ -374,9 +374,9 @@ int main(int argc, char** argv, char** envp) {
         log_abort("you need to specify the ID of target recipe");
     if(trigger_func && opts.node == NULL)
         log_abort("you need to specify the target file used by recipe");
-    
+
     // In case of interface compat_ioctl we're deploying executor_32 app
-    if(opts.handler == (interface_handler) interface_compat_ioctl)
+    if(opts.handler == (interface_handler)interface_compat_ioctl)
         interface_compat_ioctl(argv, envp);
 
     fd = kflat_open();
@@ -385,7 +385,7 @@ int main(int argc, char** argv, char** envp) {
      * Mmap memory for result
      */
     void* area = mmap(0, dump_size, PROT_READ, MAP_SHARED, fd, 0);
-    if(area == MAP_FAILED) 
+    if(area == MAP_FAILED)
         log_abort("Failed to mmap area memory - %s", strerror(errno));
     log_info("Maped Kflat area memory @ %p", area);
 
@@ -404,7 +404,7 @@ int main(int argc, char** argv, char** envp) {
          */
         setup_sigalarm();
         alarm(2);
-        
+
         rd_fd = target_open(opts.node, opts.handler == interface_write);
         ret = opts.handler(rd_fd);
         log_info("%s on node %s returned %d - %s", opts.interface, opts.node, ret, strerror(errno));
@@ -424,13 +424,13 @@ int main(int argc, char** argv, char** envp) {
 
     int ret_poll = poll(&kflat_poll, 1, (opts.poll_timeout ? opts.poll_timeout : -1));
 
-    if (ret_poll == 0) {
+    if(ret_poll == 0) {
         log_error("");
         log_error("[Recipe execution timeout]");
         log_error(" Recipe failed to execute before selected timeout (-t %d) occurred", opts.poll_timeout);
         log_error("");
         log_abort("Recipe was not invoked ");
-    } else if (ret_poll < 0) {
+    } else if(ret_poll < 0) {
         log_abort("Poll syscall failed while waiting for recipe execution - %s", strerror(errno));
     }
 
@@ -443,12 +443,15 @@ int main(int argc, char** argv, char** envp) {
         int save_fd = open(opts.output, O_RDWR | O_CREAT, 0660);
         if(save_fd < 0)
             log_abort("Failed to open %s - %s", opts.output, strerror(errno));
-        
-        for(int i = 0; i < output_size; ) {
+
+        for(int i = 0; i < output_size;) {
             ret = write(save_fd, area + i, output_size - i);
-            if(ret == 0) break;
-            else if(ret < 0) log_abort("Failed to write %s - %s", opts.output, strerror(errno));
-            else i += ret;
+            if(ret == 0)
+                break;
+            else if(ret < 0)
+                log_abort("Failed to write %s - %s", opts.output, strerror(errno));
+            else
+                i += ret;
         }
         log_info("Saved result to %s", opts.output);
         close(save_fd);

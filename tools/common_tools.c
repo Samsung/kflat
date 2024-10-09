@@ -13,13 +13,11 @@
 #include <sys/time.h>
 #include <unistd.h>
 
-
 /*******************************************************
  * LOGGING FUNCTIONS
  *******************************************************/
 static bool supports_colors = false;
 static double start_time = 0;
-
 
 static double log_time(void) {
     struct timeval time;
@@ -29,7 +27,8 @@ static double log_time(void) {
 }
 
 static void _log_generic(FILE* stream, const char* color, const char* prefix,
-                        const char* func, bool new_line, const char* fmt, va_list args) {
+                         const char* func, bool new_line, const char* fmt, va_list args) {
+    /* clang-format off */
     if(supports_colors)
         fprintf(stdout, "[%s%s" LOG_DEFAULT_COLOR "]["
                         LOG_TIME_COLOR "%7.3lf" LOG_DEFAULT_COLOR "] "
@@ -37,6 +36,7 @@ static void _log_generic(FILE* stream, const char* color, const char* prefix,
                         color, prefix, log_time(), 15 - (int) strlen(prefix), func);
     else
         fprintf(stdout, "[%s][%7.3lf] %-10s| ", prefix, log_time(), func);
+    /* clang-format on */
 
     vfprintf(stdout, fmt, args);
     if(new_line)
@@ -82,7 +82,6 @@ void init_logging(void) {
     start_time = log_time();
 }
 
-
 /*******************************************************
  * TIME MEASUREMENT
  *******************************************************/
@@ -101,7 +100,7 @@ void mark_time_end(struct time_elapsed* time) {
     }
 
     time_t ms_elapsed = time->_end.tv_sec * 1000 + time->_end.tv_usec / 1000 -
-            time->_start.tv_sec * 1000 - time->_start.tv_usec / 1000;
+                        time->_start.tv_sec * 1000 - time->_start.tv_usec / 1000;
 
     time->seconds = ms_elapsed / 1000;
     time->mseconds = ms_elapsed % 1000;

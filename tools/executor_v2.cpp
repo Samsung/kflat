@@ -20,23 +20,22 @@
 
 namespace fs = std::filesystem;
 
-static std::string format_info(const std::string &str) {
+static std::string format_info(const std::string& str) {
     std::stringstream s;
-    s   << TermColor::set(TermColor::FG_BLUE)
-        << "[Executor_v2] "
-        << TermColor::clear()
-        << str << std::endl;
+    s << TermColor::set(TermColor::FG_BLUE)
+      << "[Executor_v2] "
+      << TermColor::clear()
+      << str << std::endl;
     return s.str();
 }
 
-
-static std::string format_err(const std::runtime_error &e) {
+static std::string format_err(const std::runtime_error& e) {
     std::stringstream s;
-    s   << TermColor::set(TermColor::FG_BLUE)
-        << "[Executor_v2] "
-        << TermColor::set(TermColor::FG_RED)
-        << "[ERROR] " << TermColor::clear()
-        << e.what() << std::endl;
+    s << TermColor::set(TermColor::FG_BLUE)
+      << "[Executor_v2] "
+      << TermColor::set(TermColor::FG_RED)
+      << "[ERROR] " << TermColor::clear()
+      << e.what() << std::endl;
     return s.str();
 }
 
@@ -49,45 +48,42 @@ static bool iequals(const std::string& a, const std::string& b) {
     return std::equal(a.begin(), a.end(), b.begin(), b.end(), ichar_equals);
 }
 
-
-static ExecFlatOpts::ExecFlatVerbosity get_v_level(const std::string &level) {
-    if (iequals(level, "SUPRESS"))
+static ExecFlatOpts::ExecFlatVerbosity get_v_level(const std::string& level) {
+    if(iequals(level, "SUPRESS"))
         return ExecFlatOpts::SUPRESS;
-    if (iequals(level, "ERROR"))
+    if(iequals(level, "ERROR"))
         return ExecFlatOpts::ERROR;
-    if (iequals(level, "WARNING"))
+    if(iequals(level, "WARNING"))
         return ExecFlatOpts::WARNING;
-    if (iequals(level, "INFO"))
+    if(iequals(level, "INFO"))
         return ExecFlatOpts::INFO;
-    if (iequals(level, "DEBUG"))
+    if(iequals(level, "DEBUG"))
         return ExecFlatOpts::DEBUG;
 
     return ExecFlatOpts::WARNING;
 }
 
-
-static ExecFlatOpts::ExecFlatInterface get_interface(const std::string &s) {
-    if (iequals(s, "READ"))
+static ExecFlatOpts::ExecFlatInterface get_interface(const std::string& s) {
+    if(iequals(s, "READ"))
         return ExecFlatOpts::READ;
-    if (iequals(s, "SHOW"))
+    if(iequals(s, "SHOW"))
         return ExecFlatOpts::SHOW;
-    if (iequals(s, "WRITE"))
+    if(iequals(s, "WRITE"))
         return ExecFlatOpts::WRITE;
-    if (iequals(s, "STORE"))
+    if(iequals(s, "STORE"))
         return ExecFlatOpts::STORE;
-    if (iequals(s, "IOCTL"))
+    if(iequals(s, "IOCTL"))
         return ExecFlatOpts::IOCTL;
-    if (iequals(s, "COMPAT_IOCTL"))
+    if(iequals(s, "COMPAT_IOCTL"))
         return ExecFlatOpts::COMPAT_IOCTL;
 
     throw std::runtime_error("INTERFACE should be one of READ, SHOW, WRITE, STORE, IOCTL, COMPAT_IOCTL");
 }
 
-
-static int run_executor_v2_32(char **argv, char **envp) {
+static int run_executor_v2_32(char** argv, char** envp) {
     int ret = execve("executor_v2_32", argv, envp);
 
-    if (ret != 0 && errno == ENOENT)
+    if(ret != 0 && errno == ENOENT)
         throw std::system_error(errno, std::generic_category(), "Failed to locate 'executor_32' binary needed to execute compat_ioctl.");
     else
         throw std::system_error(errno, std::generic_category(), "Failed to spawn 32-bit executor app");
@@ -95,8 +91,7 @@ static int run_executor_v2_32(char **argv, char **envp) {
     return ret;
 }
 
-
-int main(int argc, char **argv, char **envp) {
+int main(int argc, char** argv, char** envp) {
     // Common options for both modes
     argparse::ArgumentParser program(argv[0], "1.0", argparse::default_arguments::none);
     program.add_description("Userspace interface for triggering KFLAT recipes.");
@@ -170,7 +165,6 @@ int main(int argc, char **argv, char **envp) {
     manual_trigger.add_argument("recipe")
         .help("Recipe to be run");
 
-
     // Listing all loaded KFLAT recipes
     argparse::ArgumentParser lister("LIST");
     lister.add_description("List all recipe modules.");
@@ -179,34 +173,32 @@ int main(int argc, char **argv, char **envp) {
     program.add_subparser(manual_trigger);
     program.add_subparser(lister);
 
-
     try {
         program.parse_args(argc, argv);
-    }
-    catch (const std::exception& err) {
+    } catch(const std::exception& err) {
         std::cerr << err.what() << std::endl;
         std::cerr << program;
         return 1;
     }
 
-    auto debug =        program.get<bool>("--debug");
-    auto output =       program.get<std::string>("--output");
-    auto run_now =      program.get<bool>("--run_recipe_now");
-    auto skip_body =    program.get<bool>("--skip_function_body");
+    auto debug = program.get<bool>("--debug");
+    auto output = program.get<std::string>("--output");
+    auto run_now = program.get<bool>("--run_recipe_now");
+    auto skip_body = program.get<bool>("--skip_function_body");
     auto stop_machine = program.get<bool>("--stop_machine");
     auto poll_timeout = program.get<int>("--poll_timeout");
-    if (poll_timeout <= 0)
+    if(poll_timeout <= 0)
         poll_timeout = -1;
-    auto dump_size =    program.get<unsigned int>("--dump_size");
-    auto verbosity =    get_v_level(program.get<std::string>("--verbosity"));
+    auto dump_size = program.get<unsigned int>("--dump_size");
+    auto verbosity = get_v_level(program.get<std::string>("--verbosity"));
 
     try {
         /* ===================== AUTO MODE ======================== */
-        if (program.is_subcommand_used(auto_trigger)) {
+        if(program.is_subcommand_used(auto_trigger)) {
             auto interface = get_interface(program.at<argparse::ArgumentParser>("AUTO").get<std::string>("interface"));
 #ifndef ENV_32
             // Check for special case if user is invoking compat_ioctl
-            if (interface == ExecFlatOpts::COMPAT_IOCTL) {
+            if(interface == ExecFlatOpts::COMPAT_IOCTL) {
                 return run_executor_v2_32(argv, envp);
             }
 #endif // ENV_32
@@ -219,7 +211,7 @@ int main(int argc, char **argv, char **envp) {
             kflat.run_recipe(interface, target, recipe, output, stop_machine, debug, skip_body, run_now, io_timeout, poll_timeout);
         }
         /* ===================== MANUAL MODE ======================== */
-        else if (program.is_subcommand_used(manual_trigger)) {
+        else if(program.is_subcommand_used(manual_trigger)) {
             std::cout << format_info("Starting executor_v2 in MANUAL mode...");
             auto recipe = program.at<argparse::ArgumentParser>("MANUAL").get<std::string>("recipe");
 
@@ -227,12 +219,12 @@ int main(int argc, char **argv, char **envp) {
             kflat.run_recipe_no_target(recipe, output, stop_machine, debug, skip_body, run_now, poll_timeout);
         }
         /* ===================== LIST MODE ======================== */
-        else if (program.is_subcommand_used(lister)) {
+        else if(program.is_subcommand_used(lister)) {
             std::cout << format_info("Starting executor_v2 in LIST mode...");
             ExecFlat kflat(dump_size, verbosity);
             std::cout << format_info("Listing available recipes:");
             int i = 0;
-            for (const auto &recipe : kflat.get_loaded_recipes()) {
+            for(const auto& recipe : kflat.get_loaded_recipes()) {
                 std::cout << i++ << ": " << recipe << std::endl;
             }
         }
@@ -241,8 +233,7 @@ int main(int argc, char **argv, char **envp) {
             std::cerr << program;
             return 1;
         }
-    }
-    catch (const std::runtime_error& err) {
+    } catch(const std::runtime_error& err) {
         std::cerr << format_err(err);
         return 1;
     }
