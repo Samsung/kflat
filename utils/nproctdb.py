@@ -4303,7 +4303,6 @@ def main():
 		))
 		validate_inmem_code = ""
 		if RG.ftdb.types[gv.type].classname=='builtin':
-			val_code = ""
 			validate_inmem_code = "\n"+prepend_non_empty_lines(RecipeGenerator.template_validate_inmem_code.format(
 				var_name, var_hash, RG.ftdb.types[gv.type].size//8
 			),"\t")
