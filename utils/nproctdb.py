@@ -213,7 +213,7 @@ class RecipeGenerator(object):
 	# 8 - safe info
 	template_flatten_struct_member_recipe =\
 		"  /* AGGREGATE_FLATTEN_STRUCT_ARRAY({1},{3},{6}); */\n{7}AGGREGATE_FLATTEN_{0}_ARRAY_SELF_CONTAINED_SHIFTED({1},{2},{3},{4},{6},{5}); {8}"
-	
+
 	# 0 - typename
 	# 1 - typesize
 	# 2 - refname
@@ -234,7 +234,7 @@ class RecipeGenerator(object):
 	# 6 - extra message
 	# 7 - shift value
 	template_flatten_struct_pointer_recipe = "{6}FLATTEN_{0}_ARRAY_SHIFTED_SELF_CONTAINED({1},{2},{3},{4},{7}); {5}"
-	
+
 	# 0 - typename
 	# 1 - typesize
 	# 2 - refname
@@ -243,7 +243,7 @@ class RecipeGenerator(object):
 	# 5 - extra message
 	# 6 - shift value
 	template_flatten_struct_type_pointer_recipe = "{5}FLATTEN_STRUCT_TYPE_ARRAY_SHIFTED_SELF_CONTAINED({0},{1},{2},{3},{6}); {4}"
-	
+
 
 	# 0 - typename
 	# 1 - refname
@@ -252,7 +252,7 @@ class RecipeGenerator(object):
 	# 4 - safe info
 	# 5 - extra message
 	template_flatten_type_array_member_recipe = "  /* AGGREGATE_FLATTEN_TYPE_ARRAY({0},{1},{2}); */\n{5}AGGREGATE_FLATTEN_TYPE_ARRAY_SELF_CONTAINED({0},{1},{3},{2}); {4}"
-	
+
 	# 0 - typename
 	# 1 - refname
 	# 2 - element count
@@ -262,14 +262,14 @@ class RecipeGenerator(object):
 	# 6 - extra message
 	template_flatten_compound_type_array_member_recipe =\
 		"  /* AGGREGATE_FLATTEN_TYPE_ARRAY({0},{1},{2}); */\n{6}AGGREGATE_FLATTEN_COMPOUND_TYPE_ARRAY_SELF_CONTAINED({0},{3},{1},{4},{2}); {5}"
-	
+
 	# 0 - typename
 	# 1 - refname
 	# 2 - element count
 	# 3 - safe info
 	# 4 - extra message
 	template_flatten_type_array_pointer_recipe = "{4}FLATTEN_TYPE_ARRAY({0},{1},{2}); {3}"
-	
+
 	# 0 - typename
 	# 1 - typesize
 	# 2 - refname
@@ -283,25 +283,25 @@ class RecipeGenerator(object):
 	# 2 - safe info
 	# 3 - extra message
 	template_flatten_string_member_recipe = "  /* AGGREGATE_FLATTEN_STRING({0}); */\n{3}AGGREGATE_FLATTEN_STRING_SELF_CONTAINED({0},{1}); {2}"
-	
+
 	# 0 - refname
 	# 1 - safe info
 	# 2 - extra message
 	template_flatten_string_pointer_recipe = "{2}FLATTEN_STRING({0}); {1}"
 
-	# 0 - 
+	# 0 -
 	# 1 - member offset
 	template_flatten_fptr_member_recipe = "  /* AGGREGATE_FLATTEN_FUNCTION_POINTER({0}); */\nAGGREGATE_FLATTEN_FUNCTION_POINTER_SELF_CONTAINED({0},{1});"
-	
-	# 0 - 
+
+	# 0 -
 	template_flatten_fptr_pointer_recipe = "FLATTEN_FUNCTION_POINTER({0});"
-	
-	# 0 - 
+
+	# 0 -
 	# 1 - refname
 	# 2 - member offset
 	# 3 - element count
-	# 4 - 
-	# 5 - 
+	# 4 -
+	# 5 -
 	# 6 - safe info
 	# 7 - internal pointer flattening recipe
 	# 8 - extra message
@@ -319,16 +319,16 @@ class RecipeGenerator(object):
 	template_flatten_pointer_storage_recipe = """{6}FOREACH_POINTER({0},{1},{2},{3},{4}
 {5}
 );"""
-	
-	# 0 - 
-	# 1 - 
-	# 2 - 
+
+	# 0 -
+	# 1 -
+	# 2 -
 	# 3 - array size
-	# 4 - 
+	# 4 -
 	template_flatten_pointer_array_recipe = """FOREACH_POINTER({0},{1},{2},{3},
 {4}
 );"""
-	
+
 	# 0 - element count
 	# 1 - struct tag
 	# 2 - refname
@@ -336,7 +336,7 @@ class RecipeGenerator(object):
 	# 4 - safe info
 	# 5 - size of the struct tag
 	template_flatten_struct_array_storage_recipe = "AGGREGATE_FLATTEN_STRUCT_ARRAY_STORAGE_SELF_CONTAINED({1},{5},{2},{3},{0}); {4}"
-	
+
 	# 0 - element count
 	# 1 - union tag
 	# 2 - refname
@@ -344,7 +344,7 @@ class RecipeGenerator(object):
 	# 4 - safe info
 	# 5 - size of the union tag
 	template_flatten_union_array_storage_recipe = "AGGREGATE_FLATTEN_UNION_ARRAY_STORAGE_SELF_CONTAINED({1},{5},{2},{3},{0}); {4}"
-	
+
 	# 0 - element count
 	# 1 - typename
 	# 2 - refname
@@ -359,14 +359,14 @@ class RecipeGenerator(object):
 	# 3 - member offset
 	# 4 - safe info
 	template_flatten_struct_flexible_recipe = "AGGREGATE_FLATTEN_STRUCT_FLEXIBLE_SELF_CONTAINED({0},{1},{2},{3}); {4}"
-	
+
 	# 0 - union tag
 	# 1 - element size
 	# 2 - refname
 	# 3 - member offset
 	# 4 - safe info
 	template_flatten_union_flexible_recipe = "AGGREGATE_FLATTEN_UNION_FLEXIBLE_SELF_CONTAINED({0},{1},{2},{3}); {4}"
-	
+
 	# 0 - typename
 	# 1 - element size
 	# 2 - refname
@@ -384,8 +384,8 @@ class RecipeGenerator(object):
 	# 1 - member array element size
 	# 2 - member array offset
 	# 3 - member array refname
-	# 4 - 
-	# 5 - 
+	# 4 -
+	# 5 -
 	# 6 - recipe body
 	# 7 - extra message
 	# 8 - safe info
@@ -444,7 +444,7 @@ AGGREGATE_FLATTEN_STRUCT_ARRAY_SELF_CONTAINED(list_head,{0},{1}.prev,{4},1);
 		"FUNCTION_DECLARE_FLATTEN_{0}_ARRAY_SELF_CONTAINED({1});"
 	template_flatten_declare_struct_type_array_self_contained = \
 		"FUNCTION_DECLARE_FLATTEN_STRUCT_TYPE_ARRAY_SELF_CONTAINED({0});"
-	
+
 	# 0 - STRUCT/UNION
 	# 1 - struct tag
 	# 2 - struct size
@@ -453,7 +453,7 @@ AGGREGATE_FLATTEN_STRUCT_ARRAY_SELF_CONTAINED(list_head,{0},{1}.prev,{4},1);
 	# 5 - extra message
 	template_flatten_struct_array_pointer_self_contained = \
 		"{5}FLATTEN_{0}_ARRAY_SELF_CONTAINED({1},{2},{3},{4});"
-	
+
 	# 0 - typename
 	# 1 - typesize
 	# 2 - refname
@@ -692,7 +692,7 @@ add_custom_target(${{TARGET_NAME}} ALL DEPENDS kflat_core ${{RECIPE_SOURCE_NAME}
 
 #endif /* __COMMON_H__ */
 """
-	
+
 	TABSIZE = 2
 
 	FLATTEN_STRUCT_BLACKLIST = set(["kflat","hrtimer_clock_base"])
@@ -700,7 +700,7 @@ add_custom_target(${{TARGET_NAME}} ALL DEPENDS kflat_core ${{RECIPE_SOURCE_NAME}
 
 	def __init__(self,args):
 		if args.database.endswith('.json') and not os.path.exists(args.database + '.img'):
-				
+
 			print('--- Creating FTDB database')
 			with open(args.database, "rb") as f:
 				db = json.load(f)
@@ -723,7 +723,7 @@ add_custom_target(${{TARGET_NAME}} ALL DEPENDS kflat_core ${{RECIPE_SOURCE_NAME}
 		self.include_dirs = list()
 		if args.include_dirs is not None:
 			self.include_dirs+=args.include_dirs.split(":")
-		
+
 		self.ignore_structs = set([])
 		self.ignore_struct_types = set([])
 		if args.ignore_structs is not None:
@@ -820,13 +820,13 @@ add_custom_target(${{TARGET_NAME}} ALL DEPENDS kflat_core ${{RECIPE_SOURCE_NAME}
 		else:
 			raise RuntimeError("Failed to uniquely match kernel module for input function")
 		return os.path.basename(self.gftdb.modules[target_mid]).replace('.ko', '').replace('-', '_')
-	
+
 	def get_off_target_entry(self):
 		with open('ids.json', 'r') as f:
 			funcs = json.load(f)['entry_funcs']
 		if len(funcs) != 1:
 			raise RuntimeError("Unexpected number of entrypoint function IDs found in ids.json")
-		
+
 		if '@' in funcs[0]:
 			name, loc = funcs[0].split('@')
 			funcs = [f for f in self.gftdb.funcs.entry_by_name(name) if f.location.split(':')[0] == loc]
@@ -839,11 +839,11 @@ add_custom_target(${{TARGET_NAME}} ALL DEPENDS kflat_core ${{RECIPE_SOURCE_NAME}
 	def gen_recipe_id(self):
 		if self.gftdb is None:
 			raise ValueError("Cannot generate recipe_id without global FTDB database")
-		
+
 		target = self.get_off_target_entry()
 		module = self.get_func_module_name(target)
 		return (module + ':' if module != 'vmlinux' else '') + target.name
-	
+
 	def gen_args_list(self, func):
 		if self.gftdb is None:
 			raise ValueError("Cannot generate list of input arguments without global FTDB database")
@@ -856,7 +856,7 @@ add_custom_target(${{TARGET_NAME}} ALL DEPENDS kflat_core ${{RECIPE_SOURCE_NAME}
 		elif len(func_inits) == 0:
 			raise RuntimeError("Cannot find target function in init_file - provide list of arguments manually")
 		func_init = func_inits[0]
-		
+
 		func_entry = self.get_off_target_entry()
 		func_args = [d for d in sorted(func_entry.locals, key=lambda x: x.id) if d.parm]
 
@@ -867,7 +867,7 @@ add_custom_target(${{TARGET_NAME}} ALL DEPENDS kflat_core ${{RECIPE_SOURCE_NAME}
 				if arg.name in item['name']:
 					skip = True
 					break
-			
+
 			if skip or i >= 4:
 				continue
 			if func_init['interface'] == 'ioctl' and i >= 1:
@@ -885,7 +885,7 @@ add_custom_target(${{TARGET_NAME}} ALL DEPENDS kflat_core ${{RECIPE_SOURCE_NAME}
 		real_refs = list()
 		ignore_count=0
 		for i in range(len(RT.refnames)-RT.attrnum):
-			if i in RT.decls and ( RT.refnames[i]!="__!anonrecord__" or (i+1<len(RT.refs) and 
+			if i in RT.decls and ( RT.refnames[i]!="__!anonrecord__" or (i+1<len(RT.refs) and
 				isAnonRecordDependent(ftdb.types[RT.refs[i]],ftdb.types[RT.refs[i+1]],ftdb))):
 				ignore_count+=1
 				continue
@@ -905,7 +905,7 @@ add_custom_target(${{TARGET_NAME}} ALL DEPENDS kflat_core ${{RECIPE_SOURCE_NAME}
 					continue
 				ignore_count=0
 				for i in range(len(MT.refnames)-MT.attrnum):
-					if i in MT.decls and ( MT.refnames[i]!="__!anonrecord__" or (i+1<len(MT.refs) and 
+					if i in MT.decls and ( MT.refnames[i]!="__!anonrecord__" or (i+1<len(MT.refs) and
 						isAnonRecordDependent(ftdb.types[MT.refs[i]],ftdb.types[MT.refs[i+1]],ftdb))):
 						ignore_count+=1
 						continue
@@ -926,7 +926,7 @@ add_custom_target(${{TARGET_NAME}} ALL DEPENDS kflat_core ${{RECIPE_SOURCE_NAME}
 		ignore_count=0
 		last_member_type = None
 		for i in range(len(RT.refnames)-RT.attrnum):
-			if i in RT.decls and ( RT.refnames[i]!="__!anonrecord__" or (i+1<len(RT.refs) and 
+			if i in RT.decls and ( RT.refnames[i]!="__!anonrecord__" or (i+1<len(RT.refs) and
 				isAnonRecordDependent(ftdb.types[RT.refs[i]],ftdb.types[RT.refs[i+1]],ftdb))):
 				ignore_count+=1
 				continue
@@ -942,7 +942,7 @@ add_custom_target(${{TARGET_NAME}} ALL DEPENDS kflat_core ${{RECIPE_SOURCE_NAME}
 				internal_real_refs = list()
 				ignore_count=0
 				for i in range(len(MT.refnames)-MT.attrnum):
-					if i in MT.decls and ( MT.refnames[i]!="__!anonrecord__" or (i+1<len(MT.refs) and 
+					if i in MT.decls and ( MT.refnames[i]!="__!anonrecord__" or (i+1<len(MT.refs) and
 						isAnonRecordDependent(ftdb.types[MT.refs[i]],ftdb.types[MT.refs[i+1]],ftdb))):
 						ignore_count+=1
 						continue
@@ -1484,7 +1484,7 @@ add_custom_target(${{TARGET_NAME}} ALL DEPENDS kflat_core ${{RECIPE_SOURCE_NAME}
 					if GRI is None:
 						continue
 					dep, module, size, hash = GRI
-					
+
 					# FIXME: Move it to some config file
 					if hash in ['__per_cpu_offset', 'jiffies', '__start_rodata', '__end_rodata']:
 						print(f"Ignoring blacklisted global '{hash}'")
@@ -1646,7 +1646,7 @@ add_custom_target(${{TARGET_NAME}} ALL DEPENDS kflat_core ${{RECIPE_SOURCE_NAME}
 					continue
 				discovered.add(f.id)
 				add_subfuncs(f)
-		
+
 		nameT = name.split("@")
 		targets = [x for x in self.ftdb.funcs if x.name == nameT[0]]
 		if len(targets) > 1:
@@ -1689,10 +1689,10 @@ add_custom_target(${{TARGET_NAME}} ALL DEPENDS kflat_core ${{RECIPE_SOURCE_NAME}
 		for T in self.ftdb.types:
 			if T.classname=='builtin' and 'char' in T.str:
 				return T
-	
+
 	def isTypeConst(self, T):
 		return 'c' in T.qualifiers
-	
+
 	def typeToNonConst(self, T):
 		if T is None or not self.isTypeConst(T):
 			return T
@@ -1734,7 +1734,7 @@ add_custom_target(${{TARGET_NAME}} ALL DEPENDS kflat_core ${{RECIPE_SOURCE_NAME}
 		if T.id in self.anon_record_id_map:
 			anonstruct_type_name = self.anon_record_id_map[T.id]
 		else:
-			anonstruct_type_name = "anonstruct_type_%d_t"%(self.anontype_index) 
+			anonstruct_type_name = "anonstruct_type_%d_t"%(self.anontype_index)
 			self.anontype_index = self.anontype_index+1
 			self.anon_record_id_map[T.id] = anonstruct_type_name
 		return anonstruct_type_name
@@ -2218,8 +2218,8 @@ We then assume that this pointer is pointing to a single element of a given type
 		if pteEXT[2]=='pvoid':
 			ptenfo = (
 									"pointer to void analysis",
-									"\n".join(["     %s"%(x) for x in pteEXT[3]]) if pteEXT[0]>=0 else 
-									"\n".join( [ "E: %s -> '%s'"%(expr,self.ftdb.types[int(TID)].hash) for TID,expr in 
+									"\n".join(["     %s"%(x) for x in pteEXT[3]]) if pteEXT[0]>=0 else
+									"\n".join( [ "E: %s -> '%s'"%(expr,self.ftdb.types[int(TID)].hash) for TID,expr in
 										list(itertools.chain.from_iterable([(k,e) for e in V] for k,V in pteEXT[3].items())) ] )
 							 )
 		if pteEXT[2]=='custom' or pteEXT[2]=='custom_string':
@@ -2440,16 +2440,16 @@ The expression(s)/custom info we concluded it from was:\n\
 
 		return PTE,PTEExt
 
-	# out - 
+	# out -
 	# ptrT - type of the structure member being processed
 	# pteT - type the structure member pointer points to
 	# pteEXT -
 	# poffset - offset in the pteT records type
-	# mStr - 
+	# mStr -
 	# refname - member pointer refname
 	# refoffset - member pointer offset
 	# TRT - the underlying record type for which the harness is generated
-	# tab - 
+	# tab -
 	# TPDptrT - if structure member is a typedef this is the original typedef type otherwise it's None
 	# TPDpteT - if structure member pointer points to a typedef this is the original typedef type otherwise it's None
 	# ptrLevel -
@@ -2469,7 +2469,7 @@ The expression(s)/custom info we concluded it from was:\n\
 		pteEXTmsg = ""
 		if pteEXT is not None:
 			pteEXTmsg = self.construct_PTE_extra_msg(pteEXT,mStr,refname)
-		
+
 		if pteT.classname=="attributed" and "__attribute__((noderef))" in pteT.attrcore:
 			out.write(indent("/* Member '%s' points to __user memory */"%(refname),tab)+"\n")
 			self.user_memory_pointer_members.append((TPDptrT,TRT,refname))
@@ -2701,13 +2701,13 @@ The expression(s)/custom info we concluded it from was:\n\
 			),tab)
 			out.write(recipe+"\n")
 			return anonstruct_type_name
-			
+
 		if T.classname=="record_forward":
 			RL = [x for x in self.ftdb.types if x.classname=="record" and x.str == T.str]
 			if len(RL) <= 0:
 				return None
 			T = RL[0]
-		
+
 		__type_size = T.size//8
 		if handle_flexible_size and T.str in self.RRMap and self.RRMap[T.str].have_flexible_member:
 			__type_size = "__FLEX_OBJSIZE__(%s)"%(refname)
@@ -2747,7 +2747,7 @@ The expression(s)/custom info we concluded it from was:\n\
 				return None
 			else:
 				return rtp+"*"
-		
+
 		elif T.classname=="incomplete_array" or T.classname=="const_array":
 			out.write(indent("/* TODO: implement flattening trigger for global variable '%s' */"%(gv.name),tab)+"\n")
 			return None
@@ -3257,11 +3257,11 @@ The expression(s)/custom info we concluded it from was:\n\
 				#	struct { ... } w;       // ignore "__!anonrecord__" from refs/refnames/usedrefs (present in decls)
 				#  summary: ignore all "__!recorddecl__" from decls and "__!anonrecord__" if there's the same refs entry that follows
 				for i in range(len(TRT.refnames)-TRT.attrnum):
-					if i in TRT.decls and ( TRT.refnames[i]!="__!anonrecord__" or (i+1<len(TRT.refs) and 
+					if i in TRT.decls and ( TRT.refnames[i]!="__!anonrecord__" or (i+1<len(TRT.refs) and
 							isAnonRecordDependent(self.ftdb.types[TRT.refs[i]],self.ftdb.types[TRT.refs[i+1]],self.ftdb))):
 						ignore_count+=1
 						continue
-					
+
 					erfnLst = []
 					if TRT.refnames[i]!='__!anonrecord__':
 						erfnLst.append(TRT.refnames[i])
@@ -3303,7 +3303,7 @@ The expression(s)/custom info we concluded it from was:\n\
 				else:
 					if Ts in self.allowed_members and mName not in self.allowed_members.get(Ts, set()):
 						refaccess = False
-				
+
 				self.member_count+=1
 				# RT - type of the structure member being processed
 				# TPD - if structure member is a typedef this is the original typedef type otherwise it's None
@@ -3483,7 +3483,7 @@ The expression(s)/custom info we concluded it from was:\n\
 					internal_real_refs = list()
 					ignore_count=0
 					for i in range(len(RT.refnames)-RT.attrnum):
-						if i in RT.decls and ( RT.refnames[i]!="__!anonrecord__" or (i+1<len(RT.refs) and 
+						if i in RT.decls and ( RT.refnames[i]!="__!anonrecord__" or (i+1<len(RT.refs) and
 								isAnonRecordDependent(self.ftdb.types[RT.refs[i]],self.ftdb.types[RT.refs[i+1]],self.ftdb))):
 							ignore_count+=1
 							continue
@@ -3517,7 +3517,7 @@ The expression(s)/custom info we concluded it from was:\n\
 					tpstr = "struct %s"%(TRT.str) if TRT.str!='' else "%s"%(TRTTPD.name)
 					etpstr = "struct %s"%(eT.str) if eT.str!='' else "%s"%(eTPD.name)
 					print ("@ %s:%s [%s:%s] ***  [%s:%s] @ %d [%s]"%(tpstr,refname,RT.classname,RT.str,etpstr,erfn,moffset,mStr))
-				
+
 				# Check if the member was not used in the call graph of specified functions
 				if 'OT_info' in self.config and 'used_members' in self.config['OT_info']:
 					MU = set(self.config['OT_info']['used_members'])
@@ -3562,14 +3562,14 @@ The expression(s)/custom info we concluded it from was:\n\
 					continue
 				else:
 					eT,eTPD,mID,mName,mURef,mOff,mOffLst,rfnLst,allowSpecLst,erfnLst,refname,erfn,moffset,mStr,eStr,refaccess = item
-				
+
 				mi+=1
 				RT = self.ftdb.types[mID]
 				TPD = None
 				if RT.classname=="typedef":
 					TPD = RT
 					RT = self.walkTPD(RT)
-				
+
 				iout = io.StringIO()
 				def handle_overlapping_members():
 					if 'OT_info' in self.config and 'overlapping_members' in self.config['OT_info']:
@@ -3614,7 +3614,7 @@ The expression(s)/custom info we concluded it from was:\n\
 					# Handle overlapping members
 					if not handle_overlapping_members():
 						continue
-					
+
 					# PTE - type the structure member pointer points to
 					# TPDE - if structure member pointer points to a typedef this is the original typedef type otherwise it's None
 					PTE = self.ftdb.types[RT.refs[0]]
@@ -3625,7 +3625,7 @@ The expression(s)/custom info we concluded it from was:\n\
 						else:
 							TTstr = PTE.hash
 						print ("struct %s (%s)[%s]"%(self.ftdb.types[eT.id].str,erfn,TTstr))
-					
+
 					# Check if the member pointer points to a different type than specified in the structure
 					#  (either through the use of 'container_of' macro or source type casting constructs)
 					#  (or we point to the type directly through the config file)
@@ -3862,7 +3862,7 @@ The expression(s)/custom info we concluded it from was:\n\
 			if TRT.isunion is True and have_member_ptr:
 				# We've had at least one pointer in the union; verify the internal union recipes
 				check_union = True
-		
+
 		# We enter here in all cases except that when we have a complex structure to process and only_simple flag is passed
 		#  i.e. we ignore structures which requires internal flattening recipes to provide
 		if T.classname=="record" or T.classname=="record_forward":
@@ -4297,7 +4297,7 @@ def main():
 		elif gv.name in RG.config['per_cpu_variables']['per_cpu_indirect_variables']:
 			output_template = RecipeGenerator.template_output_per_cpu_global_handler
 
-		# Generate 
+		# Generate
 		globals_handler_stream.write(output_template.format(
 			var_name, glob[6], glob[4], "\n".join(["\t\t\t"+x for x in out.getvalue().strip().split("\n")]), var_hash, glob_addr, gv.defstring, gv.hash
 		))
@@ -4406,7 +4406,7 @@ def main():
 			recipe_declare_stream.write("FUNCTION_DECLARE_FLATTEN_STRUCT_TYPE(%s);\n"%(name))
 			anon_typedef_declare_s.add(name)
 
-	
+
 	objs = list()
 	objs.append("kflat_recipes_main.o")
 
@@ -4528,7 +4528,7 @@ def main():
 
 	recipe_register_stream.write(f"KFLAT_RECIPE_EX(\"{args.recipe_id if args.recipe_id else args.func}\", handler_{args.func}, prehandler_globals_search),\n")
 	recipe_handlers_stream.write(
-		RecipeGenerator.template_output_recipe_handler.format(args.func, func_args_stream.getvalue().strip(), 
+		RecipeGenerator.template_output_recipe_handler.format(args.func, func_args_stream.getvalue().strip(),
 			globals_handler_stream.getvalue().strip()))
 
 	if not os.path.exists(args.output):
