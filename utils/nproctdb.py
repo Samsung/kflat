@@ -559,10 +559,19 @@ static void handler_{0}(struct kflat* kflat, struct probe_regs* regs) {{
 	template_output_global_variable = """
 static void* {1} = NULL;"""
 
-	# 0 - name of global variable inc. kenerl module
+	# 0 - name of global variable inc. kernel module
 	# 1 - unique hash of global variable
+	# 2 - additional code for validating memory size of builtin types (empty for non built-in types)
 	template_output_global_pre_handler = """
-	{1} = flatten_global_address_by_name("{0}");"""
+	{1} = flatten_global_address_by_name("{0}");{2}"""
+
+	# 0 - name of global variable inc. kernel module
+	# 1 - unique hash of global variable
+	# 2 - size of global variable according to FTDB
+	template_validate_inmem_code = """if({1} != NULL && flatten_validate_inmem_size((unsigned long){1}, {2} /* FTDB size value */ )) {{
+	flat_errs(\"Size difference between FTDB and kallsyms for {0} global\");
+	{1} = NULL;
+}}"""
 
 	# 0 - name of global variable inc. kernel module
 	# 1 - name of global var
@@ -4292,8 +4301,14 @@ def main():
 		globals_handler_stream.write(output_template.format(
 			var_name, glob[6], glob[4], "\n".join(["\t\t\t"+x for x in out.getvalue().strip().split("\n")]), var_hash, glob_addr, gv.defstring, gv.hash
 		))
+		validate_inmem_code = ""
+		if RG.ftdb.types[gv.type].classname=='builtin':
+			val_code = ""
+			validate_inmem_code = "\n"+prepend_non_empty_lines(RecipeGenerator.template_validate_inmem_code.format(
+				var_name, var_hash, RG.ftdb.types[gv.type].size//8
+			),"\t")
 		globals_prehandler_stream.write(RecipeGenerator.template_output_global_pre_handler.format(
-			var_name, var_hash
+			var_name, var_hash, validate_inmem_code
 		))
 		globals_variables_stream.write(RecipeGenerator.template_output_global_variable.format(
 			var_name, var_hash
