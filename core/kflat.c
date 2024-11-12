@@ -728,7 +728,7 @@ static int __init kflat_init(void) {
 	}
 
 	kflat_lookup_kallsyms_name = (lookup_kallsyms_name_t) probing_get_kallsyms();
-	kflat_kallsyms_lookup = (kallsyms_lookup_t) kflat_lookup_kallsyms_name("kallsyms_lookup");
+	kflat_kallsyms_lookup = (kallsyms_lookup_t) flatten_global_address_by_name("kallsyms_lookup");
 
 	
 	kflat_dbgfs_node = node;
