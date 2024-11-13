@@ -233,13 +233,10 @@ static bool _flatten_get_heap_obj(struct slab* slab, void* orig_ptr,
     if(object_size <= offset)
         return false;
 
-    if(cache->usersize != 0)
-        object_size = cache->usersize;
-
     if(start)
-        *start = orig_ptr - offset + cache->useroffset;
+        *start = orig_ptr - offset;
     if(end)
-        *end = orig_ptr - offset + cache->useroffset + object_size - 1;
+        *end = orig_ptr - offset + object_size - 1;
     return true;
 }
 
