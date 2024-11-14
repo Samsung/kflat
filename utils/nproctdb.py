@@ -652,7 +652,8 @@ static void* {1} = NULL;"""
 		"nodemask_t",
 		"pg_data_t",
 		"guid_t",
-		"seqcount_raw_spinlock_t"])
+		"seqcount_raw_spinlock_t",
+		"irq_cpustat_t"])
 
 	## Arguments
 	##  - recipe module name
