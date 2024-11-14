@@ -61,7 +61,7 @@ SYM_CODE_START(raw_probing_delegate)
     pop %r14;
     pop %r15;
 
-    /* If saved_ip is NULL, set return value (rax) to 0 
+    /* If saved_ip is NULL, set return value (rax) to 0
      *  and return to parent function
      */
     cmpq $0, %rax;

@@ -11,7 +11,7 @@
 SYM_CODE_START(raw_probing_delegate)
     /* Mark this code as a valid location for jump
      *  Otherwise Branch Target Identification (BTI)
-     *  would crash the kernel  
+     *  would crash the kernel
      */
     hint    0x26;           /* BTI jc */
 
@@ -68,8 +68,8 @@ SYM_CODE_START(raw_probing_delegate)
     /* Restore stack frame */
     add    sp, sp, #16*16;
 
-    /* Jump back to saved_ip. If saved_ip is NULL, 
-     *  set return value (x0) to 0 and return to 
+    /* Jump back to saved_ip. If saved_ip is NULL,
+     *  set return value (x0) to 0 and return to
      *  parent function
      */
     cmp    x16, #0;

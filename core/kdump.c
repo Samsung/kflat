@@ -3,7 +3,7 @@
  * @author Samsung R&D Poland - Mobile Security Group (srpol.mb.sec@samsung.com)
  * @brief Collection of functions for testing kernel address and
  *   dumping virtual memory layout
- * 
+ *
  */
 
 #include "kdump.h"
@@ -30,13 +30,12 @@
  * INTERVAL TREE
  *******************************************************/
 #define START(node) ((node)->start)
-#define END(node)  ((node)->end)
+#define END(node)   ((node)->end)
 
 INTERVAL_TREE_DEFINE(struct kdump_memory_node, rb,
-		     uintptr_t, __subtree_last,
-		     START, END,
-             static __attribute__((used)), kdump_interval_tree)
-
+                     uintptr_t, __subtree_last,
+                     START, END,
+                     static __attribute__((used)), kdump_interval_tree)
 
 int kdump_tree_destroy(struct kdump_memory_map* kdump) {
     struct kdump_memory_node *node, *tmp;
@@ -100,7 +99,7 @@ int kdump_tree_flatten(struct kdump_memory_map* kdump, void* __user buf, size_t 
 
     root = &kdump->imap_root.rb_root;
     for(p = rb_first_postorder(root); p != NULL; p = rb_next_postorder(p)) {
-        struct kdump_memory_node* node = (struct kdump_memory_node*) p;
+        struct kdump_memory_node* node = (struct kdump_memory_node*)p;
         mem.start = node->start;
         mem.end = node->end;
 
@@ -117,7 +116,7 @@ int kdump_tree_flatten(struct kdump_memory_map* kdump, void* __user buf, size_t 
     ret = copy_to_user(buf, &cnt, sizeof(cnt));
     if(ret)
         return -EFAULT;
-    
+
     return 0;
 }
 
@@ -145,19 +144,19 @@ int kdump_tree_remap(struct kdump_memory_map* kdump, struct vm_area_struct* vma)
 
     root = &kdump->imap_root.rb_root;
     for(p = rb_first_postorder(root); p != NULL; p = rb_next_postorder(p)) {
-        struct kdump_memory_node* node = (struct kdump_memory_node*) p;
+        struct kdump_memory_node* node = (struct kdump_memory_node*)p;
         if(node->phys_addr == 0)
             continue;
 
         ret = remap_pfn_range(vma, vma->vm_start + offset,
-                            __phys_to_pfn(node->phys_addr), node->end - node->start + 1,
-                            vma->vm_page_prot);
+                              __phys_to_pfn(node->phys_addr), node->end - node->start + 1,
+                              vma->vm_page_prot);
         if(ret && warned < 10) {
             // Warn and keep going!
             pr_warn("failed to remap physical page to userspace mapping (%zu), err=%d", offset, ret);
             warned++;
         }
-        
+
         offset += node->end - node->start + 1;
     }
 
@@ -179,7 +178,7 @@ size_t kdump_tree_total_size(struct kdump_memory_map* kdump) {
 
     root = &kdump->imap_root.rb_root;
     for(p = rb_first_postorder(root); p != NULL; p = rb_next_postorder(p)) {
-        struct kdump_memory_node* node = (struct kdump_memory_node*) p;
+        struct kdump_memory_node* node = (struct kdump_memory_node*)p;
         size += node->end - node->start + 1;
     }
     return size;
@@ -197,13 +196,13 @@ size_t kdump_tree_total_size(struct kdump_memory_map* kdump) {
  *  holds the reference to swapper_pg_dir). However, kernel developers
  *  decided to limit access to some kernel symbols from loadable modules,
  *  including the ones we need.
- * 
- * Therefore, instead of giving up, we're directly extracting pointer to 
+ *
+ * Therefore, instead of giving up, we're directly extracting pointer to
  *  Global Page Directory (PGD) from processor's register TTBR1_EL1 (ARM)
  *  or CR3 (x86).
- * 
+ *
  * For more details, please refer to "ARMv8-A Architecture Reference Manual"
- *  section D13.2.138 (p. 3764) and "Intel 64 and IA-32 Architectures 
+ *  section D13.2.138 (p. 3764) and "Intel 64 and IA-32 Architectures
  *  Software Developer’s Manuals" volume 3 section 4.5.2 (p. 2934)
  */
 
@@ -213,43 +212,41 @@ static pgd_t* kdump_get_kernel_pgd(void) {
     uint64_t ttbr1_el1, baddr;
 
     asm volatile(
-        "mrs %0, TTBR1_EL1;" 
-        : "=r"(ttbr1_el1)
-    );
+        "mrs %0, TTBR1_EL1;"
+        : "=r"(ttbr1_el1));
 
     baddr = ttbr1_el1 & 0xFFFFFFFFFFFEULL;
-    swapper_pgd = (pgd_t*) __phys_to_kimg(baddr);
+    swapper_pgd = (pgd_t*)__phys_to_kimg(baddr);
 
     return swapper_pgd;
 }
 
-static pgd_t *kdump_get_user_pgd(void) {
+static pgd_t* kdump_get_user_pgd(void) {
     pgd_t* swapper_pgd;
     uint64_t ttbr0_el1, baddr;
 
     asm volatile(
-        "mrs %0, TTBR0_EL1;" 
-        : "=r"(ttbr0_el1)
-    );
+        "mrs %0, TTBR0_EL1;"
+        : "=r"(ttbr0_el1));
 
     baddr = ttbr0_el1 & 0xFFFFFFFFFFFEULL;
-    swapper_pgd = (pgd_t*) __phys_to_virt(baddr);
+    swapper_pgd = (pgd_t*)__phys_to_virt(baddr);
 
     return swapper_pgd;
 }
 
 #elif CONFIG_X86_64
-static pgd_t *kdump_get_kernel_pgd(void) {
+static pgd_t* kdump_get_kernel_pgd(void) {
     pgd_t* swapper_pgd;
 
-    swapper_pgd = (pgd_t*) phys_to_virt(native_read_cr3_pa());
-    
+    swapper_pgd = (pgd_t*)phys_to_virt(native_read_cr3_pa());
+
     return swapper_pgd;
 }
 
 #define kdump_get_user_pgd kdump_get_kernel_pgd
 
-#else 
+#else
 #error "Kflat module supports only x86 and ARM64 architectures"
 #endif
 
@@ -268,7 +265,6 @@ static inline int pmd_sect(pmd_t pmd) {
 }
 #endif
 
-
 /*
  * Handle disabled Top-Byte-Ignore (TBI) feature
  *  Before testing address in walk_addr function, we optionally
@@ -276,12 +272,12 @@ static inline int pmd_sect(pmd_t pmd) {
  *  function. This is done, because on newer ARM processors with MTE
  *  extension, the top byte of address is used for storing TAG and
  *  should be ignored in VA translation.
- * 
+ *
  *  Kernel's macro arch_kasan_reset_tag assumes that when kernel is built
  *  with CONFIG_KASAN_HW_TAGS, it will have TBI feature enabled. However
  *  on our test devices, there were a few kernel builds that eventhough
  *  had this kernel config enabled, TBI feature remained disabled.
- * 
+ *
  *  Therefore we're manually checking the content of MMU configuration
  *  register (TCR_EL1) to see if TBI is enabled or not and handle
  *  top-byte clearing accordingly.
@@ -296,17 +292,16 @@ static int tbi_is_enabled = 0;
 static inline void tbi_check(void) {
     uint64_t tcr_el1;
     asm volatile(
-        "mrs %0, TCR_EL1;" 
-        : "=r"(tcr_el1)
-    );
+        "mrs %0, TCR_EL1;"
+        : "=r"(tcr_el1));
 
     if(tcr_el1 & (1ULL << 38))
         tbi_is_enabled = 1;
-    
+
 #ifdef CONFIG_KASAN_HW_TAGS
     if(!tbi_is_enabled)
         pr_notice("Top-bytes-ignore feature is disabled even"
-            " though CONFIG_KASAN_HW_TAGS is enabled");
+                  " though CONFIG_KASAN_HW_TAGS is enabled");
 #endif
 }
 
@@ -322,7 +317,6 @@ static inline void* ptr_reset_tag(void* addr) {
 }
 #endif
 
-
 /*******************************************************
  * RESOURCES DISCOVERING
  *******************************************************/
@@ -334,15 +328,15 @@ struct kdump_iomem_res_entry {
 LIST_HEAD(kdump_system_ram);
 
 static struct resource* r_next(struct resource* p) {
-    if (p->child)
+    if(p->child)
         return p->child;
-    while (!p->sibling && p->parent)
+    while(!p->sibling && p->parent)
         p = p->parent;
     return p->sibling;
 }
 
 static void kdump_uncollect_iomem(void) {
-    struct kdump_iomem_res_entry* entry, *n;
+    struct kdump_iomem_res_entry *entry, *n;
 
     list_for_each_entry_safe(entry, n, &kdump_system_ram, list) {
         list_del(&entry->list);
@@ -365,7 +359,7 @@ static int kdump_collect_iomem_ram(void) {
                 ret = -ENOMEM;
                 goto err;
             }
-            
+
             entry->start = res->start;
             entry->end = res->end;
             list_add(&entry->list, &kdump_system_ram);
@@ -392,18 +386,17 @@ static int kdump_is_phys_in_ram(uint64_t addr) {
     return false;
 }
 
-
 /*******************************************************
  * PAGE WALKING
  *******************************************************/
-#define SIZE_TO_NEXT_PAGE(ADDR, LEVEL)      (LEVEL ## _SIZE - (addr & ~LEVEL ## _MASK))
+#define SIZE_TO_NEXT_PAGE(ADDR, LEVEL) (LEVEL##_SIZE - (addr & ~LEVEL##_MASK))
 
 static size_t __no_sanitize_address walk_addr(pgd_t* swapper_pgd, uint64_t addr, struct page** pagep) {
-    pgd_t* pgdp, pgd;
-    p4d_t* p4dp, p4d;
-    pud_t* pudp, pud;
-    pmd_t* pmdp, pmd;
-    pte_t* ptep, pte;
+    pgd_t *pgdp, pgd;
+    p4d_t *p4dp, p4d;
+    pud_t *pudp, pud;
+    pmd_t *pmdp, pmd;
+    pte_t *ptep, pte;
 
     *pagep = NULL;
 
@@ -436,7 +429,7 @@ static size_t __no_sanitize_address walk_addr(pgd_t* swapper_pgd, uint64_t addr,
     if(pmd_none(pmd))
         return SIZE_TO_NEXT_PAGE(addr, PMD);
     else if(pmd_sect(pmd)) {
-        if(pmd_present(pmd) && pfn_valid(pmd_pfn(pmd)))        
+        if(pmd_present(pmd) && pfn_valid(pmd_pfn(pmd)))
             *pagep = pmd_page(pmd);
         return SIZE_TO_NEXT_PAGE(addr, PMD);
     }
@@ -444,7 +437,7 @@ static size_t __no_sanitize_address walk_addr(pgd_t* swapper_pgd, uint64_t addr,
     // Finally, check PTE table for page entry
     ptep = pte_offset_kernel(pmdp, addr);
     pte = READ_ONCE(*ptep);
-    if(!pte_none(pte) && pte_present(pte) && pfn_valid(pte_pfn(pte)))    
+    if(!pte_none(pte) && pte_present(pte) && pfn_valid(pte_pfn(pte)))
         *pagep = pte_page(pte);
 
     return SIZE_TO_NEXT_PAGE(addr, PAGE);
@@ -457,7 +450,7 @@ static void kdump_walk_page_range(struct kdump_memory_map* kdump, pgd_t* swapper
 
     while(start < end) {
         size = walk_addr(swapper_pgd, start, &page);
-        
+
         if(page != NULL && kdump_is_phys_in_ram(page_to_phys(page))) {
             ret = kdump_tree_add_range(kdump, start, start + size - 1, page_to_phys(page));
             if(ret)
@@ -484,7 +477,6 @@ void kdump_dump_vma(struct kdump_memory_map* kdump) {
     pr_info("Finished kernel memory dump");
 }
 
-
 size_t kdump_test_address(void* addr, size_t size) {
     size_t walked_size = 0;
     struct page* page;
@@ -493,15 +485,15 @@ size_t kdump_test_address(void* addr, size_t size) {
     size_t page_offset = (uint64_t)addr & (~PAGE_MASK);
 
     addr = ptr_reset_tag(addr);
-    addr = (void*)((unsigned long)addr & ~(PAGE_SIZE - 1)); 
+    addr = (void*)((unsigned long)addr & ~(PAGE_SIZE - 1));
 
     /* Fast path for NULL pointer addresses */
-	if (addr == NULL)
-		return 0;
-    
+    if(addr == NULL)
+        return 0;
+
 #ifdef CONFIG_X86_64
     if(!x86_test_addr_canonical(addr))
-        return 0;  
+        return 0;
 #elif defined(CONFIG_ARM64)
     if(!arm64_is_canonical_addr(addr))
         return 0;
@@ -518,14 +510,14 @@ size_t kdump_test_address(void* addr, size_t size) {
         pr_warn("Attempted to access kernel memory with enabled User Access.");
         return 0;
     }
-    
+
     pgd = is_kernel_addr ? kdump_get_kernel_pgd() : kdump_get_user_pgd();
-    
+
     for(walked_size = 0; walked_size < size + page_offset;) {
-        size_t ret_size = walk_addr(pgd, (uint64_t) addr + walked_size, &page);
+        size_t ret_size = walk_addr(pgd, (uint64_t)addr + walked_size, &page);
         if(page == NULL || !kdump_is_phys_in_ram(page_to_phys(page)))
             break;
-        
+
         walked_size += ret_size;
     }
 
@@ -553,7 +545,7 @@ void* __no_sanitize_address hwasan_safe_memcpy(void* dst, const void* src, size_
     kasan_disable_current();
     ret = memcpy(dst, src, size);
     kasan_enable_current();
-    
+
     return ret;
 }
 #else
@@ -571,71 +563,70 @@ void* hwasan_safe_memcpy(void* dst, const void* src, size_t size) {
 #include "../../mm/cma.h"
 
 struct cma_res_entry {
-	struct list_head list;
-	unsigned long pfn_start;
-	unsigned long count;
+    struct list_head list;
+    unsigned long pfn_start;
+    unsigned long count;
 };
 LIST_HEAD(cma_mem_ranges);
 
 static int _cma_areas_iterator(struct cma* cma, void* data) {
-	struct cma_res_entry* entry;
+    struct cma_res_entry* entry;
 
-	entry = kmalloc(sizeof(*entry), GFP_KERNEL);
-	if(entry == NULL) {
-		pr_err("failed to allocate memory for CMA res entry");
-		return -ENOMEM;
-	}
-	
-	entry->pfn_start = cma->base_pfn;
-	entry->count = cma->count;
-	list_add(&entry->list, &cma_mem_ranges);
+    entry = kmalloc(sizeof(*entry), GFP_KERNEL);
+    if(entry == NULL) {
+        pr_err("failed to allocate memory for CMA res entry");
+        return -ENOMEM;
+    }
 
-	return 0;
+    entry->pfn_start = cma->base_pfn;
+    entry->count = cma->count;
+    list_add(&entry->list, &cma_mem_ranges);
+
+    return 0;
 }
 
 static int collect_cma_pfns(void) {
-	size_t regions_count = 0;
-	struct cma_res_entry* entry;
+    size_t regions_count = 0;
+    struct cma_res_entry* entry;
 
-	int ret = cma_for_each_area(_cma_areas_iterator, NULL);
+    int ret = cma_for_each_area(_cma_areas_iterator, NULL);
 
-	list_for_each_entry(entry, &cma_mem_ranges, list) 
-		regions_count++;
-	pr_info("Discovered %lu regions of CMA memory", regions_count);
-	return ret;
+    list_for_each_entry(entry, &cma_mem_ranges, list)
+        regions_count++;
+    pr_info("Discovered %lu regions of CMA memory", regions_count);
+    return ret;
 }
 
 static void release_cma_pfns(void) {
-	struct cma_res_entry *entry, *tmp;
-	list_for_each_entry_safe(entry, tmp, &cma_mem_ranges, list) {
-		list_del(&entry->list);
-		kfree(entry);
-	}
+    struct cma_res_entry *entry, *tmp;
+    list_for_each_entry_safe(entry, tmp, &cma_mem_ranges, list) {
+        list_del(&entry->list);
+        kfree(entry);
+    }
 }
 
 bool is_cma_memory(void* ptr) {
-	struct page* pagep;
-	unsigned long pfn;
-	struct cma_res_entry* entry;
+    struct page* pagep;
+    unsigned long pfn;
+    struct cma_res_entry* entry;
 
-	walk_addr(kdump_get_kernel_pgd(), (uint64_t)ptr, &pagep);	
-	if(pagep == NULL)
-		return false;
-	pfn = page_to_pfn(pagep);
+    walk_addr(kdump_get_kernel_pgd(), (uint64_t)ptr, &pagep);
+    if(pagep == NULL)
+        return false;
+    pfn = page_to_pfn(pagep);
 
-	list_for_each_entry(entry, &cma_mem_ranges, list) {
-		if(pfn >= entry->pfn_start && pfn < entry->pfn_start + entry->count)
-			return true;
-	}
-	return false;
+    list_for_each_entry(entry, &cma_mem_ranges, list) {
+        if(pfn >= entry->pfn_start && pfn < entry->pfn_start + entry->count)
+            return true;
+    }
+    return false;
 }
 
-#else /* !defined(CONFIG_CMA) || !defined(KFLAT_GET_OBJ_SUPPORT) */
+#else  /* !defined(CONFIG_CMA) || !defined(KFLAT_GET_OBJ_SUPPORT) */
 bool is_cma_memory(void* ptr) {
-	return false;
+    return false;
 }
 #endif /* CONFIG_CMA && KFLAT_GET_OBJ_SUPPORT */
-
 
 /*******************************************************
  * (De)initialization

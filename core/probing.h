@@ -1,8 +1,8 @@
-/*
- * Copyright 2022 Samsung R&D Poland
- *   Mobile Security Group
+/**
+ * @file probing.c
+ * @author Samsung R&D Poland - Mobile Security Group (srpol.mb.sec@samsung.com)
+ * @brief Interface for instrumenting Linux kernel with Kprobe subsystem
  *
- * Interface for instrumenting Linux kernel with Kprobe subsystem
  */
 
 #ifndef _LINUX_PROBING_H
@@ -16,7 +16,7 @@
 /*
  * MODULE CONFIGURATION
  */
-#define PROBING_ENABLE_DEBUG        0
+#define PROBING_ENABLE_DEBUG 0
 
 /*
  * Exported functions

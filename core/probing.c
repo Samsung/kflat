@@ -2,7 +2,7 @@
  * @file probing.c
  * @author Samsung R&D Poland - Mobile Security Group (srpol.mb.sec@samsung.com)
  * @brief Interface for instrumenting Linux kernel with Kprobe subsystem
- * 
+ *
  */
 
 #include "probing.h"
@@ -21,22 +21,20 @@
  * DEBUG MACROS
  *******************************************************/
 #if PROBING_ENABLE_DEBUG
-#define PROBING_DEBUG(MSG, ...)      printk(KERN_DEBUG "kflat-probing[%d]: " MSG, current->pid, ##__VA_ARGS__)
+#define PROBING_DEBUG(MSG, ...) printk(KERN_DEBUG "kflat-probing[%d]: " MSG, current->pid, ##__VA_ARGS__)
 #else
 #define PROBING_DEBUG(MSG, ...)
 #endif
-
 
 /*******************************************************
  * EXTERNAL FUNCTIONS
  *******************************************************/
 extern void raw_probing_delegate(void);
 
-
 /*******************************************************
  * Probing internals
  *******************************************************/
-static int probing_pre_handler(struct kprobe *p, struct pt_regs *regs) {
+static int probing_pre_handler(struct kprobe* p, struct pt_regs* regs) {
     struct kflat* kflat;
     struct probe* probe;
 
@@ -73,13 +71,13 @@ static int probing_pre_handler(struct kprobe *p, struct pt_regs *regs) {
      *  minus the size of INT3 opcode (1byte).
      */
     kflat->probing.return_ip = regs->ip - 1;
-    regs->ip = (u64) raw_probing_delegate;
+    regs->ip = (u64)raw_probing_delegate;
 
-    /* We're saving pointer to KFLAT structure associated with this Kprobe into 
+    /* We're saving pointer to KFLAT structure associated with this Kprobe into
      *  temporary register RAX, that is later also used in probing_x86.s to return
      *  to intercepted function code.
      */
-    regs->ax = (unsigned long) kflat;
+    regs->ax = (unsigned long)kflat;
 #endif
 
 #ifdef CONFIG_ARM64
@@ -87,16 +85,16 @@ static int probing_pre_handler(struct kprobe *p, struct pt_regs *regs) {
      *  points to the BRK instruction itself, i.e. to the beginning of intercepted
      *  function. Therefore, we don't need to do any magic trickery like in x86_64
      *  variant of this function.
-     * 
-     * For more details on this behaviour refer to ARMv8-A Architecture Reference 
+     *
+     * For more details on this behaviour refer to ARMv8-A Architecture Reference
      *  Manual (rev. G.b) section D2.8.3
      */
     kflat->probing.return_ip = regs->pc;
-    regs->pc = (u64) raw_probing_delegate;
+    regs->pc = (u64)raw_probing_delegate;
 
     /* Similarly to x86 variant, except in here we're using temporary register X16
      */
-    regs->regs[16] = (u64) kflat;
+    regs->regs[16] = (u64)kflat;
 #endif
 
     return 1;
@@ -126,7 +124,7 @@ static int symbol_to_name_and_offset(const char* symbol, char** pname, unsigned 
     if(offset_pos == NULL)
         goto exit;
     *offset_pos = '\0';
-    
+
     ret = kstrtouint(offset_pos + 1, 10, &offset);
     if(ret) {
         kfree(name);
@@ -193,7 +191,7 @@ int probing_arm(struct kflat* kflat, const char* symbol, pid_t callee) {
 
     atomic_set(&probing->triggered, 0);
     probing->is_armed = true;
-    
+
 exit:
     mutex_unlock(&probing->lock);
     return ret;
@@ -206,7 +204,7 @@ void probing_disarm(struct kflat* kflat) {
 
     if(!probing->is_armed)
         goto exit;
-    
+
     atomic_set(&probing->triggered, 0);
     unregister_kprobe(&probing->kprobe);
     probing->is_armed = false;
@@ -219,10 +217,9 @@ exit:
 }
 NOKPROBE_SYMBOL(probing_disarm);
 
-
 /*******************************************************
  * Cheating
- * 
+ *
  *  We really need an access to kallsyms_lookup_name for
  *  dumping global variables
  *******************************************************/
@@ -244,7 +241,7 @@ __nocfi void* probing_get_kallsyms(void) {
     unregister_kprobe(&kprobe);
 
     if(result != NULL) {
-        /* 
+        /*
          * On some architectures (mainly x86_64) functions can be prefixed with
          *  control-flow integrity related instructions (like `endbr64`), which
          *  are being skipped in address returned by register_kprobe. Because of
@@ -255,7 +252,7 @@ __nocfi void* probing_get_kallsyms(void) {
          *  the function pointer from kprobe with CFI disabled and store the result
          *  as real kallsyms_lookup_name address.
          */
-        result = (void*) ((lookup_kallsyms_name_t)result)("kallsyms_lookup_name");
+        result = (void*)((lookup_kallsyms_name_t)result)("kallsyms_lookup_name");
     }
 
     return result;
