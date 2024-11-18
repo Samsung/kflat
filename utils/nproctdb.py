@@ -1865,7 +1865,7 @@ add_custom_target(${{TARGET_NAME}} ALL DEPENDS kflat_core ${{RECIPE_SOURCE_NAME}
 				self.struct_deps.add((rT.id,rT.str))
 				return "%s %s"%(__tag,rT.str)
 
-	def get_element_count(self,mStr,ptr_in_array=False):
+	def get_element_count(self,mStr,dStr,ptr_in_array=False):
 
 			# Normally we cannot know whether the pointer points to a single struct or an array of structs (or other types)
 			# Try to conclude that from information in config file, otherwise we will try to detect it at runtime
@@ -1881,9 +1881,13 @@ add_custom_target(${{TARGET_NAME}} ALL DEPENDS kflat_core ${{RECIPE_SOURCE_NAME}
 				# First check if this information is given to us directly
 				if 'custom_element_count_map' in self.config['base_config']:
 					ecM = self.config['base_config']['custom_element_count_map']
-					if mStr in ecM:
-						haveCount = True
+					element_count_nfo = None
+					if "#"+dStr in ecM:
+						element_count_nfo = ecM["#"+dStr]
+					if element_count_nfo is None and mStr in ecM:
 						element_count_nfo = ecM[mStr]
+					if element_count_nfo is not None:
+						haveCount = True
 						if isinstance(element_count_nfo,int):
 							record_count_tuple[0] = element_count_nfo
 						else:
@@ -2269,7 +2273,7 @@ the 'container_of' invocation chain.\n   The invocation chain was as follows:\n{
 
 				pteEXTmsg = "/* It was detected that the member\n\
  '{0}'\n\
-points to the other type than specified in the member type specification.\n\
+points to (possibly) other type than specified in the member type specification.\n\
 Type hash of the new pointee type is\n\
  '{1}'\n\
 with offset {4} and we concluded that using {2}.\n\
@@ -2296,7 +2300,7 @@ The expression(s)/custom info we concluded it from was:\n\
   )
 		return pteEXTmsg
 
-	def real_pointee_type(self,mStr,refname,PTE,ptr_in_array=False):
+	def real_pointee_type(self,mStr,dStr,refname,PTE,ptr_in_array=False):
 
 		havePte = False
 		PTEExt = None
@@ -2307,6 +2311,8 @@ The expression(s)/custom info we concluded it from was:\n\
 					# We have custom information for single refnames only
 					if len(refname.split("."))<=1:
 						cT = self.custom_ptr_map["@"+mStr]
+				if cT is None and "#"+dStr in self.custom_ptr_map:
+					cT = self.custom_ptr_map["#"+dStr]
 				if cT is None and mStr in self.custom_ptr_map:
 					cT = self.custom_ptr_map[mStr]
 				if cT is not None:
@@ -2454,13 +2460,13 @@ The expression(s)/custom info we concluded it from was:\n\
 	# TPDptrT - if structure member is a typedef this is the original typedef type otherwise it's None
 	# TPDpteT - if structure member pointer points to a typedef this is the original typedef type otherwise it's None
 	# ptrLevel -
-	def generate_flatten_pointer(self,out,ptrT,pteT,pteEXT,mStr,refname,refoffset,TRT,tab,TPDptrT=None,TPDpteT=None,ptrLevel=0,ptr_in_array=False):
+	def generate_flatten_pointer(self,out,ptrT,pteT,pteEXT,mStr,dStr,refname,refoffset,TRT,tab,TPDptrT=None,TPDpteT=None,ptrLevel=0,ptr_in_array=False):
 		if ptrLevel<=0:
 			if pteEXT is not None and len(pteEXT)>4:
 				# 'container_of' chain - assume single pointed element
 				record_count_tuple = [1,None,None,'direct','']
 			else:
-				record_count_tuple = self.get_element_count(mStr,ptr_in_array)
+				record_count_tuple = self.get_element_count(mStr,dStr,ptr_in_array)
 		else:
 			# Pointer at the higher level of nesting is ambiguous (cannot extract information from dereference expressions about its usage at this point)
 			record_count_tuple = [None,None,None,'nested','']
@@ -2514,7 +2520,7 @@ The expression(s)/custom info we concluded it from was:\n\
 				PTE = self.walkTPD(PTE)
 			ptrout = io.StringIO()
 			# We assume that the nested pointer points to the type specified in its type specification (we don't have detailed member information at this level)
-			ptrtp = self.generate_flatten_pointer(ptrout,pteT,PTE,None,mStr,refname,refoffset,TRT,tab,TPDpteT,TPDE,ptrLevel+1)
+			ptrtp = self.generate_flatten_pointer(ptrout,pteT,PTE,None,mStr,dStr,refname,refoffset,TRT,tab,TPDpteT,TPDE,ptrLevel+1)
 			if ptrtp is None or ptrtp=="":
 				# We have multi-level pointers to function or pointers to incomplete arrays (strange things like that); ask the user to write this flattening recipe
 				return None
@@ -3266,7 +3272,7 @@ The expression(s)/custom info we concluded it from was:\n\
 					erfnLst = []
 					if TRT.refnames[i]!='__!anonrecord__':
 						erfnLst.append(TRT.refnames[i])
-					real_refs.append( (Ts,TRT,TRTTPD,TRT.refs[i],TRT.refnames[i],TRT.usedrefs[i],TRT.memberoffsets[i-ignore_count],[],[],[],[],False) )
+					real_refs.append( (Ts,Ts,TRT,TRTTPD,TRT.refs[i],TRT.refnames[i],TRT.usedrefs[i],TRT.memberoffsets[i-ignore_count],[],[],[],[],False) )
 			except Exception as e:
 				print(json.dumps(TRT.json(),indent=4))
 				raise e
@@ -3278,6 +3284,7 @@ The expression(s)/custom info we concluded it from was:\n\
 			proc_members = list()
 			while len(real_refs)>0:
 				# Ts: type string
+				# dTs: direct type string for a given member
 				# eT: enclosing record type for a given member in the chain (encloses anonymous and anchor members)
 				# eTPD: if the enclosing record type was given through the typedef this is the original typedef type
 				# mID: member_type ID
@@ -3290,12 +3297,14 @@ The expression(s)/custom info we concluded it from was:\n\
 				# erfnLst: refname list of members chain in the outermost enclosing type (for anonymous records and anchor types)
 				# anchorMember: if this is True we have a member who is an anchor and its internal members were already processed
 				#  (you can do some additional processing for recipe generation)
-				Ts,eT,eTPD,mID,mName,mURef,mOff,mOffLst,rfnLst,allowSpecLst,erfnLst,anchorMember = real_refs.pop(0)
+				Ts,dTs,eT,eTPD,mID,mName,mURef,mOff,mOffLst,rfnLst,allowSpecLst,erfnLst,anchorMember = real_refs.pop(0)
 				refname = ".".join(rfnLst+[mName])
 				erfn = ".".join(erfnLst+[mName])
 				moffset = sum(mOffLst+[mOff])
 				mStr = "s:%s:%s"%(eT.str,erfn) if eT.str!='' else "t:%s:%s"%(eTPD.name,erfn) if eTPD is not None else "%s:%s"%(Ts,erfn)
 				eStr = "s:%s"%(eT.str) if eT.str!='' else "t:%s"%(eTPD.name) if eTPD is not None else "%s:%s"%(Ts,erfn)
+				fStr = "%s:%s"%(origin_typestring,refname)
+				dStr = "%s:%s"%(dTs,mName)
 				refaccess = True
 				if len(erfnLst)>0:
 					refbase = ".".join(erfnLst)
@@ -3481,6 +3490,7 @@ The expression(s)/custom info we concluded it from was:\n\
 
 				# Handle member record type
 				if RT.classname=="record":
+					RTstr = "t:%s"%(TPD.name) if TPD is not None else "s:%s"%(RT.str) if RT.str!="" else "a:%d"%(RT.id)
 					internal_real_refs = list()
 					ignore_count=0
 					for i in range(len(RT.refnames)-RT.attrnum):
@@ -3503,9 +3513,9 @@ The expression(s)/custom info we concluded it from was:\n\
 									erfnLst.clear()
 								member_list.append(mName)
 								allowspec_list.append(refaccess)
-							internal_real_refs.append( (eTs,eRT,eRTTPD,RT.refs[i],RT.refnames[i],RT.usedrefs[i],RT.memberoffsets[i-ignore_count],
+							internal_real_refs.append( (eTs,RTstr,eRT,eRTTPD,RT.refs[i],RT.refnames[i],RT.usedrefs[i],RT.memberoffsets[i-ignore_count],
 								mOffLst+[mOff],rfnLst+member_list,allowSpecLst+allowspec_list,erfnLst+emember_list,False) )
-					internal_real_refs.append( (Ts,eT,eTPD,mID,mName,mURef,mOff,mOffLst,rfnLst,allowSpecLst,erfnLst,True) )
+					internal_real_refs.append( (Ts,Ts,eT,eTPD,mID,mName,mURef,mOff,mOffLst,rfnLst,allowSpecLst,erfnLst,True) )
 					real_refs = internal_real_refs+real_refs
 					continue
 
@@ -3520,9 +3530,9 @@ The expression(s)/custom info we concluded it from was:\n\
 					print ("@ %s:%s [%s:%s] ***  [%s:%s] @ %d [%s]"%(tpstr,refname,RT.classname,RT.str,etpstr,erfn,moffset,mStr))
 
 				# Check if the member was not used in the call graph of specified functions
-				if 'OT_info' in self.config and 'used_members' in self.config['OT_info']:
-					MU = set(self.config['OT_info']['used_members'])
-					if mStr not in MU:
+				if 'OT_info' in self.config and 'used_full_members' in self.config['OT_info']:
+					MU = set(self.config['OT_info']['used_full_members'])
+					if fStr not in MU:
 						proc_members.append(("/* member '%s' was not used [config] */\n"%(refname),None))
 						continue
 				else:
@@ -3531,7 +3541,7 @@ The expression(s)/custom info we concluded it from was:\n\
 						proc_members.append(("/* member '%s' was not used [call graph] */\n"%(refname),None))
 						continue
 
-				proc_members.append((eT,eTPD,mID,mName,mURef,mOff,mOffLst,rfnLst,allowSpecLst,erfnLst,refname,erfn,moffset,mStr,eStr,refaccess))
+				proc_members.append((eT,eTPD,mID,mName,mURef,mOff,mOffLst,rfnLst,allowSpecLst,erfnLst,refname,erfn,moffset,mStr,eStr,dStr,refaccess))
 
 				moffEnd = moffset
 				if RT.size<=0:
@@ -3562,7 +3572,7 @@ The expression(s)/custom info we concluded it from was:\n\
 						outv.append(item[0])
 					continue
 				else:
-					eT,eTPD,mID,mName,mURef,mOff,mOffLst,rfnLst,allowSpecLst,erfnLst,refname,erfn,moffset,mStr,eStr,refaccess = item
+					eT,eTPD,mID,mName,mURef,mOff,mOffLst,rfnLst,allowSpecLst,erfnLst,refname,erfn,moffset,mStr,eStr,dStr,refaccess = item
 
 				mi+=1
 				RT = self.ftdb.types[mID]
@@ -3630,7 +3640,7 @@ The expression(s)/custom info we concluded it from was:\n\
 					# Check if the member pointer points to a different type than specified in the structure
 					#  (either through the use of 'container_of' macro or source type casting constructs)
 					#  (or we point to the type directly through the config file)
-					PTE,PTEExt = self.real_pointee_type(mStr,refname,PTE)
+					PTE,PTEExt = self.real_pointee_type(mStr,dStr,refname,PTE)
 
 					# Now try to generate some recipes
 					TPDE = None
@@ -3652,7 +3662,7 @@ The expression(s)/custom info we concluded it from was:\n\
 						have_member_ptr = True
 						if resolved_record_forward:
 							PTE = resolved_record_forward
-						if self.generate_flatten_pointer(iout,RT,PTE,PTEExt,mStr,refname,moffset,TRT,0,TPD,TPDE,0) is None:
+						if self.generate_flatten_pointer(iout,RT,PTE,PTEExt,mStr,dStr,refname,moffset,TRT,0,TPD,TPDE,0) is None:
 							to_fix = True
 							self.complex_pointer_members.append((TPD,TRT,refname))
 				# RT.classname=="pointer"
@@ -3789,7 +3799,7 @@ The expression(s)/custom info we concluded it from was:\n\
 							if not handle_overlapping_members():
 								continue
 							PTE = self.ftdb.types[AT.refs[0]]
-							PTE,PTEExt = self.real_pointee_type(mStr,refname,PTE,True)
+							PTE,PTEExt = self.real_pointee_type(mStr,dStr,refname,PTE,True)
 							TPDE = None
 							if PTE.classname=="typedef":
 								TPDE = PTE
@@ -3810,7 +3820,7 @@ The expression(s)/custom info we concluded it from was:\n\
 								if resolved_record_forward:
 									PTE = resolved_record_forward
 							ptrout = io.StringIO()
-							ptrtp = self.generate_flatten_pointer(ptrout,AT,PTE,PTEExt,mStr,refname,moffset,TRT,0,TPDAT,TPDE,0,True)
+							ptrtp = self.generate_flatten_pointer(ptrout,AT,PTE,PTEExt,mStr,dStr,refname,moffset,TRT,0,TPDAT,TPDE,0,True)
 							if ptrtp is None or ptrtp=="":
 								to_fix = True
 								self.complex_pointer_members.append((TPD,TRT,refname))
