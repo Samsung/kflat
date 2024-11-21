@@ -3,14 +3,13 @@
  * @author Samsung R&D Poland - Mobile Security Group (srpol.mb.sec@samsung.com)
  * @brief Structures and functions responsible of memory disovery
  *  and pointers validation
- * 
+ *
  */
 #ifndef _LINUX_KDUMP_H
 #define _LINUX_KDUMP_H
 
 #include <linux/rbtree.h>
 #include <linux/mm.h>
-
 
 /*******************************************************
  * Exported structures
@@ -33,7 +32,6 @@ struct kdump_memory_flat {
     uint64_t end;
 } __packed;
 
-
 /*******************************************************
  * Exported functions
  *******************************************************/
@@ -51,7 +49,7 @@ size_t kdump_tree_total_size(struct kdump_memory_map* kdump);
 
 /**
  * @brief Check whether provided address range is valid
- * 
+ *
  * @param addr starting address
  * @param size size of memory range to be checked
  * @return size_t number of bytes from `addr` pointer that are valid kernel memory.
@@ -63,7 +61,7 @@ void* hwasan_safe_memcpy(void* dst, const void* src, size_t size);
 
 /**
  * @brief Check whether provided address belongs to CMA allocator
- * 
+ *
  * @param ptr pointer to memory
  * @return true CMA area
  * @return false other memory

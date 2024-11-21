@@ -2,12 +2,11 @@
  * @file flatten_port.h
  * @author Samsung R&D Poland - Mobile Security Group (srpol.mb.sec@samsung.com)
  * @brief Include file responsible solely for selecting proper BSP header
- * 
+ *
  */
 
 #ifndef FLATTEN_PORT_H
 #define FLATTEN_PORT_H
-
 
 /*************************************
  * BSP
@@ -24,7 +23,6 @@
 #error "No BSP selected - select proper include path in flatten_port.h"
 
 #endif /* FLATTEN_*_BSP */
-
 
 /*************************************
  * CONFIGURATION CHECKS
