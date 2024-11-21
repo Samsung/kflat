@@ -729,16 +729,17 @@
  * AGGERGATE & FLATTEN macros for
  *  generic types
  *******************************/
-#define FLATTEN_COMPOUND_TYPE_ARRAY(T, N, p, n)                                                                                                  \
-    do {                                                                                                                                         \
-        DBGM4(FLATTEN_COMPOUND_TYPE_ARRAY, T, N, p, n);                                                                                          \
-        if((!FLAT_ACCESSOR->error) && (ADDR_RANGE_VALID(p, (n)*N))) {                                                                            \
-            int err = fixup_set_insert_force_update(FLAT_ACCESSOR, __fptr->node, __fptr->offset, flatten_plain_type(FLAT_ACCESSOR, (p), (n)*N)); \
-            if((err) && (err != EINVAL) && (err != EEXIST) && (err != EAGAIN)) {                                                                 \
-                FLAT_ACCESSOR->error = err;                                                                                                      \
-            }                                                                                                                                    \
-        } else                                                                                                                                   \
-            DBGS("FLATTEN_COMPOUND_TYPE_ARRAY: error(%d), ADDR(%lx)\n", FLAT_ACCESSOR->error, (uintptr_t)p);                                     \
+#define FLATTEN_COMPOUND_TYPE_ARRAY(T, N, p, n)                                                                                                      \
+    do {                                                                                                                                             \
+        size_t count = (n);                                                                                                                          \
+        DBGS("FLATTEN_COMPOUND_TYPE_ARRAY(%s, %lu, p:%lx, n:%zu)\n", #T, (unsigned long)N, (unsigned long)p, count);                                 \
+        if((!FLAT_ACCESSOR->error) && (ADDR_RANGE_VALID(p, count * N))) {                                                                            \
+            int err = fixup_set_insert_force_update(FLAT_ACCESSOR, __fptr->node, __fptr->offset, flatten_plain_type(FLAT_ACCESSOR, (p), count * N)); \
+            if((err) && (err != EINVAL) && (err != EEXIST) && (err != EAGAIN)) {                                                                     \
+                FLAT_ACCESSOR->error = err;                                                                                                          \
+            }                                                                                                                                        \
+        } else                                                                                                                                       \
+            DBGS("FLATTEN_COMPOUND_TYPE_ARRAY: error(%d), ADDR(%lx)\n", FLAT_ACCESSOR->error, (uintptr_t)p);                                         \
     } while(0)
 
 #define FLATTEN_TYPE_ARRAY(T, p, n) FLATTEN_COMPOUND_TYPE_ARRAY(T, sizeof(T), p, n)
