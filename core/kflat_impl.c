@@ -123,6 +123,30 @@ bool check_kfence_address(void* ptr, void** start, void** end) {
 #endif
 }
 
+bool is_percpu_address(void* ptr) {
+    // Extract neccessary functions from kallsyms
+    static typeof(is_module_percpu_address)* func_is_module_percpu_address = NULL;
+    static typeof(is_kernel_percpu_address)* func_is_kernel_percpu_address = NULL;
+
+    if(func_is_module_percpu_address == NULL) {
+        func_is_module_percpu_address = flatten_global_address_by_name("is_module_percpu_address");
+        if(func_is_module_percpu_address == NULL) {
+            WARN_ONCE(1, "is_module_percpu_address is not available in kallsyms");
+            return false;
+        }
+    }
+
+    if(func_is_kernel_percpu_address == NULL) {
+        func_is_kernel_percpu_address = flatten_global_address_by_name("is_kernel_percpu_address");
+        if(func_is_kernel_percpu_address == NULL) {
+            WARN_ONCE(1, "is_kernel_percpu_address is not available in kallsyms");
+            return false;
+        }
+    }
+
+    return func_is_kernel_percpu_address((unsigned long)ptr) || func_is_module_percpu_address((unsigned long)ptr);
+}
+
 /*
  * Original implementation of kmem_cache_debug_flags can be
  * 	found in mm/slab.h
@@ -307,6 +331,11 @@ bool flatten_get_object(struct flat* flat, void* ptr, void** start, void** end) 
 
     if(object_is_on_stack(ptr)) {
         DBGS("flatten_get_object - ptr(%llx) is on stack\n", ptr);
+        return false;
+    }
+
+    if(is_percpu_address(ptr)) {
+        DBGS("flatten_get_object - ptr(%llx) is in per_cpu section\n", ptr);
         return false;
     }
 
