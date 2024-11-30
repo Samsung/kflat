@@ -44,6 +44,7 @@ if(CMAKE_SYSTEM_PROCESSOR MATCHES arm64)
         ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- CFLAGS="--target=aarch64-linux-gnu --prefix=aarch64-linux-gnu-"
     )
     set(CMAKE_C_FLAGS "--target=aarch64-linux-gnu --prefix=aarch64-linux-gnu-")
+    set(CMAKE_CXX_FLAGS "--target=aarch64-linux-gnu --prefix=aarch64-linux-gnu-")
 endif()
 
 if(KFLAT_OPTS)
