@@ -210,7 +210,8 @@ int run_test(struct args* args, const char* name) {
         goto munmap_area;
     } else if(output_size < 0) {
         log_error("failed to execute KFLAT_TEST ioctl - %s", strerror(errno));
-        goto munmap_area;
+        /* Just wait for a while, we still might want to collect some logs */
+        /* goto munmap_area; */
     }
 
     mark_time_end(&kernel_time);
@@ -251,6 +252,10 @@ int run_test(struct args* args, const char* name) {
             if(!args->validate || args->verbose)
                 log_info("\t saved flatten log to file %s [%lu bytes]", out_name, read_count);
         }
+    }
+
+    if(output_size < 0) {
+        goto munmap_area;
     }
 
 save_image:
