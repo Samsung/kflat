@@ -330,12 +330,12 @@ bool flatten_get_object(struct flat* flat, void* ptr, void** start, void** end) 
 #endif
 
     if(object_is_on_stack(ptr)) {
-        DBGS("flatten_get_object - ptr(%llx) is on stack\n", ptr);
+        DBGS("flatten_get_object - ptr(%llx) is on stack\n", (unsigned long long)ptr);
         return false;
     }
 
     if(is_percpu_address(ptr)) {
-        DBGS("flatten_get_object - ptr(%llx) is in per_cpu section\n", ptr);
+        DBGS("flatten_get_object - ptr(%llx) is in per_cpu section\n", (unsigned long long)ptr);
         return false;
     }
 
@@ -344,7 +344,7 @@ bool flatten_get_object(struct flat* flat, void* ptr, void** start, void** end) 
         if(size == 0)
             return false;
 
-        DBGS("flatten_get_object - ptr (%llx) is a valid vmalloc object\n", ptr);
+        DBGS("flatten_get_object - ptr (%llx) is a valid vmalloc object\n", (unsigned long long)ptr);
         if(end)
             *end = ptr + size - 1;
 
@@ -363,13 +363,13 @@ bool flatten_get_object(struct flat* flat, void* ptr, void** start, void** end) 
 
     // Vmalloc is not a valid virt_addr according to this macro
     if(!virt_addr_valid(ptr)) {
-        DBGS("flatten_get_object - invalid virt ptr(%llx)\n", ptr);
+        DBGS("flatten_get_object - invalid virt ptr(%llx)\n", (unsigned long long)ptr);
         return false;
     }
 
     obj = flatten_find_heap_object(ptr);
     if(obj != NULL) {
-        DBGS("flatten_get_object - ptr (%llx) is a valid SLAB object\n", ptr);
+        DBGS("flatten_get_object - ptr (%llx) is a valid SLAB object\n", (unsigned long long)ptr);
         return _flatten_get_heap_obj(obj, ptr, start, end);
     }
 
@@ -382,7 +382,7 @@ bool flatten_get_object(struct flat* flat, void* ptr, void** start, void** end) 
     // Try retrieving object size from compound_page (used by kmalloc_large)
     head = virt_to_head_page(ptr);
     if(head != NULL) {
-        DBGS("flatten_get_object - ptr (%llx) is a compound_page\n", ptr);
+        DBGS("flatten_get_object - ptr (%llx) is a compound_page\n", (unsigned long long)ptr);
         if(start)
             *start = page_address(head);
         if(end) {
@@ -393,7 +393,7 @@ bool flatten_get_object(struct flat* flat, void* ptr, void** start, void** end) 
         return true;
     }
 
-    DBGS("flatten_get_object - failed to detect ptr(%llx) allocation method (is it global var?)\n", ptr);
+    DBGS("flatten_get_object - failed to detect ptr(%llx) allocation method (is it global var?)\n", (unsigned long long)ptr);
     return false;
 }
 #else  /* KFLAT_GET_OBJ_SUPPORT */

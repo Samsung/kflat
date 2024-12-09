@@ -1379,13 +1379,13 @@ struct flat_node* flatten_acquire_node_for_ptr(struct flat* flat, const void* _p
                 struct flat_node* nn;
                 if(node->storage == 0) {
                     flat->error = EFAULT;
-                    DBGS("%s(%lx): EFAULT (node(%lx)->storage==0)\n", __func__, (uintptr_t)_ptr, node);
+                    DBGS("%s(%llx): EFAULT (node(%llx)->storage==0)\n", __func__, (unsigned long long)_ptr, (unsigned long long)node);
                     return 0;
                 }
                 nn = (struct flat_node*)flat_zalloc(flat, sizeof(struct flat_node), 1);
                 if(nn == 0) {
                     flat->error = ENOMEM;
-                    DBGS("%s(%lx): ENOMEM\n", __func__, (uintptr_t)_ptr);
+                    DBGS("%s(%llx): ENOMEM\n", __func__, (unsigned long long)_ptr);
                     return 0;
                 }
                 nn->start = p;
@@ -1409,13 +1409,13 @@ struct flat_node* flatten_acquire_node_for_ptr(struct flat* flat, const void* _p
             struct flat_node* nn;
             if(prev->storage == NULL) {
                 flat->error = EFAULT;
-                DBGS("%s(%lx): EFAULT (prev(%llx)->storage==0)\n", __func__, (uintptr_t)_ptr, (uint64_t)prev);
+                DBGS("%s(%llx): EFAULT (prev(%llx)->storage==0)\n", __func__, (unsigned long long)_ptr, (unsigned long long)prev);
                 return 0;
             }
             nn = (struct flat_node*)flat_zalloc(flat, sizeof(struct flat_node), 1);
             if(nn == NULL) {
                 flat->error = ENOMEM;
-                DBGS("%s(%lx): ENOMEM\n", __func__, (uintptr_t)_ptr);
+                DBGS("%s(%llx): ENOMEM\n", __func__, (unsigned long long)_ptr);
                 return 0;
             }
             nn->start = p;
@@ -1430,7 +1430,7 @@ struct flat_node* flatten_acquire_node_for_ptr(struct flat* flat, const void* _p
         node = (struct flat_node*)flat_zalloc(flat, sizeof(struct flat_node), 1);
         if(!node) {
             flat->error = ENOMEM;
-            DBGS("%s(%lx): ENOMEM\n", __func__, (uintptr_t)_ptr);
+            DBGS("%s(%llx): ENOMEM\n", __func__, (unsigned long long)_ptr);
             return 0;
         }
         node->start = (uint64_t)_ptr;
@@ -1449,7 +1449,7 @@ struct flat_node* flatten_acquire_node_for_ptr(struct flat* flat, const void* _p
         }
         if(!storage) {
             flat->error = ENOMEM;
-            DBGS("%s(%lx): ENOMEM\n", __func__, (uintptr_t)_ptr);
+            DBGS("%s(%llx): ENOMEM\n", __func__, (unsigned long long)_ptr);
             return 0;
         }
         node->storage = storage;
@@ -1469,16 +1469,16 @@ void flatten_generic(struct flat* flat, void* q, struct flatten_pointer* fptr, c
     struct flat_node* __ptr_node;
     const void* _fp = (const void*)((char*)p + shift);
 
-    DBGS("flatten_generic: ADDR(%lx)\n", (uintptr_t)_fp);
+    DBGS("flatten_generic: ADDR(%llx)\n", (unsigned long long)_fp);
 
     if(flat->error || !ADDR_RANGE_VALID(_fp, count * el_size)) {
-        DBGS("flatten_generic: error(%d), ADDR(0x%lx)", flat->error, (uintptr_t)_fp);
+        DBGS("flatten_generic: error(%d), ADDR(0x%llx)\n", flat->error, (unsigned long long)_fp);
         return;
     }
 
     __shifted = flatten_plain_type(flat, _fp, count * el_size);
     if(__shifted == NULL) {
-        DBGS("flatten_generic: flatten_plain_type() == NULL");
+        DBGS("flatten_generic: flatten_plain_type() == NULL\n");
         flat->error = EFAULT;
         return;
     }
@@ -1494,7 +1494,7 @@ void flatten_generic(struct flat* flat, void* q, struct flatten_pointer* fptr, c
 
     err = fixup_set_insert_force_update(flat, fptr->node, fptr->offset, __shifted);
     if(err && err != EINVAL && err != EEXIST && err != EAGAIN) {
-        DBGS("flatten_generic: fixup_set_insert_force_update(): err(%d)", err);
+        DBGS("flatten_generic: fixup_set_insert_force_update(): err(%d)\n", err);
         flat->error = err;
     } else if(err != EEXIST) {
         struct fixup_set_node* struct_inode;
@@ -1559,7 +1559,7 @@ void flatten_aggregate_generic(struct flat* flat, void* q, const void* _ptr,
 
     __shifted = flatten_plain_type(flat, _fp, el_size * count);
     if(__shifted == NULL) {
-        DBGS("  \\-> AGGREGATE_FLATTEN_GENERIC:flatten_plain_type(): NULL");
+        DBGS("  \\-> AGGREGATE_FLATTEN_GENERIC:flatten_plain_type(): NULL\n");
         flat->error = EFAULT;
         return;
     }
@@ -1629,7 +1629,7 @@ void flatten_aggregate_generic_storage(struct flat* flat, void* q, const void* _
     void* _fp = (unsigned char*)_ptr + _off;
 
     if(flat->error || !ADDR_RANGE_VALID(_fp, count * el_size)) {
-        DBGS("flatten_aggregate_generic_storage: error(%d), ADDR(0x%lx)", flat->error, (uintptr_t)_fp);
+        DBGS("flatten_aggregate_generic_storage: error(%d), ADDR(0x%llx)\n", flat->error, (unsigned long long)_fp);
         return;
     }
 

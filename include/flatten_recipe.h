@@ -19,7 +19,7 @@
         size_t _i;                                                                                                                                   \
         void* _fp_first = NULL;                                                                                                                      \
         const FULL_TYPE* _ptr = (const FULL_TYPE*)ptr;                                                                                               \
-        DBGS("%s(%lx,%zu)\n", __func__, (uintptr_t)_ptr, n);                                                                                         \
+        DBGS("%s(%llx,%zu)\n", __func__, (unsigned long long)_ptr, n);                                                                               \
         AGGREGATE_FLATTEN_ASSERT(n < INT_MAX, EINVAL); /* Limit array size to some sane value */                                                     \
         for(_i = 0; _i < n; ++_i) {                                                                                                                  \
             void* _fp = (void*)TARGET_FUNC(flat, (FULL_TYPE*)((unsigned char*)_ptr + _i * FLSIZE), custom_val, index, __q);                          \
@@ -50,7 +50,7 @@
             flat->error = EFAULT;                                                                                                                    \
             return NULL;                                                                                                                             \
         }                                                                                                                                            \
-        DBGS("%s(%lx,%zu)\n", __func__, (uintptr_t)_ptr, n);                                                                                         \
+        DBGS("%s(%llx,%zu)\n", __func__, (unsigned long long)_ptr, n);                                                                               \
         _fp = (void*)TARGET_FUNC(flat, (FULL_TYPE*)((unsigned char*)_ptr), custom_val, index, __q);                                                  \
         if(flat->error)                                                                                                                              \
             return NULL;                                                                                                                             \
@@ -151,23 +151,23 @@
         const FULL_TYPE* _ptr = (const FULL_TYPE*)ptr;                                                                                   \
         size_t type_size = FLSIZE;                                                                                                       \
         if(type_size == SIZE_MAX) {                                                                                                      \
-            DBGS("ERROR: failed to detect flexible array size @ %lx\n", ptr);                                                            \
+            DBGS("ERROR: failed to detect flexible array size @ %llx\n", (unsigned long long)ptr);                                       \
             flat->error = EFAULT;                                                                                                        \
             return 0;                                                                                                                    \
         }                                                                                                                                \
                                                                                                                                          \
-        DBGS("%s(%lx): [%zu]\n", __func__, (uintptr_t)_ptr, type_size);                                                                  \
+        DBGS("%s(%llx): [%zu]\n", __func__, (unsigned long long)_ptr, type_size);                                                        \
         __node = flatten_acquire_node_for_ptr(FLAT_ACCESSOR, (void*)ptr, type_size);                                                     \
                                                                                                                                          \
         __VA_ARGS__                                                                                                                      \
         if(flat->error) {                                                                                                                \
-            DBGS("%s(%lx): %d\n", __func__, (uintptr_t)_ptr, flat->error);                                                               \
+            DBGS("%s(%llx): %d\n", __func__, (unsigned long long)_ptr, flat->error);                                                     \
             return 0;                                                                                                                    \
         }                                                                                                                                \
         __node = flat_interval_tree_iter_first(&flat->FLCTRL.imap_root, (uint64_t)_ptr, (uint64_t)_ptr + sizeof(void*) - 1);             \
         if(__node == 0) {                                                                                                                \
             flat->error = EFAULT;                                                                                                        \
-            DBGS("%s(%lx): EFAULT (__node==0)\n", __func__, (uintptr_t)_ptr);                                                            \
+            DBGS("%s(%llx): EFAULT (__node==0)\n", __func__, (unsigned long long)_ptr);                                                  \
             return 0;                                                                                                                    \
         }                                                                                                                                \
         _node_offset = (uint64_t)_ptr - __node->start;                                                                                   \
@@ -176,7 +176,7 @@
         r = make_flatten_pointer(flat, __node, _node_offset);                                                                            \
         if(!r) {                                                                                                                         \
             flat->error = ENOMEM;                                                                                                        \
-            DBGS("%s(%lx): ENOMEM\n", __func__, (uintptr_t)_ptr);                                                                        \
+            DBGS("%s(%llx): ENOMEM\n", __func__, (unsigned long long)_ptr);                                                              \
             return 0;                                                                                                                    \
         }                                                                                                                                \
         return r;                                                                                                                        \
@@ -279,14 +279,14 @@
 #define FLATTEN_GENERIC(p, EL_SIZE, COUNT, CUSTOM_VAL, FUNC, SHIFT) \
     flatten_generic(FLAT_ACCESSOR, __q, __fptr, p, EL_SIZE, COUNT, CUSTOM_VAL, FUNC, SHIFT)
 
-#define FLATTEN_STRUCT_ARRAY(T, p, n)     \
-    DBGM3(FLATTEN_STRUCT_ARRAY, T, p, n); \
+#define FLATTEN_STRUCT_ARRAY(T, p, n)           \
+    DBGS("FLATTEN_STRUCT_ARRAY" #T #p #n "\n"); \
     FLATTEN_GENERIC(p, sizeof(struct T), n, 0, flatten_struct_array_##T, 0)
 
 #define FLATTEN_STRUCT_ARRAY_FLEXIBLE(T, p, n)                                                                        \
     do {                                                                                                              \
         size_t type_size;                                                                                             \
-        DBGM3(FLATTEN_STRUCT_ARRAY_FLEXIBLE, T, p, n);                                                                \
+        DBGS("FLATTEN_STRUCT_ARRAY_FLEXIBLE" #T #p #n "\n");                                                          \
         if(n != 1) {                                                                                                  \
             DBGS("ERROR: Multiple elements in an array of structure type with flexible array members: [ " #T " ]\n"); \
             flat->error = EFAULT;                                                                                     \
@@ -294,7 +294,7 @@
         }                                                                                                             \
         type_size = FLATTEN_DETECT_OBJECT_SIZE((void*)p, SIZE_MAX);                                                   \
         if(type_size == SIZE_MAX) {                                                                                   \
-            DBGS("ERROR: failed to detect flexible array size @ %lx\n", p);                                           \
+            DBGS("ERROR: failed to detect flexible array size @ %llx\n", (unsigned long long)p);                      \
             flat->error = EFAULT;                                                                                     \
             break;                                                                                                    \
         }                                                                                                             \
@@ -307,14 +307,14 @@
 #define FLATTEN_STRUCT_FLEXIBLE(T, p) \
     FLATTEN_STRUCT_ARRAY_FLEXIBLE(T, p, 1)
 
-#define FLATTEN_STRUCT_ARRAY_SHIFTED(T, p, n, s)     \
-    DBGM4(FLATTEN_STRUCT_ARRAY_SHIFTED, T, p, n, s); \
+#define FLATTEN_STRUCT_ARRAY_SHIFTED(T, p, n, s)           \
+    DBGS("FLATTEN_STRUCT_ARRAY_SHIFTED" #T #p #n #s "\n"); \
     FLATTEN_GENERIC(p, sizeof(struct T), n, 0, flatten_struct_array_##T, s)
 
 #define FLATTEN_STRUCT_ARRAY_SHIFTED_FLEXIBLE(T, p, n, s)                                                             \
     do {                                                                                                              \
         size_t type_size;                                                                                             \
-        DBGM3(FLATTEN_STRUCT_ARRAY_SHIFTED_FLEXIBLE, T, p, n);                                                        \
+        DBGS("FLATTEN_STRUCT_ARRAY_SHIFTED_FLEXIBLE" #T #p #n "\n");                                                  \
         if(n != 1) {                                                                                                  \
             DBGS("ERROR: Multiple elements in an array of structure type with flexible array members: [ " #T " ]\n"); \
             flat->error = EFAULT;                                                                                     \
@@ -322,7 +322,7 @@
         }                                                                                                             \
         type_size = FLATTEN_DETECT_OBJECT_SIZE((void*)p, SIZE_MAX);                                                   \
         if(type_size == SIZE_MAX) {                                                                                   \
-            DBGS("ERROR: failed to detect flexible array size @ %lx\n", p);                                           \
+            DBGS("ERROR: failed to detect flexible array size @ %llx\n", (unsigned long long)p);                      \
             flat->error = EFAULT;                                                                                     \
             break;                                                                                                    \
         }                                                                                                             \
@@ -335,14 +335,14 @@
 #define FLATTEN_STRUCT_SHIFTED_FLEXIBLE(T, p, s) \
     FLATTEN_STRUCT_ARRAY_SHIFTED_FLEXIBLE(T, p, 1, s)
 
-#define FLATTEN_STRUCT_ARRAY_SPECIALIZE(TAG, T, p, n) \
-    DBGM3(FLATTEN_STRUCT_ARRAY_SPECIALIZE, T, p, n);  \
+#define FLATTEN_STRUCT_ARRAY_SPECIALIZE(TAG, T, p, n)      \
+    DBGS("FLATTEN_STRUCT_ARRAY_SPECIALIZE" #T #p #n "\n"); \
     FLATTEN_GENERIC(p, sizeof(struct T), n, 0, flatten_struct_array_##T##_##TAG, 0)
 
 #define FLATTEN_STRUCT_ARRAY_SPECIALIZE_FLEXIBLE(TAG, T, p, n)                                                        \
     do {                                                                                                              \
         size_t type_size;                                                                                             \
-        DBGM3(FLATTEN_STRUCT_ARRAY_SPECIALIZE_FLEXIBLE, T, p, n);                                                     \
+        DBGS("FLATTEN_STRUCT_ARRAY_SPECIALIZE_FLEXIBLE" #T #p #n "\n");                                               \
         if(n != 1) {                                                                                                  \
             DBGS("ERROR: Multiple elements in an array of structure type with flexible array members: [ " #T " ]\n"); \
             flat->error = EFAULT;                                                                                     \
@@ -350,7 +350,7 @@
         }                                                                                                             \
         type_size = FLATTEN_DETECT_OBJECT_SIZE((void*)p, SIZE_MAX);                                                   \
         if(type_size == SIZE_MAX) {                                                                                   \
-            DBGS("ERROR: failed to detect flexible array size @ %lx\n", p);                                           \
+            DBGS("ERROR: failed to detect flexible array size @ %llx\n", (unsigned long long)p);                      \
             flat->error = EFAULT;                                                                                     \
             break;                                                                                                    \
         }                                                                                                             \
@@ -363,14 +363,14 @@
 #define FLATTEN_STRUCT_SPECIALIZE_FLEXIBLE(TAG, T, p) \
     FLATTEN_STRUCT_ARRAY_SPECIALIZE_FLEXIBLE(TAG, T, p, 1)
 
-#define FLATTEN_STRUCT_TYPE_ARRAY(T, p, n)     \
-    DBGM3(FLATTEN_STRUCT_TYPE_ARRAY, T, p, n); \
+#define FLATTEN_STRUCT_TYPE_ARRAY(T, p, n)           \
+    DBGS("FLATTEN_STRUCT_TYPE_ARRAY" #T #p #n "\n"); \
     FLATTEN_GENERIC(p, sizeof(T), n, 0, flatten_struct_type_array_##T, 0)
 
 #define FLATTEN_STRUCT_TYPE_ARRAY_FLEXIBLE(T, p, n)                                                                   \
     do {                                                                                                              \
         size_t type_size;                                                                                             \
-        DBGM3(FLATTEN_STRUCT_TYPE_ARRAY_FLEXIBLE, T, p, n);                                                           \
+        DBGS("FLATTEN_STRUCT_TYPE_ARRAY_FLEXIBLE" #T #p #n "\n");                                                     \
         if(n != 1) {                                                                                                  \
             DBGS("ERROR: Multiple elements in an array of structure type with flexible array members: [ " #T " ]\n"); \
             flat->error = EFAULT;                                                                                     \
@@ -378,7 +378,7 @@
         }                                                                                                             \
         type_size = FLATTEN_DETECT_OBJECT_SIZE((void*)p, SIZE_MAX);                                                   \
         if(type_size == SIZE_MAX) {                                                                                   \
-            DBGS("ERROR: failed to detect flexible array size @ %lx\n", p);                                           \
+            DBGS("ERROR: failed to detect flexible array size @ %llx\n", (unsigned long long)p);                      \
             flat->error = EFAULT;                                                                                     \
             break;                                                                                                    \
         }                                                                                                             \
@@ -391,14 +391,14 @@
 #define FLATTEN_STRUCT_TYPE_FLEXIBLE(T, p) \
     FLATTEN_STRUCT_TYPE_ARRAY_FLEXIBLE(T, p, 1)
 
-#define FLATTEN_STRUCT_TYPE_ARRAY_SHIFTED(T, p, n, s)     \
-    DBGM4(FLATTEN_STRUCT_TYPE_ARRAY_SHIFTED, T, p, n, s); \
+#define FLATTEN_STRUCT_TYPE_ARRAY_SHIFTED(T, p, n, s)           \
+    DBGS("FLATTEN_STRUCT_TYPE_ARRAY_SHIFTED" #T #p #n #s "\n"); \
     FLATTEN_GENERIC(p, sizeof(T), n, 0, flatten_struct_type_array_##T, s)
 
 #define FLATTEN_STRUCT_TYPE_ARRAY_SHIFTED_FLEXIBLE(T, p, n, s)                                                        \
     do {                                                                                                              \
         size_t type_size;                                                                                             \
-        DBGM3(FLATTEN_STRUCT_TYPE_ARRAY_SHIFTED_FLEXIBLE, T, p, n);                                                   \
+        DBGS("FLATTEN_STRUCT_TYPE_ARRAY_SHIFTED_FLEXIBLE" #T #p #n "\n");                                             \
         if(n != 1) {                                                                                                  \
             DBGS("ERROR: Multiple elements in an array of structure type with flexible array members: [ " #T " ]\n"); \
             flat->error = EFAULT;                                                                                     \
@@ -406,7 +406,7 @@
         }                                                                                                             \
         type_size = FLATTEN_DETECT_OBJECT_SIZE((void*)p, SIZE_MAX);                                                   \
         if(type_size == SIZE_MAX) {                                                                                   \
-            DBGS("ERROR: failed to detect flexible array size @ %lx\n", p);                                           \
+            DBGS("ERROR: failed to detect flexible array size @ %llx\n", (unsigned long long)p);                      \
             flat->error = EFAULT;                                                                                     \
             break;                                                                                                    \
         }                                                                                                             \
@@ -419,14 +419,14 @@
 #define FLATTEN_STRUCT_TYPE_SHIFTED_FLEXIBLE(T, p, s) \
     FLATTEN_STRUCT_TYPE_ARRAY_SHIFTED_FLEXIBLE(T, p, 1, s)
 
-#define FLATTEN_STRUCT_TYPE_ARRAY_SPECIALIZE(TAG, T, p, n) \
-    DBGM3(FLATTEN_STRUCT_TYPE_ARRAY_SPECIALIZE, T, p, n);  \
+#define FLATTEN_STRUCT_TYPE_ARRAY_SPECIALIZE(TAG, T, p, n)      \
+    DBGS("FLATTEN_STRUCT_TYPE_ARRAY_SPECIALIZE" #T #p #n "\n"); \
     FLATTEN_GENERIC(p, sizeof(T), n, 0, flatten_struct_type_array_##T##_##TAG, 0)
 
 #define FLATTEN_STRUCT_TYPE_ARRAY_SPECIALIZE_FLEXIBLE(TAG, T, p, n)                                                   \
     do {                                                                                                              \
         size_t type_size;                                                                                             \
-        DBGM3(FLATTEN_STRUCT_TYPE_ARRAY_SPECIALIZE_FLEXIBLE, T, p, n);                                                \
+        DBGS("FLATTEN_STRUCT_TYPE_ARRAY_SPECIALIZE_FLEXIBLE" #T #p #n "\n");                                          \
         if(n != 1) {                                                                                                  \
             DBGS("ERROR: Multiple elements in an array of structure type with flexible array members: [ " #T " ]\n"); \
             flat->error = EFAULT;                                                                                     \
@@ -434,7 +434,7 @@
         }                                                                                                             \
         type_size = FLATTEN_DETECT_OBJECT_SIZE((void*)p, SIZE_MAX);                                                   \
         if(type_size == SIZE_MAX) {                                                                                   \
-            DBGS("ERROR: failed to detect flexible array size @ %lx\n", p);                                           \
+            DBGS("ERROR: failed to detect flexible array size @ %llx\n", (unsigned long long)p);                      \
             flat->error = EFAULT;                                                                                     \
             break;                                                                                                    \
         }                                                                                                             \
@@ -447,19 +447,19 @@
 #define FLATTEN_STRUCT_TYPE_SPECIALIZE_FLEXIBLE(TAG, T, p) \
     FLATTEN_STRUCT_TYPE_ARRAY_SPECIALIZE_FLEXIBLE(TAG, T, p, 1)
 
-#define FLATTEN_STRUCT_ARRAY_SELF_CONTAINED(T, N, p, n)     \
-    DBGM4(FLATTEN_STRUCT_ARRAY_SELF_CONTAINED, T, N, p, n); \
+#define FLATTEN_STRUCT_ARRAY_SELF_CONTAINED(T, N, p, n)           \
+    DBGS("FLATTEN_STRUCT_ARRAY_SELF_CONTAINED" #T #N #p #n "\n"); \
     FLATTEN_GENERIC(p, N, n, 0, flatten_struct_array_##T, 0)
 
-#define FLATTEN_STRUCT_ARRAY_SELF_CONTAINED_SPECIALIZE(TAG, T, N, p, n)     \
-    DBGM5(FLATTEN_STRUCT_ARRAY_SELF_CONTAINED_SPECIALIZE, TAG, T, N, p, n); \
+#define FLATTEN_STRUCT_ARRAY_SELF_CONTAINED_SPECIALIZE(TAG, T, N, p, n)           \
+    DBGS("FLATTEN_STRUCT_ARRAY_SELF_CONTAINED_SPECIALIZE" #TAG #T #N #p #n "\n"); \
     FLATTEN_GENERIC(p, N, n, 0, flatten_struct_array_##T##_##TAG, 0)
 
 #define FLATTEN_STRUCT_SELF_CONTAINED(T, N, p) \
     FLATTEN_STRUCT_ARRAY_SELF_CONTAINED(T, N, p, 1)
 
-#define FLATTEN_STRUCT_ARRAY_SHIFTED_SELF_CONTAINED(T, N, p, n, s)     \
-    DBGM5(FLATTEN_STRUCT_ARRAY_SHIFTED_SELF_CONTAINED, T, N, p, n, s); \
+#define FLATTEN_STRUCT_ARRAY_SHIFTED_SELF_CONTAINED(T, N, p, n, s)           \
+    DBGS("FLATTEN_STRUCT_ARRAY_SHIFTED_SELF_CONTAINED" #T #N #p #n #s "\n"); \
     FLATTEN_GENERIC(p, N, n, 0, flatten_struct_array_##T, s)
 
 #define FLATTEN_STRUCT_SHIFTED_SELF_CONTAINED(T, N, p, s) \
@@ -468,23 +468,23 @@
 #define FLATTEN_STRUCT_SELF_CONTAINED_SPECIALIZE(TAG, T, N, p) \
     FLATTEN_STRUCT_ARRAY_SELF_CONTAINED_SPECIALIZE(TAG, T, N, p, 1)
 
-#define FLATTEN_UNION_ARRAY_SELF_CONTAINED(T, N, p, n)     \
-    DBGM4(FLATTEN_UNION_ARRAY_SELF_CONTAINED, T, N, p, n); \
+#define FLATTEN_UNION_ARRAY_SELF_CONTAINED(T, N, p, n)           \
+    DBGS("FLATTEN_UNION_ARRAY_SELF_CONTAINED" #T #N #p #n "\n"); \
     FLATTEN_GENERIC(p, N, n, 0, flatten_union_array_##T, 0)
 
-#define FLATTEN_UNION_ARRAY_SHIFTED_SELF_CONTAINED(T, N, p, n, s)     \
-    DBGM5(FLATTEN_UNION_ARRAY_SHIFTED_SELF_CONTAINED, T, N, p, n, s); \
+#define FLATTEN_UNION_ARRAY_SHIFTED_SELF_CONTAINED(T, N, p, n, s)           \
+    DBGS("FLATTEN_UNION_ARRAY_SHIFTED_SELF_CONTAINED" #T #N #p #n #s "\n"); \
     FLATTEN_GENERIC(p, N, n, 0, flatten_union_array_##T, s)
 
-#define FLATTEN_STRUCT_TYPE_ARRAY_SELF_CONTAINED(T, N, p, n)     \
-    DBGM4(FLATTEN_STRUCT_TYPE_ARRAY_SELF_CONTAINED, T, N, p, n); \
+#define FLATTEN_STRUCT_TYPE_ARRAY_SELF_CONTAINED(T, N, p, n)           \
+    DBGS("FLATTEN_STRUCT_TYPE_ARRAY_SELF_CONTAINED" #T #N #p #n "\n"); \
     FLATTEN_GENERIC(p, N, n, 0, flatten_struct_type_array_##T, 0)
 
 #define FLATTEN_STRUCT_TYPE_SELF_CONTAINED(T, N, p) \
     FLATTEN_STRUCT_TYPE_ARRAY_SELF_CONTAINED(T, N, p, 1)
 
-#define FLATTEN_STRUCT_TYPE_ARRAY_SHIFTED_SELF_CONTAINED(T, N, p, n, s)     \
-    DBGM5(FLATTEN_STRUCT_TYPE_ARRAY_SHIFTED_SELF_CONTAINED, T, N, p, n, s); \
+#define FLATTEN_STRUCT_TYPE_ARRAY_SHIFTED_SELF_CONTAINED(T, N, p, n, s)           \
+    DBGS("FLATTEN_STRUCT_TYPE_ARRAY_SHIFTED_SELF_CONTAINED" #T #N #p #n #s "\n"); \
     FLATTEN_GENERIC(p, N, n, 0, flatten_struct_type_array_##T, s)
 
 #define FLATTEN_STRUCT_TYPE_SHIFTED_SELF_CONTAINED(T, N, p, s) \
@@ -502,50 +502,50 @@
     } while(0)
 
 /* AGGREGATE_*_STORAGE */
-#define AGGREGATE_FLATTEN_GENERIC_STORAGE(FULL_TYPE, SIZE, TARGET, _off, n, CUSTOM_VAL)                                                                                  \
-    do {                                                                                                                                                                 \
-        DBGM3(AGGREGATE_FLATTEN_GENERIC_STORAGE, FULL_TYPE, _off, n);                                                                                                    \
-        DBGS("FULL_TYPE [%lx:%zu -> %lx], size(%zu), n(%ld)\n", (uintptr_t)_ptr, (size_t)_off, (uintptr_t)((const FULL_TYPE*)((unsigned char*)(_ptr) + _off)), SIZE, n); \
-        flatten_aggregate_generic_storage(FLAT_ACCESSOR, __q, _ptr, SIZE, n, (uintptr_t)(CUSTOM_VAL), _off, TARGET);                                                     \
+#define AGGREGATE_FLATTEN_GENERIC_STORAGE(FULL_TYPE, SIZE, TARGET, _off, n, CUSTOM_VAL)                                                                                                                             \
+    do {                                                                                                                                                                                                            \
+        DBGS("AGGREGATE_FLATTEN_GENERIC_STORAGE" #FULL_TYPE #_off #n "\n");                                                                                                                                         \
+        DBGS("FULL_TYPE [%llx:%zu -> %llx], size(%zu), n(%ld)\n", (unsigned long long)_ptr, (size_t)_off, (unsigned long long)((const FULL_TYPE*)((unsigned char*)(_ptr) + _off)), (size_t)SIZE, (unsigned long)n); \
+        flatten_aggregate_generic_storage(FLAT_ACCESSOR, __q, _ptr, SIZE, n, (uintptr_t)(CUSTOM_VAL), _off, TARGET);                                                                                                \
     } while(0)
 
-#define AGGREGATE_FLATTEN_GENERIC_STORAGE_FLEXIBLE(FULL_TYPE, FLSIZE, OFF, CUSTOM_VAL, TARGET)            \
-    do {                                                                                                  \
-        void *start, *end;                                                                                \
-        ssize_t el_cnt;                                                                                   \
-                                                                                                          \
-        bool rv = flatten_get_object(FLAT_ACCESSOR, (void*)_ptr, &start, &end);                           \
-        DBGS("flatten_get_object(): %d, start(%lx), end(%lx), size(%zu)\n", rv, start, end, end - start); \
-        if(!rv)                                                                                           \
-            break;                                                                                        \
-                                                                                                          \
-        el_cnt = (long)(end - (void*)_ptr - OFF) / FLSIZE;                                                \
-        if(el_cnt <= 0)                                                                                   \
-            break;                                                                                        \
-        AGGREGATE_FLATTEN_GENERIC_STORAGE(FULL_TYPE, FLSIZE, TARGET, OFF, el_cnt, CUSTOM_VAL);            \
+#define AGGREGATE_FLATTEN_GENERIC_STORAGE_FLEXIBLE(FULL_TYPE, FLSIZE, OFF, CUSTOM_VAL, TARGET)                                                                \
+    do {                                                                                                                                                      \
+        void *start, *end;                                                                                                                                    \
+        ssize_t el_cnt;                                                                                                                                       \
+                                                                                                                                                              \
+        bool rv = flatten_get_object(FLAT_ACCESSOR, (void*)_ptr, &start, &end);                                                                               \
+        DBGS("flatten_get_object(): %d, start(%llx), end(%llx), size(%zu)\n", rv, (unsigned long long)start, (unsigned long long)end, (size_t)(end - start)); \
+        if(!rv)                                                                                                                                               \
+            break;                                                                                                                                            \
+                                                                                                                                                              \
+        el_cnt = (long)(end - (void*)_ptr - OFF) / FLSIZE;                                                                                                    \
+        if(el_cnt <= 0)                                                                                                                                       \
+            break;                                                                                                                                            \
+        AGGREGATE_FLATTEN_GENERIC_STORAGE(FULL_TYPE, FLSIZE, TARGET, OFF, el_cnt, CUSTOM_VAL);                                                                \
     } while(0)
 
-#define AGGREGATE_FLATTEN_GENERIC_COMPOUND_TYPE_STORAGE_FLEXIBLE(T, SIZE, OFF)                               \
-    do {                                                                                                     \
-        void *start, *end;                                                                                   \
-        ssize_t el_cnt;                                                                                      \
-        const T* __p;                                                                                        \
-                                                                                                             \
-        bool rv = flatten_get_object(FLAT_ACCESSOR, (void*)_ptr, &start, &end);                              \
-        if(!rv)                                                                                              \
-            break;                                                                                           \
-                                                                                                             \
-        el_cnt = (long)(end - (void*)_ptr - OFF) / SIZE;                                                     \
-        if(el_cnt <= 0)                                                                                      \
-            break;                                                                                           \
-        __p = (const T*)((unsigned char*)(_ptr) + OFF);                                                      \
-        if(!FLAT_ACCESSOR->error) {                                                                          \
-            struct flatten_pointer* fptr = flatten_plain_type(FLAT_ACCESSOR, __p, (el_cnt)*SIZE);            \
-            if(fptr == NULL) {                                                                               \
-                DBGS("AGGREGATE_FLATTEN_GENERIC_COMPOUND_TYPE_STORAGE_FLEXIBLE:flatten_plain_type(): NULL"); \
-                FLAT_ACCESSOR->error = EFAULT;                                                               \
-            }                                                                                                \
-        }                                                                                                    \
+#define AGGREGATE_FLATTEN_GENERIC_COMPOUND_TYPE_STORAGE_FLEXIBLE(T, SIZE, OFF)                                 \
+    do {                                                                                                       \
+        void *start, *end;                                                                                     \
+        ssize_t el_cnt;                                                                                        \
+        const T* __p;                                                                                          \
+                                                                                                               \
+        bool rv = flatten_get_object(FLAT_ACCESSOR, (void*)_ptr, &start, &end);                                \
+        if(!rv)                                                                                                \
+            break;                                                                                             \
+                                                                                                               \
+        el_cnt = (long)(end - (void*)_ptr - OFF) / SIZE;                                                       \
+        if(el_cnt <= 0)                                                                                        \
+            break;                                                                                             \
+        __p = (const T*)((unsigned char*)(_ptr) + OFF);                                                        \
+        if(!FLAT_ACCESSOR->error) {                                                                            \
+            struct flatten_pointer* fptr = flatten_plain_type(FLAT_ACCESSOR, __p, (el_cnt)*SIZE);              \
+            if(fptr == NULL) {                                                                                 \
+                DBGS("AGGREGATE_FLATTEN_GENERIC_COMPOUND_TYPE_STORAGE_FLEXIBLE:flatten_plain_type(): NULL\n"); \
+                FLAT_ACCESSOR->error = EFAULT;                                                                 \
+            }                                                                                                  \
+        }                                                                                                      \
     } while(0)
 
 #define AGGREGATE_FLATTEN_STRUCT_ARRAY_STORAGE(T, f, n) \
@@ -621,14 +621,14 @@
     AGGREGATE_FLATTEN_GENERIC_COMPOUND_TYPE_STORAGE_FLEXIBLE(T, N, OFF)
 
 /* AGGREGATE_* */
-#define AGGREGATE_FLATTEN_GENERIC(FULL_TYPE, TARGET, N, f, _off, n, CUSTOM_VAL, pre_f, post_f, _shift)                  \
-    do {                                                                                                                \
-        size_t count = (n);                                                                                             \
-        DBGS("AGGREGATE_FLATTEN_GENERIC(%s, %s, N:0x%zu, off:0x%zu, n:0x%zu)\n", #FULL_TYPE, #f, N, _off, count);       \
-        DBGS("  \\-> FULL_TYPE [%lx:%zu -> %lx]\n", (uintptr_t)_ptr, (size_t)_off, (uintptr_t)OFFATTRN(_off, _shift));  \
-        if(((uintptr_t)(pre_f) != 0) || ((uintptr_t)(post_f) != 0))                                                     \
-            DBGS("  \\-> PRE_F[%llx]; POST_F[%llx]\n", (uintptr_t)pre_f, (uintptr_t)post_f);                            \
-        flatten_aggregate_generic(FLAT_ACCESSOR, __q, _ptr, N, count, CUSTOM_VAL, _off, _shift, TARGET, pre_f, post_f); \
+#define AGGREGATE_FLATTEN_GENERIC(FULL_TYPE, TARGET, N, f, _off, n, CUSTOM_VAL, pre_f, post_f, _shift)                                     \
+    do {                                                                                                                                   \
+        size_t count = (n);                                                                                                                \
+        DBGS("AGGREGATE_FLATTEN_GENERIC(%s, %s, N:0x%zu, off:0x%zu, n:0x%zu)\n", #FULL_TYPE, #f, (size_t)N, (size_t)_off, (size_t)count);  \
+        DBGS("  \\-> FULL_TYPE [%llx:%zu -> %llx]\n", (unsigned long long)_ptr, (size_t)_off, (unsigned long long)OFFATTRN(_off, _shift)); \
+        if(((uintptr_t)(pre_f) != 0) || ((uintptr_t)(post_f) != 0))                                                                        \
+            DBGS("  \\-> PRE_F[%llx]; POST_F[%llx]\n", (unsigned long long)pre_f, (unsigned long long)post_f);                             \
+        flatten_aggregate_generic(FLAT_ACCESSOR, __q, _ptr, N, count, CUSTOM_VAL, _off, _shift, TARGET, pre_f, post_f);                    \
     } while(0)
 
 #define AGGREGATE_FLATTEN_STRUCT_ARRAY_SELF_CONTAINED(T, N, f, _off, n) \
@@ -640,8 +640,8 @@
 #define AGGREGATE_FLATTEN_UNION_ARRAY_SELF_CONTAINED(T, N, f, _off, n) \
     AGGREGATE_FLATTEN_GENERIC(union T, flatten_union_array_##T, N, f, _off, n, 0, 0, 0, 0)
 
-#define AGGREGATE_FLATTEN_STRUCT_ARRAY(T, f, n)     \
-    DBGM3(AGGREGATE_FLATTEN_STRUCT_ARRAY, T, f, n); \
+#define AGGREGATE_FLATTEN_STRUCT_ARRAY(T, f, n)           \
+    DBGS("AGGREGATE_FLATTEN_STRUCT_ARRAY" #T #f #n "\n"); \
     AGGREGATE_FLATTEN_STRUCT_ARRAY_SELF_CONTAINED(T, sizeof(struct T), f, offsetof(_container_type, f), n)
 
 #define AGGREGATE_FLATTEN_STRUCT(T, f) \
@@ -732,14 +732,14 @@
 #define FLATTEN_COMPOUND_TYPE_ARRAY(T, N, p, n)                                                                                                      \
     do {                                                                                                                                             \
         size_t count = (n);                                                                                                                          \
-        DBGS("FLATTEN_COMPOUND_TYPE_ARRAY(%s, %lu, p:%lx, n:%zu)\n", #T, (unsigned long)N, (unsigned long)p, count);                                 \
+        DBGS("FLATTEN_COMPOUND_TYPE_ARRAY(%s, %lu, p:%llx, n:%zu)\n", #T, (unsigned long)N, (unsigned long long)p, (size_t)count);                   \
         if((!FLAT_ACCESSOR->error) && (ADDR_RANGE_VALID(p, count * N))) {                                                                            \
             int err = fixup_set_insert_force_update(FLAT_ACCESSOR, __fptr->node, __fptr->offset, flatten_plain_type(FLAT_ACCESSOR, (p), count * N)); \
             if((err) && (err != EINVAL) && (err != EEXIST) && (err != EAGAIN)) {                                                                     \
                 FLAT_ACCESSOR->error = err;                                                                                                          \
             }                                                                                                                                        \
         } else                                                                                                                                       \
-            DBGS("FLATTEN_COMPOUND_TYPE_ARRAY: error(%d), ADDR(%lx)\n", FLAT_ACCESSOR->error, (uintptr_t)p);                                         \
+            DBGS("FLATTEN_COMPOUND_TYPE_ARRAY: error(%d), ADDR(%llx)\n", FLAT_ACCESSOR->error, (unsigned long long)p);                               \
     } while(0)
 
 #define FLATTEN_TYPE_ARRAY(T, p, n) FLATTEN_COMPOUND_TYPE_ARRAY(T, sizeof(T), p, n)
@@ -747,31 +747,31 @@
 
 #define FLATTEN_STRING(p)                                                                                                                                      \
     do {                                                                                                                                                       \
-        DBGM1(FLATTEN_STRING, p);                                                                                                                              \
+        DBGS("FLATTEN_STRING" #p "\n");                                                                                                                        \
         if((!FLAT_ACCESSOR->error) && (ADDR_VALID(p))) {                                                                                                       \
             int err = fixup_set_insert_force_update(FLAT_ACCESSOR, __fptr->node, __fptr->offset, flatten_plain_type(FLAT_ACCESSOR, (p), STRING_VALID_LEN(p))); \
             if((err) && (err != EINVAL) && (err != EEXIST) && (err != EAGAIN)) {                                                                               \
                 FLAT_ACCESSOR->error = err;                                                                                                                    \
             }                                                                                                                                                  \
         } else                                                                                                                                                 \
-            DBGS("FLATTEN_STRING: error(%d), ADDR(%lx)\n", FLAT_ACCESSOR->error, (uintptr_t)p);                                                                \
+            DBGS("FLATTEN_STRING: error(%d), ADDR(%llx)\n", FLAT_ACCESSOR->error, (unsigned long long)p);                                                      \
     } while(0)
 
 #define FLATTEN_FUNCTION_POINTER(p)                                                                                      \
     do {                                                                                                                 \
-        DBGM1(FLATTEN_FUNCTION_POINTER, p);                                                                              \
+        DBGS("FLATTEN_FUNCTION_POINTER" #p "\n");                                                                        \
         if((!FLAT_ACCESSOR->error) && (TEXT_ADDR_VALID(p))) {                                                            \
             int err = fixup_set_insert_fptr_force_update(FLAT_ACCESSOR, __fptr->node, __fptr->offset, (unsigned long)p); \
             if((err) && (err != EEXIST)) {                                                                               \
                 FLAT_ACCESSOR->error = err;                                                                              \
             }                                                                                                            \
         } else                                                                                                           \
-            DBGS("FLATTEN_FUNCTION_POINTER: error(%d), ADDR(%lx)\n", FLAT_ACCESSOR->error, (uintptr_t)p);                \
+            DBGS("FLATTEN_FUNCTION_POINTER: error(%d), ADDR(%llx)\n", FLAT_ACCESSOR->error, (unsigned long long)p);      \
     } while(0)
 
 #define AGGREGATE_FLATTEN_TYPE_ARRAY(T, f, n)                                                                                 \
     do {                                                                                                                      \
-        DBGS("AGGREGATE_FLATTEN_TYPE_ARRAY(%s, %s, n:0x%zu)\n", #T, #f, n);                                                   \
+        DBGS("AGGREGATE_FLATTEN_TYPE_ARRAY(%s, %s, n:0x%zu)\n", #T, #f, (size_t)n);                                           \
         if((!FLAT_ACCESSOR->error) && (ADDR_RANGE_VALID(ATTR(f), (n) * sizeof(T)))) {                                         \
             size_t _off = offsetof(_container_type, f);                                                                       \
             struct flat_node* __node = flat_interval_tree_iter_first(&FLAT_ACCESSOR->FLCTRL.imap_root, (uint64_t)_ptr + _off, \
@@ -786,29 +786,29 @@
                 }                                                                                                             \
             }                                                                                                                 \
         } else                                                                                                                \
-            DBGS("AGGREGATE_FLATTEN_TYPE_ARRAY: error(%d), ADDR(%lx)\n", FLAT_ACCESSOR->error, (uintptr_t)ATTR(f));           \
+            DBGS("AGGREGATE_FLATTEN_TYPE_ARRAY: error(%d), ADDR(%llx)\n", FLAT_ACCESSOR->error, (unsigned long long)ATTR(f)); \
     } while(0)
 
 #define AGGREGATE_FLATTEN_TYPE(T, f) AGGREGATE_FLATTEN_TYPE_ARRAY(T, f, 1)
 
-#define AGGREGATE_FLATTEN_COMPOUND_TYPE_ARRAY_SELF_CONTAINED(T, N, f, _off, n)                                                                           \
-    do {                                                                                                                                                 \
-        DBGS("AGGREGATE_FLATTEN_COMPOUND_TYPE_ARRAY_SELF_CONTAINED(%s, %s, N:0x%zu, off:0x%zu, n:0x%zu)\n", #T, #f, N, _off, n);                         \
-        DBGS("  \\->OFFATTR[%lx]\n", (uintptr_t)OFFATTR(void*, _off));                                                                                   \
-        if((!FLAT_ACCESSOR->error) && (ADDR_RANGE_VALID(OFFATTR(void*, _off), (n) * (N)))) {                                                             \
-            struct flat_node* __node = flat_interval_tree_iter_first(&FLAT_ACCESSOR->FLCTRL.imap_root, (uint64_t)_ptr + _off,                            \
-                                                                     (uint64_t)_ptr + _off + sizeof(T*) - 1);                                            \
-            if(__node == 0) {                                                                                                                            \
-                FLAT_ACCESSOR->error = EFAULT;                                                                                                           \
-            } else {                                                                                                                                     \
-                int err = fixup_set_insert_force_update(FLAT_ACCESSOR, __node, (uint64_t)_ptr - __node->start + _off,                                    \
-                                                        flatten_plain_type(FLAT_ACCESSOR, OFFATTR(void*, _off), (n)*N));                                 \
-                if((err) && (err != EEXIST) && (err != EAGAIN)) {                                                                                        \
-                    FLAT_ACCESSOR->error = err;                                                                                                          \
-                }                                                                                                                                        \
-            }                                                                                                                                            \
-        } else                                                                                                                                           \
-            DBGS("AGGREGATE_FLATTEN_COMPOUND_TYPE_ARRAY_SELF_CONTAINED: error(%d), ADDR(%lx)\n", FLAT_ACCESSOR->error, (uintptr_t)OFFATTR(void*, _off)); \
+#define AGGREGATE_FLATTEN_COMPOUND_TYPE_ARRAY_SELF_CONTAINED(T, N, f, _off, n)                                                                                     \
+    do {                                                                                                                                                           \
+        DBGS("AGGREGATE_FLATTEN_COMPOUND_TYPE_ARRAY_SELF_CONTAINED(%s, %s, N:0x%zu, off:0x%zu, n:0x%zu)\n", #T, #f, (size_t)N, (size_t)_off, (size_t)n);           \
+        DBGS("  \\->OFFATTR[%llx]\n", (unsigned long long)OFFATTR(void*, _off));                                                                                   \
+        if((!FLAT_ACCESSOR->error) && (ADDR_RANGE_VALID(OFFATTR(void*, _off), (n) * (N)))) {                                                                       \
+            struct flat_node* __node = flat_interval_tree_iter_first(&FLAT_ACCESSOR->FLCTRL.imap_root, (uint64_t)_ptr + _off,                                      \
+                                                                     (uint64_t)_ptr + _off + sizeof(T*) - 1);                                                      \
+            if(__node == 0) {                                                                                                                                      \
+                FLAT_ACCESSOR->error = EFAULT;                                                                                                                     \
+            } else {                                                                                                                                               \
+                int err = fixup_set_insert_force_update(FLAT_ACCESSOR, __node, (uint64_t)_ptr - __node->start + _off,                                              \
+                                                        flatten_plain_type(FLAT_ACCESSOR, OFFATTR(void*, _off), (n)*N));                                           \
+                if((err) && (err != EEXIST) && (err != EAGAIN)) {                                                                                                  \
+                    FLAT_ACCESSOR->error = err;                                                                                                                    \
+                }                                                                                                                                                  \
+            }                                                                                                                                                      \
+        } else                                                                                                                                                     \
+            DBGS("AGGREGATE_FLATTEN_COMPOUND_TYPE_ARRAY_SELF_CONTAINED: error(%d), ADDR(%llx)\n", FLAT_ACCESSOR->error, (unsigned long long)OFFATTR(void*, _off)); \
     } while(0)
 
 #define AGGREGATE_FLATTEN_TYPE_ARRAY_SELF_CONTAINED(T, f, _off, n) \
@@ -818,7 +818,7 @@
 
 #define AGGREGATE_FLATTEN_STRING_SELF_CONTAINED(f, _off)                                                                                                              \
     do {                                                                                                                                                              \
-        DBGOF(AGGREGATE_FLATTEN_STRING_SELF_CONTAINED, f, "%lx:%zu", (unsigned long)OFFATTR(const char*, _off), (size_t)_off);                                        \
+        DBGS("AGGREGATE_FLATTEN_STRING_SELF_CONTAINED" #f "%lx:%zu\n", (unsigned long)OFFATTR(const char*, _off), (size_t)_off);                                      \
         if((!FLAT_ACCESSOR->error) && (ADDR_VALID(OFFATTR(void*, _off)))) {                                                                                           \
             struct flat_node* __node = flat_interval_tree_iter_first(&FLAT_ACCESSOR->FLCTRL.imap_root, (uint64_t)_ptr + _off,                                         \
                                                                      (uint64_t)_ptr + _off + sizeof(char*) - 1);                                                      \
@@ -832,28 +832,28 @@
                 }                                                                                                                                                     \
             }                                                                                                                                                         \
         } else                                                                                                                                                        \
-            DBGS("AGGREGATE_FLATTEN_STRING_SELF_CONTAINED: error(%d), ADDR(%lx)\n", FLAT_ACCESSOR->error, (uintptr_t)OFFATTR(void*, _off));                           \
+            DBGS("AGGREGATE_FLATTEN_STRING_SELF_CONTAINED: error(%d), ADDR(%llx)\n", FLAT_ACCESSOR->error, (unsigned long long)OFFATTR(void*, _off));                 \
     } while(0)
 
 #define AGGREGATE_FLATTEN_STRING(f) AGGREGATE_FLATTEN_STRING_SELF_CONTAINED(f, offsetof(_container_type, f))
 
-#define AGGREGATE_FLATTEN_FUNCTION_POINTER_SELF_CONTAINED(f, _off)                                                                                    \
-    do {                                                                                                                                              \
-        DBGOF(AGGREGATE_FLATTEN_FUNCTION_POINTER_SELF_CONTAINED, f, "%lx:%zu", (unsigned long)OFFATTR(void*, _off), (size_t)_off);                    \
-        if((!FLAT_ACCESSOR->error) && (TEXT_ADDR_VALID(OFFATTR(void*, _off)))) {                                                                      \
-            struct flat_node* __node = flat_interval_tree_iter_first(&FLAT_ACCESSOR->FLCTRL.imap_root, (uint64_t)_ptr + _off,                         \
-                                                                     (uint64_t)_ptr + _off + sizeof(int (*)(void)) - 1);                              \
-            if(__node == 0) {                                                                                                                         \
-                FLAT_ACCESSOR->error = EFAULT;                                                                                                        \
-            } else {                                                                                                                                  \
-                int err = fixup_set_insert_fptr_force_update(FLAT_ACCESSOR, __node, (uint64_t)_ptr - __node->start + _off,                            \
-                                                             (unsigned long)OFFATTR(void*, _off));                                                    \
-                if((err) && (err != EEXIST) && (err != EAGAIN)) {                                                                                     \
-                    FLAT_ACCESSOR->error = err;                                                                                                       \
-                }                                                                                                                                     \
-            }                                                                                                                                         \
-        } else                                                                                                                                        \
-            DBGS("AGGREGATE_FLATTEN_FUNCTION_POINTER_SELF_CONTAINED: error(%d), ADDR(%lx)\n", FLAT_ACCESSOR->error, (uintptr_t)OFFATTR(void*, _off)); \
+#define AGGREGATE_FLATTEN_FUNCTION_POINTER_SELF_CONTAINED(f, _off)                                                                                              \
+    do {                                                                                                                                                        \
+        DBGS("AGGREGATE_FLATTEN_FUNCTION_POINTER_SELF_CONTAINED" #f "%lx:%zu\n", (unsigned long)OFFATTR(void*, _off), (size_t)_off);                            \
+        if((!FLAT_ACCESSOR->error) && (TEXT_ADDR_VALID(OFFATTR(void*, _off)))) {                                                                                \
+            struct flat_node* __node = flat_interval_tree_iter_first(&FLAT_ACCESSOR->FLCTRL.imap_root, (uint64_t)_ptr + _off,                                   \
+                                                                     (uint64_t)_ptr + _off + sizeof(int (*)(void)) - 1);                                        \
+            if(__node == 0) {                                                                                                                                   \
+                FLAT_ACCESSOR->error = EFAULT;                                                                                                                  \
+            } else {                                                                                                                                            \
+                int err = fixup_set_insert_fptr_force_update(FLAT_ACCESSOR, __node, (uint64_t)_ptr - __node->start + _off,                                      \
+                                                             (unsigned long)OFFATTR(void*, _off));                                                              \
+                if((err) && (err != EEXIST) && (err != EAGAIN)) {                                                                                               \
+                    FLAT_ACCESSOR->error = err;                                                                                                                 \
+                }                                                                                                                                               \
+            }                                                                                                                                                   \
+        } else                                                                                                                                                  \
+            DBGS("AGGREGATE_FLATTEN_FUNCTION_POINTER_SELF_CONTAINED: error(%d), ADDR(%llx)\n", FLAT_ACCESSOR->error, (unsigned long long)OFFATTR(void*, _off)); \
     } while(0)
 
 #define AGGREGATE_FLATTEN_FUNCTION_POINTER(f) AGGREGATE_FLATTEN_FUNCTION_POINTER_SELF_CONTAINED(f, offsetof(_container_type, f))
@@ -882,7 +882,7 @@
 /* TODO: Use ADDR_RANGE_VALID */
 #define FOREACH_POINTER(PTRTYPE, v, p, s, ...)                                                              \
     do {                                                                                                    \
-        DBGM4(FOREACH_POINTER, PTRTYPE, v, p, s);                                                           \
+        DBGS("FOREACH_POINTER" #PTRTYPE #v #p #s "\n");                                                     \
         if((!FLAT_ACCESSOR->error) && (ADDR_VALID(p))) {                                                    \
             PTRTYPE const* _m = (PTRTYPE const*)(p);                                                        \
             size_t _i, _sz = (s);                                                                           \
@@ -898,7 +898,7 @@
                 }                                                                                           \
             }                                                                                               \
         } else                                                                                              \
-            DBGS("FOREACH_POINTER: error(%d), ADDR(%lx)\n", FLAT_ACCESSOR->error, (uintptr_t)p);            \
+            DBGS("FOREACH_POINTER: error(%d), ADDR(%llx)\n", FLAT_ACCESSOR->error, (unsigned long long)p);  \
     } while(0)
 
 #define FOR_POINTER(PTRTYPE, v, p, ...) \
@@ -906,7 +906,7 @@
 
 #define FOR_VIRTUAL_POINTER(p, ...)                                                     \
     do {                                                                                \
-        DBGM1(FOR_VIRTUAL_POINTER, p);                                                  \
+        DBGS("FOR_VIRTUAL_POINTER" #p "\n");                                            \
         if((!FLAT_ACCESSOR->error) && (ADDR_VALID(p))) {                                \
             struct flatten_pointer* __fptr = make_flatten_pointer(FLAT_ACCESSOR, 0, 0); \
             if(__fptr) {                                                                \
@@ -921,36 +921,36 @@
 /*******************************
  * FLATTEN entry point
  *******************************/
-#define FOR_EXTENDED_ROOT_POINTER(p, __name, __size, ...)                                           \
-    do {                                                                                            \
-        struct bqueue* __q;                                                                         \
-        struct flat* flat = FLAT_EXTRACTOR;                                                         \
-        flat->_root_ptr = (void*)p;                                                                 \
-        __q = &FLAT_ACCESSOR->bq;                                                                   \
-        bqueue_clear(__q);                                                                          \
-                                                                                                    \
-        DBGS("FOR_EXTENDED_ROOT_POINTER(%s[%llx], %s, %llx)\n", #p, (uintptr_t)p, __name, __size);  \
-        if((!FLAT_ACCESSOR->error) && (ADDR_VALID(p))) {                                            \
-            struct flatten_pointer* __fptr = make_flatten_pointer(FLAT_ACCESSOR, 0, 0);             \
-            const void* __root_ptr __attribute__((unused)) = (const void*)p;                        \
-            if(__fptr) {                                                                            \
-                __VA_ARGS__;                                                                        \
-                flat_free(__fptr);                                                                  \
-            } else {                                                                                \
-                FLAT_ACCESSOR->error = ENOMEM;                                                      \
-            }                                                                                       \
-        }                                                                                           \
-        if(!FLAT_ACCESSOR->error) {                                                                 \
-            if(__name != NULL) {                                                                    \
-                int err = root_addr_append_extended(FLAT_ACCESSOR, (uintptr_t)(p), __name, __size); \
-                if((err) && (err != EEXIST))                                                        \
-                    FLAT_ACCESSOR->error = err;                                                     \
-            } else {                                                                                \
-                FLAT_ACCESSOR->error = root_addr_append(FLAT_ACCESSOR, (uintptr_t)(p));             \
-            }                                                                                       \
-        }                                                                                           \
-                                                                                                    \
-        flatten_run_iter_harness(FLAT_ACCESSOR);                                                    \
+#define FOR_EXTENDED_ROOT_POINTER(p, __name, __size, ...)                                                                 \
+    do {                                                                                                                  \
+        struct bqueue* __q;                                                                                               \
+        struct flat* flat = FLAT_EXTRACTOR;                                                                               \
+        flat->_root_ptr = (void*)p;                                                                                       \
+        __q = &FLAT_ACCESSOR->bq;                                                                                         \
+        bqueue_clear(__q);                                                                                                \
+                                                                                                                          \
+        DBGS("FOR_EXTENDED_ROOT_POINTER(%s[%llx], %s, %zu)\n", #p, (unsigned long long)p, (char*)__name, (size_t)__size); \
+        if((!FLAT_ACCESSOR->error) && (ADDR_VALID(p))) {                                                                  \
+            struct flatten_pointer* __fptr = make_flatten_pointer(FLAT_ACCESSOR, 0, 0);                                   \
+            const void* __root_ptr __attribute__((unused)) = (const void*)p;                                              \
+            if(__fptr) {                                                                                                  \
+                __VA_ARGS__;                                                                                              \
+                flat_free(__fptr);                                                                                        \
+            } else {                                                                                                      \
+                FLAT_ACCESSOR->error = ENOMEM;                                                                            \
+            }                                                                                                             \
+        }                                                                                                                 \
+        if(!FLAT_ACCESSOR->error) {                                                                                       \
+            if(__name != NULL) {                                                                                          \
+                int err = root_addr_append_extended(FLAT_ACCESSOR, (uintptr_t)(p), __name, __size);                       \
+                if((err) && (err != EEXIST))                                                                              \
+                    FLAT_ACCESSOR->error = err;                                                                           \
+            } else {                                                                                                      \
+                FLAT_ACCESSOR->error = root_addr_append(FLAT_ACCESSOR, (uintptr_t)(p));                                   \
+            }                                                                                                             \
+        }                                                                                                                 \
+                                                                                                                          \
+        flatten_run_iter_harness(FLAT_ACCESSOR);                                                                          \
     } while(0)
 
 #define FOR_ROOT_POINTER(p, ...) FOR_EXTENDED_ROOT_POINTER(p, NULL, 0, ##__VA_ARGS__)
@@ -977,14 +977,15 @@
  * When successfully detected it returns the size of the object starting from '__ptr' to the end of the object
  * When detection fails returns the value passed in '__dEFAULT_size'
  */
-#define FLATTEN_DETECT_OBJECT_SIZE(__ptr, __dEFAULT_size)                                                                              \
-    ({                                                                                                                                 \
-        void *__start, *__end;                                                                                                         \
-        size_t __deduced_size;                                                                                                         \
-        bool rv = flatten_get_object(FLAT_ACCESSOR, __ptr, &__start, &__end);                                                          \
-        DBGS("FLATTEN_DETECT_OBJECT_SIZE(%llx, %lld) -> (rv: %d)[from: %llx; to: %llx]\n", __ptr, __dEFAULT_size, rv, __start, __end); \
-        __deduced_size = (uintptr_t)__end - (uintptr_t)__ptr + 1;                                                                      \
-        (rv) ? (__deduced_size) : (__dEFAULT_size);                                                                                    \
+#define FLATTEN_DETECT_OBJECT_SIZE(__ptr, __dEFAULT_size)                                                             \
+    ({                                                                                                                \
+        void *__start, *__end;                                                                                        \
+        size_t __deduced_size;                                                                                        \
+        bool rv = flatten_get_object(FLAT_ACCESSOR, __ptr, &__start, &__end);                                         \
+        DBGS("FLATTEN_DETECT_OBJECT_SIZE(%llx, %lld) -> (rv: %d)[from: %llx; to: %llx]\n", (unsigned long long)__ptr, \
+             (unsigned long long)__dEFAULT_size, rv, (unsigned long long)__start, (unsigned long long)__end);         \
+        __deduced_size = (uintptr_t)__end - (uintptr_t)__ptr + 1;                                                     \
+        (rv) ? (__deduced_size) : (__dEFAULT_size);                                                                   \
     })
 
 /* The following dEFAULT macro argument implementation was based on https://stackoverflow.com/a/3048361 */

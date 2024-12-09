@@ -234,13 +234,7 @@ static inline void destroy_flatten_pointer(struct flatten_pointer* fp) {
             FLATTEN_LOG_DEBUG(fmt, ##__VA_ARGS__); \
     } while(0)
 
-#define DBGS(M, ...)                                flat_dbg(M, ##__VA_ARGS__)
-#define DBGM1(name, a1)                             flat_dbg(#name "(" #a1 ")\n")
-#define DBGOF(name, F, FMT, P, Q)                   flat_dbg(#name "(" #F "[" FMT "])\n", P, Q)
-#define DBGTNFOMF(name, T, N, F, FMT, P, Q, PF, FF) flat_dbg(#name "(" #T "," #N "," #F "[" FMT "]," #PF "," #FF ")\n", P, Q)
-#define DBGM3(name, a1, a2, a3)                     flat_dbg(#name "(" #a1 "," #a2 "," #a3 ")\n")
-#define DBGM4(name, a1, a2, a3, a4)                 flat_dbg(#name "(" #a1 "," #a2 "," #a3 "," #a4 ")\n")
-#define DBGM5(name, a1, a2, a3, a4, a5)             flat_dbg(#name "(" #a1 "," #a2 "," #a3 "," #a4 "," #a5 ")\n")
+#define DBGS(M, ...) flat_dbg(M, ##__VA_ARGS__)
 
 /*************************************
  * HELPER MACROS
