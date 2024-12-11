@@ -1227,7 +1227,7 @@ add_custom_target(${{TARGET_NAME}} ALL DEPENDS kflat_core ${{RECIPE_SOURCE_NAME}
 			if record_string not in self.additional_custom_recipe_deps:
 				self.additional_custom_recipe_deps[record_string] = set()
 			self.additional_custom_recipe_deps[record_string].add(depstring)
-			m = self.include_pattern.search(s)
+			m = self.adddep_pattern.search(s)
 		return s
 
 	def resolve_additional_custom_recipe_deps(self,record_string):
