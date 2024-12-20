@@ -540,7 +540,7 @@
             break;                                                                                             \
         __p = (const T*)((unsigned char*)(_ptr) + OFF);                                                        \
         if(!FLAT_ACCESSOR->error) {                                                                            \
-            struct flatten_pointer* fptr = flatten_plain_type(FLAT_ACCESSOR, __p, (el_cnt)*SIZE);              \
+            struct flatten_pointer* fptr = flatten_plain_type(FLAT_ACCESSOR, __p, (el_cnt) * SIZE);            \
             if(fptr == NULL) {                                                                                 \
                 DBGS("AGGREGATE_FLATTEN_GENERIC_COMPOUND_TYPE_STORAGE_FLEXIBLE:flatten_plain_type(): NULL\n"); \
                 FLAT_ACCESSOR->error = EFAULT;                                                                 \
@@ -624,7 +624,7 @@
 #define AGGREGATE_FLATTEN_GENERIC(FULL_TYPE, TARGET, N, f, _off, n, CUSTOM_VAL, pre_f, post_f, _shift)                                     \
     do {                                                                                                                                   \
         size_t count = (n);                                                                                                                \
-        DBGS("AGGREGATE_FLATTEN_GENERIC(%s, %s, N:0x%zu, off:0x%zu, n:0x%zu)\n", #FULL_TYPE, #f, (size_t)N, (size_t)_off, (size_t)count);  \
+        DBGS("AGGREGATE_FLATTEN_GENERIC(%s, %s, N:%zu, off:%zu, n:%zu)\n", #FULL_TYPE, #f, (size_t)N, (size_t)_off, (size_t)count);        \
         DBGS("  \\-> FULL_TYPE [%llx:%zu -> %llx]\n", (unsigned long long)_ptr, (size_t)_off, (unsigned long long)OFFATTRN(_off, _shift)); \
         if(((uintptr_t)(pre_f) != 0) || ((uintptr_t)(post_f) != 0))                                                                        \
             DBGS("  \\-> PRE_F[%llx]; POST_F[%llx]\n", (unsigned long long)pre_f, (unsigned long long)post_f);                             \
@@ -771,7 +771,7 @@
 
 #define AGGREGATE_FLATTEN_TYPE_ARRAY(T, f, n)                                                                                 \
     do {                                                                                                                      \
-        DBGS("AGGREGATE_FLATTEN_TYPE_ARRAY(%s, %s, n:0x%zu)\n", #T, #f, (size_t)n);                                           \
+        DBGS("AGGREGATE_FLATTEN_TYPE_ARRAY(%s, %s, n:%zu)\n", #T, #f, (size_t)n);                                             \
         if((!FLAT_ACCESSOR->error) && (ADDR_RANGE_VALID(ATTR(f), (n) * sizeof(T)))) {                                         \
             size_t _off = offsetof(_container_type, f);                                                                       \
             struct flat_node* __node = flat_interval_tree_iter_first(&FLAT_ACCESSOR->FLCTRL.imap_root, (uint64_t)_ptr + _off, \
@@ -793,7 +793,7 @@
 
 #define AGGREGATE_FLATTEN_COMPOUND_TYPE_ARRAY_SELF_CONTAINED(T, N, f, _off, n)                                                                                     \
     do {                                                                                                                                                           \
-        DBGS("AGGREGATE_FLATTEN_COMPOUND_TYPE_ARRAY_SELF_CONTAINED(%s, %s, N:0x%zu, off:0x%zu, n:0x%zu)\n", #T, #f, (size_t)N, (size_t)_off, (size_t)n);           \
+        DBGS("AGGREGATE_FLATTEN_COMPOUND_TYPE_ARRAY_SELF_CONTAINED(%s, %s, N:%zu, off:%zu, n:%zu)\n", #T, #f, (size_t)N, (size_t)_off, (size_t)n);                 \
         DBGS("  \\->OFFATTR[%llx]\n", (unsigned long long)OFFATTR(void*, _off));                                                                                   \
         if((!FLAT_ACCESSOR->error) && (ADDR_RANGE_VALID(OFFATTR(void*, _off), (n) * (N)))) {                                                                       \
             struct flat_node* __node = flat_interval_tree_iter_first(&FLAT_ACCESSOR->FLCTRL.imap_root, (uint64_t)_ptr + _off,                                      \
@@ -802,7 +802,7 @@
                 FLAT_ACCESSOR->error = EFAULT;                                                                                                                     \
             } else {                                                                                                                                               \
                 int err = fixup_set_insert_force_update(FLAT_ACCESSOR, __node, (uint64_t)_ptr - __node->start + _off,                                              \
-                                                        flatten_plain_type(FLAT_ACCESSOR, OFFATTR(void*, _off), (n)*N));                                           \
+                                                        flatten_plain_type(FLAT_ACCESSOR, OFFATTR(void*, _off), (n) * N));                                         \
                 if((err) && (err != EEXIST) && (err != EAGAIN)) {                                                                                                  \
                     FLAT_ACCESSOR->error = err;                                                                                                                    \
                 }                                                                                                                                                  \
