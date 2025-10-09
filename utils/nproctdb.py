@@ -659,7 +659,7 @@ static void* {1} = NULL;"""
 	##  - recipe module name
 	##  - list of object files for the interface module
 	template_cmake_recipes = """# Auto-generated CMake file
-set(KBUILD_CMD $(MAKE) M=${{CMAKE_CURRENT_BINARY_DIR}} src=${{CMAKE_CURRENT_SOURCE_DIR}} ${{KBUILD_FLAGS}} modules)
+set(KBUILD_CMD ${{CMAKE_MAKE_PROGRAM}} M=${{CMAKE_CURRENT_BINARY_DIR}} src=${{CMAKE_CURRENT_SOURCE_DIR}} ${{KBUILD_FLAGS}} modules)
 set(RECIPE_SOURCE_NAME {1})
 set(TARGET_NAME {0})
 

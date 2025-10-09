@@ -62,7 +62,7 @@ KFLAT_RECIPE_MODULE("<Description of your module>");
 To add new kflat recipe, upload `.c`/`.h` files to the new directory and copy the CMakeLists.txt.template file (rename it to CMakeLists.txt).
 The CMakeLists.txt should look as follows:
 ```cmake
-set(KBUILD_CMD $(MAKE) M=${CMAKE_CURRENT_BINARY_DIR} src=${CMAKE_CURRENT_SOURCE_DIR} ${KBUILD_FLAGS} modules)
+set(KBUILD_CMD ${CMAKE_MAKE_PROGRAM} M=${CMAKE_CURRENT_BINARY_DIR} src=${CMAKE_CURRENT_SOURCE_DIR} ${KBUILD_FLAGS} modules)
 # Edit these two lines
 set(RECIPE_SOURCE_NAME edit_me0)
 set(TARGET_NAME edit_me1)
@@ -134,7 +134,7 @@ add_dependencies(external_recipes ${EXTERNAL_RECIPES})
 
 #### external/example1/CMakeLists.txt
 ```cmake
-set(KBUILD_CMD $(MAKE) M=${CMAKE_CURRENT_BINARY_DIR} src=${CMAKE_CURRENT_SOURCE_DIR} ${KBUILD_FLAGS} modules)
+set(KBUILD_CMD ${CMAKE_MAKE_PROGRAM} M=${CMAKE_CURRENT_BINARY_DIR} src=${CMAKE_CURRENT_SOURCE_DIR} ${KBUILD_FLAGS} modules)
 set(RECIPE_SOURCE_NAME example1_recipe)
 set(TARGET_NAME example1)
 
@@ -155,7 +155,7 @@ add_custom_target(${TARGET_NAME} ALL DEPENDS kflat_core ${RECIPE_SOURCE_NAME})
 
 #### external/example2/CMakeLists.txt
 ```cmake
-set(KBUILD_CMD $(MAKE) M=${CMAKE_CURRENT_BINARY_DIR} src=${CMAKE_CURRENT_SOURCE_DIR} ${KBUILD_FLAGS} modules)
+set(KBUILD_CMD ${CMAKE_MAKE_PROGRAM} M=${CMAKE_CURRENT_BINARY_DIR} src=${CMAKE_CURRENT_SOURCE_DIR} ${KBUILD_FLAGS} modules)
 set(RECIPE_SOURCE_NAME example2_recipe)
 set(TARGET_NAME example2)
 
