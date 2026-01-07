@@ -439,8 +439,10 @@ int fixup_set_reserve_address(struct flat* flat, uintptr_t addr) {
             new_node = &((*new_node)->rb_left);
         else if(data->offset > ADDR_KEY(this_node))
             new_node = &((*new_node)->rb_right);
-        else
+        else {
+            flat_free(data);
             return EEXIST;
+        }
     }
 
     /* Add new node and rebalance tree. */
@@ -486,8 +488,10 @@ int fixup_set_reserve(struct flat* flat, struct flat_node* node, size_t offset) 
             new_node = &((*new_node)->rb_left);
         else if(ADDR_KEY(data) > ADDR_KEY(this_node))
             new_node = &((*new_node)->rb_right);
-        else
+        else {
+            flat_free(data);
             return EEXIST;
+        }
     }
 
     /* Add new node and rebalance tree. */
@@ -522,6 +526,8 @@ int fixup_set_update(struct flat* flat, struct flat_node* node, size_t offset, s
             return EFAULT;
         }
         rb_erase(&inode->node, &flat->FLCTRL.fixup_set_root.rb_root);
+        flat_free(inode->ptr);
+        flat_free(inode);
         return fixup_set_insert(flat, node, offset, ptr, flags);
     }
 
@@ -596,6 +602,7 @@ int fixup_set_insert(struct flat* flat, struct flat_node* node, size_t offset, s
             new_node = &((*new_node)->rb_right);
         else {
             DBGS("fixup_set_insert(...): EEXIST\n");
+            flat_free(data);
             return EEXIST;
         }
     }
@@ -672,7 +679,7 @@ int fixup_set_insert_force_update(struct flat* flat, struct flat_node* node, siz
             new_node = &((*new_node)->rb_right);
         else {
             flat_free((void*)data->ptr);
-            data->ptr = ptr;
+            flat_free(data);
             return EAGAIN;
         }
     }
@@ -736,8 +743,10 @@ int fixup_set_insert_fptr(struct flat* flat, struct flat_node* node, size_t offs
             new_node = &((*new_node)->rb_left);
         else if(ADDR_KEY(data) > ADDR_KEY(this_node))
             new_node = &((*new_node)->rb_right);
-        else
+        else {
+            flat_free(data);
             return EEXIST;
+        }
     }
 
     /* Add new node and rebalance tree. */
@@ -797,8 +806,7 @@ int fixup_set_insert_fptr_force_update(struct flat* flat, struct flat_node* node
             new_node = &((*new_node)->rb_right);
         else {
             flat_free((void*)data->ptr);
-            data->ptr = (struct flatten_pointer*)fptr;
-            data->flags = FIXUP_FUNC_POINTER;
+            flat_free(data);
             return EAGAIN;
         }
     }
