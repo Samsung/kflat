@@ -122,7 +122,7 @@ int binary_stream_calculate_index(struct flat* flat) {
         struct blstream* prev = list_prev_entry(ptr, head);
         if(ptr->alignment && index != 0) {
             if(ptr->alignment > 128) {
-                flat_errs("Invalid ptr->alignment(%zu) in blstream node", ptr->alignment);
+                flat_errs("Invalid ptr->alignment(%hu) in blstream node", ptr->alignment);
                 return EINVAL;
             }
 
@@ -946,7 +946,6 @@ static int mem_fragment_index_write(struct flat* flat, size_t* wcounter_p) {
     struct rb_node* p = rb_first(&flat->FLCTRL.imap_root.rb_root);
     size_t index = 0;
     size_t fragment_size = 0;
-    size_t mcount = 0;
     while(p) {
         struct flat_node* node = (struct flat_node*)p;
         fragment_size += node->storage->size;
@@ -964,7 +963,6 @@ static int mem_fragment_index_write(struct flat* flat, size_t* wcounter_p) {
                 FLATTEN_WRITE_ONCE(&fragment_size, sizeof(size_t), wcounter_p);
             }
             fragment_size = 0;
-            mcount++;
         }
     };
 
@@ -976,7 +974,6 @@ static int mem_fragment_index_debug_print(struct flat* flat) {
     struct rb_node* p = rb_first(&flat->FLCTRL.imap_root.rb_root);
     size_t index = 0;
     size_t fragment_size = 0;
-    size_t mcount = 0;
     FLATTEN_LOG_DEBUG("# Fragment list\n");
     while(p) {
         struct flat_node* node = (struct flat_node*)p;
@@ -991,7 +988,6 @@ static int mem_fragment_index_debug_print(struct flat* flat) {
                 FLATTEN_LOG_DEBUG("%08zu [%zu]\n", index, fragment_size);
             }
             fragment_size = 0;
-            mcount++;
         }
     };
 
@@ -1472,7 +1468,6 @@ EXPORT_FUNC(flatten_acquire_node_for_ptr);
 
 void flatten_generic(struct flat* flat, void* q, struct flatten_pointer* fptr, const void* p, size_t el_size, size_t count, uintptr_t custom_val, flatten_struct_t func_ptr, unsigned long shift) {
     int err;
-    size_t i;
     struct flatten_pointer* __shifted;
     struct flat_node* __ptr_node;
     const void* _fp = (const void*)((char*)p + shift);
@@ -1508,24 +1503,18 @@ void flatten_generic(struct flat* flat, void* q, struct flatten_pointer* fptr, c
         struct fixup_set_node* struct_inode;
         err = 0;
 
-        for(i = 0; i < count; ++i) {
-            const void* target = (char*)_fp + i * el_size;
-            struct_inode = fixup_set_search(flat, (uint64_t)target);
-            if(!struct_inode) {
-                struct flatten_job job = {0};
+        struct_inode = fixup_set_search(flat, (uint64_t)_fp);
+        if(!struct_inode) {
+            struct flatten_job job = {0};
 
-                int err = fixup_set_reserve_address(flat, (uint64_t)target);
-                if(err)
-                    break;
-
-                job.size = 1;
+            int err = fixup_set_reserve_address(flat, (uint64_t)_fp);
+            if(!err) {
+                job.size = count;
                 job.custom_val = custom_val;
-                job.index = i;
-                job.ptr = (struct flatten_base*)target;
+                job.index = 0;
+                job.ptr = (struct flatten_base*)_fp;
                 job.fun = func_ptr;
                 err = bqueue_push_back(flat, (struct bqueue*)q, &job, sizeof(struct flatten_job));
-                if(err)
-                    break;
             }
         }
 
@@ -1544,7 +1533,6 @@ void flatten_aggregate_generic(struct flat* flat, void* q, const void* _ptr,
     const void* _fp = 0;
     struct flatten_pointer* __shifted;
     struct fixup_set_node* __struct_inode;
-    size_t _i;
 
     _p = (void*)OFFATTR(const void*, _off);
     if(pre_f)
@@ -1593,35 +1581,15 @@ void flatten_aggregate_generic(struct flat* flat, void* q, const void* _ptr,
         return;
 
     err = 0;
-    for(_i = 0; _i < count; ++_i) {
-        struct flat_node* __struct_node = flat_interval_tree_iter_first(
-            &flat->FLCTRL.imap_root,
-            (uint64_t)((char*)_fp + _i * el_size),
-            (uint64_t)((char*)_fp + (_i + 1) * el_size - 1));
-        if(__struct_node == NULL) {
-            err = EFAULT;
-            break;
-        }
-
-        __struct_inode = fixup_set_search(flat, (uint64_t)((char*)_fp + _i * el_size));
-        if(!__struct_inode) {
-            struct flatten_job __job;
-            int err = fixup_set_reserve_address(flat, (uint64_t)((char*)_fp + _i * el_size));
-            if(err)
-                break;
-            __job.node = 0;
-            __job.offset = 0;
-            __job.size = 1;
-            __job.custom_val = (uintptr_t)custom_val;
-            __job.index = _i;
-            __job.ptr = (struct flatten_base*)((char*)_fp + _i * el_size);
-            __job.fun = func_ptr;
-            __job.fp = 0;
-            __job.convert = 0;
-            err = bqueue_push_back(flat, (struct bqueue*)q, &__job, sizeof(struct flatten_job));
-            if(err)
-                break;
-        }
+    __struct_inode = fixup_set_search(flat, (uint64_t)_fp);
+    if(!__struct_inode && !fixup_set_reserve_address(flat, (uint64_t)_fp)) {
+        struct flatten_job job = {0};
+        job.size = count;
+        job.custom_val = (uintptr_t)custom_val;
+        job.index = 0;
+        job.ptr = (struct flatten_base*)_fp;
+        job.fun = func_ptr;
+        err = bqueue_push_back(flat, (struct bqueue*)q, &job, sizeof(struct flatten_job));
     }
     if(err && (err != EEXIST))
         flat->error = err;
@@ -1631,8 +1599,7 @@ EXPORT_FUNC(flatten_aggregate_generic);
 void flatten_aggregate_generic_storage(struct flat* flat, void* q, const void* _ptr,
                                        size_t el_size, size_t count, uintptr_t custom_val, ssize_t _off, flatten_struct_t func_ptr) {
     int err = 0;
-    void* target;
-    struct flatten_job job;
+    struct flatten_job job = {0};
     struct fixup_set_node* inode;
     void* _fp = (unsigned char*)_ptr + _off;
 
@@ -1641,32 +1608,22 @@ void flatten_aggregate_generic_storage(struct flat* flat, void* q, const void* _
         return;
     }
 
-    for(size_t i = 0; i < count; ++i) {
-        target = (unsigned char*)_ptr + _off + i * el_size;
-        if(flat->error)
-            break;
+    inode = fixup_set_search(flat, (uintptr_t)_fp);
+    if(!inode)
+        err = fixup_set_reserve_address(flat, (uintptr_t)_fp);
 
-        inode = fixup_set_search(flat, (uintptr_t)target);
-        if(!inode)
-            err = fixup_set_reserve_address(flat, (uintptr_t)target);
-
-        if(err && err != EEXIST) {
-            flat->error = err;
-            DBGS("AGGREGATE_FLATTEN_GENERIC_STORAGE: error(%d)\n", flat->error);
-            break;
-        }
-
-        job.node = 0;
-        job.offset = 0;
-        job.size = 1;
-        job.custom_val = custom_val;
-        job.index = i;
-        job.ptr = (struct flatten_base*)target;
-        job.fun = func_ptr;
-        job.fp = 0;
-        job.convert = 0;
-        bqueue_push_back(flat, (struct bqueue*)q, &job, sizeof(struct flatten_job));
+    if(err && err != EEXIST) {
+        flat->error = err;
+        DBGS("AGGREGATE_FLATTEN_GENERIC_STORAGE: error(%d)\n", flat->error);
+        return;
     }
+
+    job.size = count;
+    job.custom_val = custom_val;
+    job.index = 0;
+    job.ptr = (struct flatten_base*)_fp;
+    job.fun = func_ptr;
+    bqueue_push_back(flat, (struct bqueue*)q, &job, sizeof(struct flatten_job));
 }
 EXPORT_FUNC(flatten_aggregate_generic_storage);
 
@@ -1690,7 +1647,6 @@ struct flatten_pointer* flatten_plain_type(struct flat* flat, const void* _ptr, 
 
     node_offset = (uintptr_t)_ptr - node->start;
     node->storage->alignment = align_array[(uintptr_t)_ptr % 8];
-    node->storage->align_offset = node_offset;
 
     flat_ptr = make_flatten_pointer(flat, node, node_offset);
     if(!flat_ptr) {
@@ -1722,20 +1678,9 @@ void flatten_run_iter_harness(struct flat* flat) {
         }
 
         fp = job.fun(flat, job.ptr, job.size, job.custom_val, job.index, bq);
-        if(job.convert != NULL)
-            fp = job.convert((struct flatten_pointer*)fp, job.ptr);
-
-        if(job.node != NULL) {
-            err = fixup_set_insert_force_update(flat, job.node, job.offset, (struct flatten_pointer*)fp);
-            if(err && err != EINVAL && err != EEXIST && err != EAGAIN) {
-                flat->error = err;
-                break;
-            }
-        } else {
-            if(!fp)
-                break;
-            flat_free(fp);
-        }
+        if(!fp)
+            break;
+        flat_free(fp);
 
         n++;
         now = ktime_get();

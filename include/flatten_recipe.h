@@ -14,28 +14,37 @@
 /*************************************
  * FUNCTION_FLATTEN macros for ARRAYS
  *************************************/
+static const short align_array[] = {8, 1, 2, 1, 4, 1, 2, 1};
+
 #define FUNCTION_DEFINE_FLATTEN_GENERIC_ARRAY(FUNC_NAME, TARGET_FUNC, FULL_TYPE, FLSIZE)                                                             \
     struct flatten_pointer* FUNC_NAME(struct flat* flat, const void* ptr, size_t n, uintptr_t custom_val, unsigned long index, struct bqueue* __q) { \
         size_t _i;                                                                                                                                   \
-        void* _fp_first = NULL;                                                                                                                      \
+        struct flat_node* __node;                                                                                                                    \
+        struct flatten_pointer* r = 0;                                                                                                               \
+        size_t _node_offset;                                                                                                                         \
         const FULL_TYPE* _ptr = (const FULL_TYPE*)ptr;                                                                                               \
         DBGS("%s(%llx,%zu)\n", __func__, (unsigned long long)_ptr, n);                                                                               \
+                                                                                                                                                     \
         AGGREGATE_FLATTEN_ASSERT(n < INT_MAX, EINVAL); /* Limit array size to some sane value */                                                     \
+        __node = flatten_acquire_node_for_ptr(FLAT_ACCESSOR, (void*)ptr, n * (FLSIZE));                                                              \
+                                                                                                                                                     \
         for(_i = 0; _i < n; ++_i) {                                                                                                                  \
-            void* _fp = (void*)TARGET_FUNC(flat, (FULL_TYPE*)((unsigned char*)_ptr + _i * FLSIZE), custom_val, index, __q);                          \
-            if(_fp == NULL) {                                                                                                                        \
-                flat_free(_fp_first);                                                                                                                \
-                _fp_first = NULL;                                                                                                                    \
-                break;                                                                                                                               \
+            TARGET_FUNC(flat, (FULL_TYPE*)((unsigned char*)_ptr + _i * FLSIZE), custom_val, index, __q);                                             \
+            if(flat->error) {                                                                                                                        \
+                DBGS("%s(%llx): %d\n", __func__, (unsigned long long)_ptr, flat->error);                                                             \
+                return NULL;                                                                                                                         \
             }                                                                                                                                        \
-            if(_fp_first == NULL)                                                                                                                    \
-                _fp_first = _fp;                                                                                                                     \
-            else                                                                                                                                     \
-                flat_free(_fp);                                                                                                                      \
         }                                                                                                                                            \
-        if(flat->error)                                                                                                                              \
-            return NULL;                                                                                                                             \
-        return _fp_first;                                                                                                                            \
+                                                                                                                                                     \
+        _node_offset = (uint64_t)_ptr - __node->start;                                                                                               \
+        __node->storage->alignment = align_array[(uintptr_t)ptr % 8];                                                                                \
+        r = make_flatten_pointer(flat, __node, _node_offset);                                                                                        \
+        if(!r) {                                                                                                                                     \
+            flat->error = ENOMEM;                                                                                                                    \
+            DBGS("%s(%llx): ENOMEM\n", __func__, (unsigned long long)_ptr);                                                                          \
+            return 0;                                                                                                                                \
+        }                                                                                                                                            \
+        return r;                                                                                                                                    \
     }
 
 /* We assume that when we have an array to structure type that contains flexible array members we cannot have more than single element of this array
@@ -141,13 +150,8 @@
 #define FUNCTION_DEFINE_FLATTEN_GENERIC_BASE(FUNC_NAME, FULL_TYPE, FLSIZE, ...)                                                          \
                                                                                                                                          \
     struct flatten_pointer* FUNC_NAME(struct flat* flat, const void* ptr, uintptr_t __cval, unsigned long __index, struct bqueue* __q) { \
-                                                                                                                                         \
-        static const short align_array[] = {8, 1, 2, 1, 4, 1, 2, 1};                                                                     \
-        struct flat_node* __node;                                                                                                        \
+        size_t _alignment __attribute__((unused)) = align_array[(uintptr_t)ptr % 8];                                                     \
         typedef FULL_TYPE _container_type __attribute__((unused));                                                                       \
-        size_t _alignment = align_array[(uintptr_t)ptr % 8];                                                                             \
-        struct flatten_pointer* r = 0;                                                                                                   \
-        size_t _node_offset;                                                                                                             \
         const FULL_TYPE* _ptr = (const FULL_TYPE*)ptr;                                                                                   \
         size_t type_size = FLSIZE;                                                                                                       \
         if(type_size == SIZE_MAX) {                                                                                                      \
@@ -157,29 +161,10 @@
         }                                                                                                                                \
                                                                                                                                          \
         DBGS("%s(%llx): [%zu]\n", __func__, (unsigned long long)_ptr, type_size);                                                        \
-        __node = flatten_acquire_node_for_ptr(FLAT_ACCESSOR, (void*)ptr, type_size);                                                     \
                                                                                                                                          \
         __VA_ARGS__                                                                                                                      \
-        if(flat->error) {                                                                                                                \
-            DBGS("%s(%llx): %d\n", __func__, (unsigned long long)_ptr, flat->error);                                                     \
-            return 0;                                                                                                                    \
-        }                                                                                                                                \
-        __node = flat_interval_tree_iter_first(&flat->FLCTRL.imap_root, (uint64_t)_ptr, (uint64_t)_ptr + sizeof(void*) - 1);             \
-        if(__node == 0) {                                                                                                                \
-            flat->error = EFAULT;                                                                                                        \
-            DBGS("%s(%llx): EFAULT (__node==0)\n", __func__, (unsigned long long)_ptr);                                                  \
-            return 0;                                                                                                                    \
-        }                                                                                                                                \
-        _node_offset = (uint64_t)_ptr - __node->start;                                                                                   \
-        __node->storage->alignment = _alignment;                                                                                         \
-        __node->storage->align_offset = _node_offset;                                                                                    \
-        r = make_flatten_pointer(flat, __node, _node_offset);                                                                            \
-        if(!r) {                                                                                                                         \
-            flat->error = ENOMEM;                                                                                                        \
-            DBGS("%s(%llx): ENOMEM\n", __func__, (unsigned long long)_ptr);                                                              \
-            return 0;                                                                                                                    \
-        }                                                                                                                                \
-        return r;                                                                                                                        \
+                                                                                                                                         \
+        return NULL;                                                                                                                     \
     }
 
 #define FUNCTION_DEFINE_FLATTEN_STRUCT(FLTYPE, ...)                                                                  \
@@ -540,7 +525,7 @@
             break;                                                                                             \
         __p = (const T*)((unsigned char*)(_ptr) + OFF);                                                        \
         if(!FLAT_ACCESSOR->error) {                                                                            \
-            struct flatten_pointer* fptr = flatten_plain_type(FLAT_ACCESSOR, __p, (el_cnt) * SIZE);            \
+            struct flatten_pointer* fptr = flatten_plain_type(FLAT_ACCESSOR, __p, (el_cnt)*SIZE);              \
             if(fptr == NULL) {                                                                                 \
                 DBGS("AGGREGATE_FLATTEN_GENERIC_COMPOUND_TYPE_STORAGE_FLEXIBLE:flatten_plain_type(): NULL\n"); \
                 FLAT_ACCESSOR->error = EFAULT;                                                                 \
@@ -802,7 +787,7 @@
                 FLAT_ACCESSOR->error = EFAULT;                                                                                                                     \
             } else {                                                                                                                                               \
                 int err = fixup_set_insert_force_update(FLAT_ACCESSOR, __node, (uint64_t)_ptr - __node->start + _off,                                              \
-                                                        flatten_plain_type(FLAT_ACCESSOR, OFFATTR(void*, _off), (n) * N));                                         \
+                                                        flatten_plain_type(FLAT_ACCESSOR, OFFATTR(void*, _off), (n)*N));                                           \
                 if((err) && (err != EEXIST) && (err != EAGAIN)) {                                                                                                  \
                     FLAT_ACCESSOR->error = err;                                                                                                                    \
                 }                                                                                                                                                  \

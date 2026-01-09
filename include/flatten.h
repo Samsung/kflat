@@ -50,8 +50,7 @@ struct blstream {
     void* data;
     size_t size;
     size_t index;
-    size_t alignment;
-    size_t align_offset;
+    unsigned short alignment;
 };
 
 struct FLCONTROL {
@@ -146,16 +145,17 @@ typedef struct flatten_pointer* (*flatten_struct_iter_f)(struct flat* flat, cons
 typedef struct flatten_pointer* (*flatten_struct_f)(struct flat* flat, const void* _ptr);
 
 struct flatten_job {
-    struct flat_node* node;
-    size_t offset;
     size_t size;
     uintptr_t custom_val;
     unsigned long index;
     struct flatten_base* ptr;
     flatten_struct_t fun;
+
+#if 0 /* FIXME: figure out if this fields will be useful in the future */
     /* Mixed pointer support */
     const struct flatten_base* fp;
     flatten_struct_embedded_convert_t convert;
+#endif
 };
 
 #define START(node) ((node)->start)
