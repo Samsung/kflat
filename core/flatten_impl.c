@@ -1749,13 +1749,13 @@ void flatten_run_iter_harness(struct flat* flat) {
                 flat->error = EAGAIN;
                 break;
             }
-            flat_infos("Still working! done %lu recipes in total time %lld [ms], memory used: %zu, memory avail: %zu \n",
+            flat_infos("Still working! done %lu recipes in total time %lld [us], memory used: %zu, memory avail: %zu \n",
                        n, total_time / NSEC_PER_MSEC, flat->mptrindex, flat->msize);
             init_time = ktime_get();
         }
     }
     total_time += ktime_get() - init_time;
-    flat_infos("Done working with %lu recipes in total time %lld [ms], memory used: %zu, memory avail: %zu \n",
+    flat_infos("Done working with %lu recipes in total time %lld [us], memory used: %zu, memory avail: %zu \n",
                n, total_time / NSEC_PER_MSEC, flat->mptrindex, flat->msize);
 }
 EXPORT_FUNC(flatten_run_iter_harness);
